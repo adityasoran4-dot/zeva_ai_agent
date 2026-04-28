@@ -4753,7 +4753,12 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
                         <div className="flex items-center justify-between mb-1">
                           <label className="text-[10px] font-semibold text-gray-600">Total Amount <span className="text-red-500">*</span></label>
                         </div>
-                        <input type="number" step="0.01" value={formData.amount || "0.00"} readOnly
+                        <input type="number" step="0.01" value={(() => {
+                          const amount = parseFloat(formData.amount || "0") || 0;
+                          const decimal = amount - Math.floor(amount);
+                          // Apply rounding rule: if decimal > 0.5, round up
+                          return decimal > 0.5 ? Math.ceil(amount) : Math.floor(amount);
+                        })()} readOnly
                           className="w-full px-2.5 py-1.5 text-xs border border-gray-200 rounded-lg bg-gray-100 text-gray-900 font-bold"
                         />
                         {parseFloat(formData.pendingUsed || "0") > 0 && (
@@ -4829,7 +4834,10 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
                                 : 0;
                               
                               const netDue = Math.max(0, amountForCredits - appliedAdvance - appliedPast50 - appliedPast54 - appliedPast159);
-                              return netDue.toFixed(2);
+                              // Apply rounding rule: if decimal > 0.5, round up
+                              const decimal = netDue - Math.floor(netDue);
+                              const roundedNetDue = decimal > 0.5 ? Math.ceil(netDue) : Math.floor(netDue);
+                              return roundedNetDue.toFixed(0);
                             })()
                           }
                           {isDoctorDiscountApplied && (
@@ -4875,105 +4883,110 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
                       </div>
                     </div>
 
-                    {/* Cashback Balance Options */}
-                    {availableCashback && availableCashback.amount > 0 && (
-                      <div className="mt-3">
-                        <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-3 space-y-2">
-                          <h4 className="text-[10px] font-bold text-green-800 uppercase tracking-wider mb-2 flex items-center gap-1">
-                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
-                            </svg>
-                            Available Cashback
-                          </h4>
-                         
-                          <label className="flex items-center justify-between cursor-pointer group">
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="checkbox"
-                                checked={useCashback}
-                                onChange={(e) => {
-                                  setUseCashback(e.target.checked);
-                                  console.log('[CashbackModal] Use cashback:', e.target.checked);
-                                }}
-                                className="w-3.5 h-3.5 text-green-600 rounded focus:ring-green-500 border-gray-300"
-                              />
-                              <span className="text-[10px] font-medium text-gray-700 group-hover:text-gray-900">Use cashback balance now</span>
+                    {/* Cashback and Advance Balance Options - Side by Side */}
+                    {(availableCashback && availableCashback.amount > 0) || (balances.advanceBalance > 0 || balances.pastAdvance159FlatBalance > 0 || balances.pastAdvance50PercentBalance > 0 || balances.pastAdvance54PercentBalance > 0) ? (
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        {/* Cashback Balance Options */}
+                        {availableCashback && availableCashback.amount > 0 && (
+                          <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-2 space-y-1">
+                            <h4 className="text-[9px] font-bold text-green-800 uppercase tracking-wider mb-1 flex items-center gap-1">
+                              <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                              </svg>
+                              Available Cashback
+                            </h4>
+                           
+                            <label className="flex items-center justify-between cursor-pointer group">
+                              <div className="flex items-center gap-1.5">
+                                <input
+                                  type="checkbox"
+                                  checked={useCashback}
+                                  onChange={(e) => {
+                                    setUseCashback(e.target.checked);
+                                    console.log('[CashbackModal] Use cashback:', e.target.checked);
+                                  }}
+                                  className="w-3 h-3 text-green-600 rounded focus:ring-green-500 border-gray-300"
+                                />
+                                <span className="text-[9px] font-medium text-gray-700 group-hover:text-gray-900">Use now</span>
+                              </div>
+                              <span className="text-[9px] font-bold text-green-700 bg-green-100 px-1.5 py-0.5 rounded-full">
+                                {getCurrencySymbol(currency)} {availableCashback.amount.toFixed(2)}
+                              </span>
+                            </label>
+                            
+                            <div className="text-[8px] text-green-600">
+                              Expires: {new Date(availableCashback.expiryDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} ({availableCashback.daysRemaining} days)
                             </div>
-                            <span className="text-[10px] font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
-                              {getCurrencySymbol(currency)} {availableCashback.amount.toFixed(2)}
-                            </span>
-                          </label>
-                          
-                          <div className="text-[9px] text-green-600 mt-1">
-                            Expires: {new Date(availableCashback.expiryDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} ({availableCashback.daysRemaining} days remaining)
                           </div>
+                        )}
+
+                        {/* Advance Balance Options */}
+                        {(balances.advanceBalance > 0 || balances.pastAdvance159FlatBalance > 0 || balances.pastAdvance50PercentBalance > 0 || balances.pastAdvance54PercentBalance > 0) && (
+                          <div className="bg-gradient-to-r from-teal-50 to-blue-50 border border-teal-200 rounded-lg p-2 space-y-1">
+                            <h4 className="text-[9px] font-bold text-teal-800 uppercase tracking-wider mb-1 flex items-center gap-1">
+                              <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z"/>
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z" clipRule="evenodd"/>
+                              </svg>
+                              Available Advances
+                            </h4>
+                           
+                            {/* Regular Advance Balance */}
+                            {balances.advanceBalance > 0 && (
+                              <label className="flex items-center justify-between cursor-pointer group">
+                                <div className="flex items-center gap-1.5">
+                                  <input
+                                    type="checkbox"
+                                    checked={applyAdvance}
+                                    onChange={(e) => setApplyAdvance(e.target.checked)}
+                                    className="w-3 h-3 text-teal-600 rounded focus:ring-teal-500 border-gray-300"
+                                  />
+                                  <span className="text-[9px] font-medium text-gray-700 group-hover:text-gray-900">Use now</span>
+                                </div>
+                                <span className="text-[9px] font-bold text-teal-700 bg-teal-100 px-1.5 py-0.5 rounded-full">
+                                  {getCurrencySymbol(currency)} {balances.advanceBalance.toFixed(2)}
+                                </span>
+                              </label>
+                            )}
+
+                            {/* 159 Flat Past Advance (if available) */}
+                            {balances.pastAdvance159FlatBalance > 0 && (
+                              <label className="flex items-center justify-between cursor-pointer group">
+                                <div className="flex items-center gap-1.5">
+                                  <input
+                                    type="checkbox"
+                                    checked={applyPastAdvance159Flat}
+                                    onChange={(e) => setApplyPastAdvance159Flat(e.target.checked)}
+                                    className="w-3 h-3 text-orange-600 rounded focus:ring-orange-500 border-gray-300"
+                                  />
+                                  <span className="text-[9px] font-medium text-gray-700 group-hover:text-gray-900">159 Flat</span>
+                                </div>
+                                <span className="text-[9px] font-bold text-orange-700 bg-orange-100 px-1.5 py-0.5 rounded-full">
+                                  {getCurrencySymbol(currency)} {balances.pastAdvance159FlatBalance.toFixed(2)}
+                                </span>
+                              </label>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ) : null}
+
+                    {/* Summary of applied advances */}
+                    {(applyAdvance || applyPastAdvance50Percent || applyPastAdvance54Percent || applyPastAdvance159Flat) && (
+                      <div className="mt-2 pt-2 border-t border-teal-200">
+                        <div className="flex items-center justify-between text-[10px]">
+                          <span className="font-semibold text-gray-700">Total Applied:</span>
+                          <span className="font-bold text-teal-700">
+                            {getCurrencySymbol(currency)} {(
+                              (applyAdvance ? Math.min(balances.advanceBalance, parseFloat(formData.amount) || 0) : 0) +
+                              (applyPastAdvance50Percent ? Math.min(balances.pastAdvance50PercentBalance, parseFloat(formData.amount) || 0) : 0) +
+                              (applyPastAdvance54Percent ? Math.min(balances.pastAdvance54PercentBalance, parseFloat(formData.amount) || 0) : 0) +
+                              (applyPastAdvance159Flat ? Math.min(balances.pastAdvance159FlatBalance, parseFloat(formData.amount) || 0) : 0)
+                            ).toFixed(2)}
+                          </span>
                         </div>
                       </div>
                     )}
-
-                    {/* Advance Balance Options */}
-                    <div className="mt-3">
-                      <div className="bg-gradient-to-r from-teal-50 to-blue-50 border border-teal-200 rounded-xl p-3 space-y-2">
-                        <h4 className="text-[10px] font-bold text-teal-800 uppercase tracking-wider mb-2 flex items-center gap-1">
-                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z"/>
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z" clipRule="evenodd"/>
-                          </svg>
-                          Available Advances
-                        </h4>
-                       
-                        {/* Regular Advance Balance */}
-                        <label className="flex items-center justify-between cursor-pointer group">
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="checkbox"
-                              checked={applyAdvance}
-                              onChange={(e) => setApplyAdvance(e.target.checked)}
-                              className="w-3.5 h-3.5 text-teal-600 rounded focus:ring-teal-500 border-gray-300"
-                            />
-                            <span className="text-[10px] font-medium text-gray-700 group-hover:text-gray-900">Use advance balance now</span>
-                          </div>
-                          <span className="text-[10px] font-bold text-teal-700 bg-teal-100 px-2 py-0.5 rounded-full">
-                            {getCurrencySymbol(currency)} {balances.advanceBalance.toFixed(2)}
-                          </span>
-                        </label>
-
-                        {/* 159 Flat Past Advance (if available) */}
-                        {balances.pastAdvance159FlatBalance > 0 && (
-                          <label className="flex items-center justify-between cursor-pointer group">
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="checkbox"
-                                checked={applyPastAdvance159Flat}
-                                onChange={(e) => setApplyPastAdvance159Flat(e.target.checked)}
-                                className="w-3.5 h-3.5 text-orange-600 rounded focus:ring-orange-500 border-gray-300"
-                              />
-                              <span className="text-[10px] font-medium text-gray-700 group-hover:text-gray-900">Use 159 Flat past advance now</span>
-                            </div>
-                            <span className="text-[10px] font-bold text-orange-700 bg-orange-100 px-2 py-0.5 rounded-full">
-                              {getCurrencySymbol(currency)} {balances.pastAdvance159FlatBalance.toFixed(2)}
-                            </span>
-                          </label>
-                        )}
-
-                        {/* Summary of applied advances */}
-                        {(applyAdvance || applyPastAdvance50Percent || applyPastAdvance54Percent || applyPastAdvance159Flat) && (
-                          <div className="mt-2 pt-2 border-t border-teal-200">
-                            <div className="flex items-center justify-between text-[10px]">
-                              <span className="font-semibold text-gray-700">Total Applied:</span>
-                              <span className="font-bold text-teal-700">
-                                {getCurrencySymbol(currency)} {(
-                                  (applyAdvance ? Math.min(balances.advanceBalance, parseFloat(formData.amount) || 0) : 0) +
-                                  (applyPastAdvance50Percent ? Math.min(balances.pastAdvance50PercentBalance, parseFloat(formData.amount) || 0) : 0) +
-                                  (applyPastAdvance54Percent ? Math.min(balances.pastAdvance54PercentBalance, parseFloat(formData.amount) || 0) : 0) +
-                                  (applyPastAdvance159Flat ? Math.min(balances.pastAdvance159FlatBalance, parseFloat(formData.amount) || 0) : 0)
-                                ).toFixed(2)}
-                              </span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
 
                     <div className="mt-2">
                       <button type="button"
@@ -5442,7 +5455,7 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
                         <span className="text-[10px] text-gray-500">Loading packages...</span>
                       </div>
                     ) : (
-                      <div className="space-y-2">
+                      <div className="space-y-2" style={{ maxHeight: 'calc(5 * 80px + 10px)', overflowY: 'auto' }}>
                         {/* Combine regular packages and userPackages */}
                         {(() => {
                           const purchasedPackages = (patientDetails?.packages || []).filter((p: any) => {
