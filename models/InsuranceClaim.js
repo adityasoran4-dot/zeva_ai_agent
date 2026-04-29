@@ -163,6 +163,78 @@ const InsuranceClaimSchema = new mongoose.Schema(
       ref: "User",
       default: null,
     },
+    rejectedFromPassClaimsByName: {
+      type: String,
+      default: "",
+    },
+    rejectedFromPassClaimsByRole: {
+      type: String,
+      default: "",
+    },
+
+    // Approval tracking (by doctorStaff in all-claims)
+    approvedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    approvedByName: {
+      type: String,
+      default: "",
+    },
+    approvedByRole: {
+      type: String,
+      default: "",
+    },
+    approvedAt: {
+      type: Date,
+      default: null,
+    },
+
+    // Rejection tracking (by doctorStaff in all-claims)
+    rejectedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    rejectedByName: {
+      type: String,
+      default: "",
+    },
+    rejectedByRole: {
+      type: String,
+      default: "",
+    },
+    rejectedAt: {
+      type: Date,
+      default: null,
+    },
+
+    // Release tracking (by clinic/agent in pass-claims)
+    releasedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    releasedByName: {
+      type: String,
+      default: "",
+    },
+    releasedByRole: {
+      type: String,
+      default: "",
+    },
+    releasedAt: {
+      type: Date,
+      default: null,
+    },
+
+    // Pending claim amount (remaining amount for Advance + Partial Pay type)
+    pendingClaim: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
 
     // Patient info denormalized for quick display
     patientFirstName: {

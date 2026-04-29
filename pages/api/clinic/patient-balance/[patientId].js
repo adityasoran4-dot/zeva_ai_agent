@@ -1,5 +1,6 @@
 import dbConnect from "../../../../lib/database";
 import Billing from "../../../../models/Billing";
+import InsuranceClaim from "../../../../models/InsuranceClaim";
 import { getUserFromReq } from "../../lead-ms/auth";
 
 export default async function handler(req, res) {
@@ -171,11 +172,23 @@ export default async function handler(req, res) {
       ),
     );
 
+    // Aggregate pendingClaim from insurance claims (Advance + Partial Pay)
+    const claimMatch = { patientId };
+    if (clinicId) claimMatch.clinicId = clinicId;
+    const claims = await InsuranceClaim.find(claimMatch)
+      .select("pendingClaim status")
+      .lean();
+    let totalPendingClaim = 0;
+    for (const c of claims) {
+      totalPendingClaim += Number(c.pendingClaim || 0);
+    }
+    
     return res.status(200).json({
       success: true,
       balances: {
         advanceBalance,
         pendingBalance,
+        pendingClaim: Math.max(0, Number(totalPendingClaim.toFixed(2))),
         pastAdvanceBalance,
         pastAdvance50PercentBalance,
         pastAdvance54PercentBalance,

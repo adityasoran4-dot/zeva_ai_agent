@@ -139,15 +139,20 @@ export default async function handler(req, res) {
         if (advanceStatus !== undefined) {
           claim.advanceStatus = advanceStatus;
         }
-        // Recalculate advanceAmount
+        // Recalculate advanceAmount and pendingClaim
         if (claim.advanceStatus === "Full Pay") {
           claim.advanceAmount = claim.claimAmount;
+          claim.pendingClaim = 0;
         } else if (claim.advanceStatus === "Partial Pay") {
           claim.advanceAmount = claim.claimAmount * 0.5;
+          claim.pendingClaim = claim.claimAmount * 0.5;
+        } else {
+          claim.pendingClaim = 0;
         }
       } else {
         claim.advanceStatus = null;
         claim.advanceAmount = 0;
+        claim.pendingClaim = 0;
       }
 
       // Reset status to Under Review when edited from Rejected

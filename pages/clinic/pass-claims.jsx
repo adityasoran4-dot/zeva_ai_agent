@@ -48,9 +48,9 @@ function PassClaimsPage() {
       const headers = getAuthHeaders();
       const res = await axios.get("/api/clinic/insurance-claims", { headers });
       if (res.data.success) {
-        // Only show Approved and Rejected claims (already reviewed by doctor)
+        // Only show Approved, Rejected, and Released claims (already reviewed by doctor)
         const reviewedClaims = (res.data.data || []).filter(
-          (c) => c.status === "Approved" || c.status === "Rejected"
+          (c) => c.status === "Approved" || c.status === "Rejected" || c.status === "Released"
         );
         setClaims(reviewedClaims);
       }
@@ -142,14 +142,16 @@ function PassClaimsPage() {
     const styles = {
       Approved: "bg-green-100 text-green-800 border-green-300",
       Rejected: "bg-red-100 text-red-800 border-red-300",
+      Released: "bg-blue-100 text-blue-800 border-blue-300",
     };
     return styles[status] || "bg-gray-100 text-gray-800 border-gray-300";
   };
 
-  const tabs = ["Approved", "Rejected"];
+  const tabs = ["Approved", "Rejected", "Released"];
   const tabCounts = {
     Approved: claims.filter((c) => c.status === "Approved").length,
     Rejected: claims.filter((c) => c.status === "Rejected").length,
+    Released: claims.filter((c) => c.status === "Released").length,
   };
 
   const formatDate = (dateString) => {
@@ -257,10 +259,15 @@ function PassClaimsPage() {
                 <div className={`px-4 py-2 border-b ${getStatusBadge(claim.status)}`}>
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-semibold">
-                      {claim.status === "Approved" ? "✓ Approved" : "✗ Rejected"}
+                      {claim.status === "Approved" ? "✓ Approved" : claim.status === "Rejected" ? "✗ Rejected" : "✓ Released"}
                     </span>
                     <span className="text-xs">
-                      {formatDate(claim.reviewedAt)}
+                      {claim.status === "Approved" 
+                        ? formatDate(claim.approvedAt)
+                        : claim.status === "Rejected"
+                        ? formatDate(claim.rejectedAt)
+                        : formatDate(claim.releasedAt)
+                      }
                     </span>
                   </div>
                 </div>
@@ -277,8 +284,25 @@ function PassClaimsPage() {
 
                   {/* Doctor Info */}
                   <div>
-                    <p className="text-xs text-gray-500 uppercase font-semibold">Reviewed By</p>
-                    <p className="text-sm font-medium text-gray-900">{claim.doctorName}</p>
+                    <p className="text-xs text-gray-500 uppercase font-semibold">
+                      {claim.status === "Released" ? "Released By" : "Reviewed By"}
+                    </p>
+                    <p className="text-sm font-medium text-gray-900">
+                      {claim.status === "Approved" 
+                        ? claim.approvedByName || claim.doctorName
+                        : claim.status === "Rejected"
+                        ? claim.rejectedByName || claim.doctorName
+                        : claim.releasedByName || claim.doctorName
+                      }
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {claim.status === "Approved" 
+                        ? (claim.approvedByRole ? claim.approvedByRole.charAt(0).toUpperCase() + claim.approvedByRole.slice(1) : "")
+                        : claim.status === "Rejected"
+                        ? (claim.rejectedByRole ? claim.rejectedByRole.charAt(0).toUpperCase() + claim.rejectedByRole.slice(1) : "")
+                        : (claim.releasedByRole ? claim.releasedByRole.charAt(0).toUpperCase() + claim.releasedByRole.slice(1) : "")
+                      }
+                    </p>
                   </div>
 
                   {/* Insurance Info */}
@@ -505,7 +529,7 @@ function PassClaimsPage() {
             <div className={`px-6 py-4 border-b ${getStatusBadge(viewModal.status)}`}>
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-bold">
-                  {viewModal.status === "Approved" ? "✓ Approved Claim" : "✗ Rejected Claim"}
+                  {viewModal.status === "Approved" ? "✓ Approved Claim" : viewModal.status === "Rejected" ? "✗ Rejected Claim" : "✓ Released Claim"}
                 </h2>
                 <button
                   onClick={() => setViewModal(null)}
@@ -539,11 +563,24 @@ function PassClaimsPage() {
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div>
                     <p className="text-teal-700">Reviewed By</p>
-                    <p className="font-medium text-teal-900">{viewModal.doctorName}</p>
+                    <p className="font-medium text-teal-900">
+                      {viewModal.status === "Approved" 
+                        ? viewModal.approvedByName || viewModal.doctorName
+                        : viewModal.rejectedByName || viewModal.doctorName
+                      }
+                    </p>
+                    <p className="text-xs text-teal-700 capitalize">
+                      {viewModal.status === "Approved" 
+                        ? (viewModal.approvedByRole || "")
+                        : (viewModal.rejectedByRole || "")
+                      }
+                    </p>
                   </div>
                   <div>
                     <p className="text-teal-700">Reviewed At</p>
-                    <p className="font-medium text-teal-900">{formatDate(viewModal.reviewedAt)}</p>
+                    <p className="font-medium text-teal-900">
+                      {formatDate(viewModal.status === "Approved" ? viewModal.approvedAt : viewModal.rejectedAt)}
+                    </p>
                   </div>
                 </div>
               </div>

@@ -56,11 +56,12 @@ export default async function handler(req, res) {
       }
     }
 
-    // Only claims with "Under Review" status can be reviewed
-    if (claim.status !== "Under Review") {
+    // Allow reviewing claims with "Under Review", "Approved", or "Rejected" status
+    // This allows reverting already reviewed claims back to the opposite status
+    if (!["Under Review", "Approved", "Rejected"].includes(claim.status)) {
       return res.status(400).json({
         success: false,
-        message: `Cannot review claim with status "${claim.status}". Only "Under Review" claims can be reviewed.`,
+        message: `Cannot review claim with status "${claim.status}". Only "Under Review", "Approved", or "Rejected" claims can be reviewed.`,
       });
     }
 
@@ -72,9 +73,28 @@ export default async function handler(req, res) {
     // Update claim status
     if (action === "approve") {
       claim.status = "Approved";
+      claim.approvedBy = user._id;
+      claim.approvedByName = user.name || user.firstName || "";
+      claim.approvedByRole = user.role;
+      claim.approvedAt = new Date();
+      // Clear rejection fields if reverting from Rejected to Approved
+      claim.rejectedBy = null;
+      claim.rejectedByName = "";
+      claim.rejectedByRole = "";
+      claim.rejectedAt = null;
+      claim.rejectionReason = "";
     } else {
       claim.status = "Rejected";
-      claim.rejectionReason = rejectionReason.trim();
+      claim.rejectionReason = rejectionReason?.trim() || "";
+      claim.rejectedBy = user._id;
+      claim.rejectedByName = user.name || user.firstName || "";
+      claim.rejectedByRole = user.role;
+      claim.rejectedAt = new Date();
+      // Clear approval fields if reverting from Approved to Rejected
+      claim.approvedBy = null;
+      claim.approvedByName = "";
+      claim.approvedByRole = "";
+      claim.approvedAt = null;
     }
 
     claim.reviewedBy = user._id;

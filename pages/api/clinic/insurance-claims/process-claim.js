@@ -68,6 +68,8 @@ export default async function handler(req, res) {
       // Release claim - mark as Released (final status)
       claim.status = "Released";
       claim.releasedBy = user._id;
+      claim.releasedByName = user.name || user.firstName || "";
+      claim.releasedByRole = user.role;
       claim.releasedAt = new Date();
     } else if (action === "reject") {
       // Reject claim back to doctor - reset to Under Review
@@ -80,6 +82,8 @@ export default async function handler(req, res) {
       claim.rejectedFromPassClaims = true;
       claim.rejectedFromPassClaimsAt = new Date();
       claim.rejectedFromPassClaimsBy = user._id;
+      claim.rejectedFromPassClaimsByName = user.name || user.firstName || "";
+      claim.rejectedFromPassClaimsByRole = user.role;
     }
 
     await claim.save();
