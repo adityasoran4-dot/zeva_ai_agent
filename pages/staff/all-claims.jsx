@@ -296,7 +296,7 @@ function AllClaimsPage() {
           />
         </div>
 
-        {/* Claims Table */}
+        {/* Claims Cards Grid */}
         {filteredClaims.length === 0 ? (
           <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
             <FileText className="w-12 h-12 text-gray-300 mx-auto mb-3" />
@@ -306,98 +306,205 @@ function AllClaimsPage() {
             </p>
           </div>
         ) : (
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-100">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Patient</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Claim Type</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Department</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Service</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Amount</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Co-Pay</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Created</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-100">
-                  {paginatedClaims.map((claim) => (
-                    <tr key={claim._id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
-                          {claim.patientFirstName} {claim.patientLastName}
-                        </div>
-                        <div className="text-xs text-gray-500">{claim.patientMobileNumber}</div>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${
-                          claim.claimType === "Advance" ? "bg-orange-100 text-orange-800" : "bg-blue-100 text-blue-800"
-                        }`}>
-                          {claim.claimType}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">{claim.departmentName || "-"}</td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">{claim.serviceName || "-"}</td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-gray-900">
-                        {claim.claimAmount?.toLocaleString()}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
-                        <div>{claim.coPayPercent}%</div>
-                        <div className="text-xs text-gray-500">{claim.coPayType}</div>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold border ${getStatusBadge(claim.status)}`}>
-                          {claim.status}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-500">
-                        {new Date(claim.createdAt).toLocaleDateString()}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => setViewModal(claim)}
-                            className="p-1.5 text-gray-500 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
-                            title="View Details"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          {claim.status === "Under Review" && (
-                            <>
-                              <button
-                                onClick={() => handleApprove(claim._id)}
-                                disabled={actionLoading}
-                                className="p-1.5 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg transition-colors disabled:opacity-50"
-                                title="Approve"
-                              >
-                                <CheckCircle className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => { setRejectModal(claim); setRejectionReason(""); }}
-                                className="p-1.5 text-red-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                title="Reject"
-                              >
-                                <XCircle className="w-4 h-4" />
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {paginatedClaims.map((claim) => (
+              <div
+                key={claim._id}
+                className="bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow overflow-hidden"
+              >
+                {/* Card Header - Status */}
+                <div className={`px-4 py-2 border-b ${getStatusBadge(claim.status)}`}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold flex items-center gap-1">
+                      {claim.status === "Under Review" && <Clock className="w-3.5 h-3.5" />}
+                      {claim.status === "Approved" && <CheckCircle className="w-3.5 h-3.5" />}
+                      {claim.status === "Rejected" && <XCircle className="w-3.5 h-3.5" />}
+                      {claim.status === "Released" && <CheckCircle className="w-3.5 h-3.5" />}
+                      {claim.status}
+                    </span>
+                    <span className="text-xs">{new Date(claim.createdAt).toLocaleDateString()}</span>
+                  </div>
+                </div>
 
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50">
-                <p className="text-xs text-gray-600">
-                  Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, filteredClaims.length)} of {filteredClaims.length}
-                </p>
-                <div className="flex items-center gap-1">
+                {/* Card Body */}
+                <div className="p-4 space-y-3">
+                  {/* Patient Info */}
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase font-semibold">Patient</p>
+                    <p className="text-sm font-medium text-gray-900">
+                      {claim.patientFirstName} {claim.patientLastName}
+                    </p>
+                    <p className="text-xs text-gray-500">{claim.patientMobileNumber}</p>
+                  </div>
+
+                  {/* Status-specific Action Info */}
+                  {claim.status === "Approved" && claim.approvedByName && (
+                    <div className="bg-green-50 rounded-md p-2 border border-green-200">
+                      <p className="text-xs text-green-600 uppercase font-semibold mb-1 flex items-center gap-1">
+                        <CheckCircle className="w-3 h-3" />
+                        Approved By
+                      </p>
+                      <p className="text-sm font-medium text-gray-900">
+                        {claim.approvedByName}
+                        <span className="text-gray-500 capitalize ml-1">({claim.approvedByRole})</span>
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {claim.approvedAt ? new Date(claim.approvedAt).toLocaleString() : ""}
+                      </p>
+                    </div>
+                  )}
+
+                  {claim.status === "Rejected" && claim.rejectedByName && (
+                    <div className="bg-red-50 rounded-md p-2 border border-red-200">
+                      <p className="text-xs text-red-600 uppercase font-semibold mb-1 flex items-center gap-1">
+                        <XCircle className="w-3 h-3" />
+                        Rejected By
+                      </p>
+                      <p className="text-sm font-medium text-gray-900">
+                        {claim.rejectedByName}
+                        <span className="text-gray-500 capitalize ml-1">({claim.rejectedByRole})</span>
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {claim.rejectedAt ? new Date(claim.rejectedAt).toLocaleString() : ""}
+                      </p>
+                    </div>
+                  )}
+
+                  {claim.status === "Released" && claim.releasedByName && (
+                    <div className="bg-blue-50 rounded-md p-2 border border-blue-200">
+                      <p className="text-xs text-blue-600 uppercase font-semibold mb-1 flex items-center gap-1">
+                        <CheckCircle className="w-3 h-3" />
+                        Released By
+                      </p>
+                      <p className="text-sm font-medium text-gray-900">
+                        {claim.releasedByName}
+                        <span className="text-gray-500 capitalize ml-1">({claim.releasedByRole})</span>
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {claim.releasedAt ? new Date(claim.releasedAt).toLocaleString() : ""}
+                      </p>
+                    </div>
+                  )}
+
+                  {claim.status === "Under Review" && claim.rejectedFromPassClaims === true && (
+                    <div className="bg-red-50 rounded-md p-2 border border-red-200">
+                      <p className="text-xs text-red-600 font-semibold flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" />
+                        Rejected Back from Pass-Claims
+                      </p>
+                      <p className="text-xs text-red-700 mt-1">{claim.reviewNotes}</p>
+                      {claim.rejectedFromPassClaimsByName && (
+                        <p className="text-xs text-gray-600 mt-2">
+                          Rejected by: {claim.rejectedFromPassClaimsByName}
+                          <span className="text-gray-500 capitalize ml-1">({claim.rejectedFromPassClaimsByRole})</span>
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Claim Details */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <p className="text-xs text-gray-500">Claim Type</p>
+                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${
+                        claim.claimType === "Advance" ? "bg-orange-100 text-orange-800" : "bg-blue-100 text-blue-800"
+                      }`}>
+                        {claim.claimType}
+                      </span>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Amount</p>
+                      <p className="text-sm font-semibold text-gray-900">₹{claim.claimAmount?.toLocaleString()}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <p className="text-xs text-gray-500">Department</p>
+                      <p className="text-sm text-gray-900 truncate">{claim.departmentName || "N/A"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Co-Pay</p>
+                      <p className="text-sm text-gray-900">{claim.coPayPercent}%</p>
+                    </div>
+                  </div>
+
+                  {/* Insurance Info */}
+                  <div>
+                    <p className="text-xs text-gray-500">Insurance</p>
+                    <p className="text-sm text-gray-900 truncate">{claim.insuranceProvider} - {claim.policyNumber}</p>
+                  </div>
+                </div>
+
+                {/* Card Footer - Actions */}
+                <div className="px-4 py-3 border-t border-gray-200 bg-gray-50 flex items-center justify-between">
+                  <span className="text-xs text-gray-500">
+                    #{claim._id?.slice(-6)}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setViewModal(claim)}
+                      className="flex items-center gap-1 px-3 py-1.5 bg-gray-600 text-white text-xs font-medium rounded-md hover:bg-gray-700 transition-colors"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      View
+                    </button>
+                    {claim.status === "Under Review" && (
+                      <>
+                        <button
+                          onClick={() => handleApprove(claim._id)}
+                          disabled={actionLoading}
+                          className="flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded-md hover:bg-green-700 transition-colors disabled:opacity-50"
+                          title="Approve"
+                        >
+                          <CheckCircle className="w-3.5 h-3.5" />
+                          Approve
+                        </button>
+                        <button
+                          onClick={() => { setRejectModal(claim); setRejectionReason(""); }}
+                          className="flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white text-xs font-medium rounded-md hover:bg-red-700 transition-colors"
+                          title="Reject"
+                        >
+                          <XCircle className="w-3.5 h-3.5" />
+                          Reject
+                        </button>
+                      </>
+                    )}
+                    {claim.status === "Approved" && (
+                      <button
+                        onClick={() => { setRejectModal(claim); setRejectionReason(""); }}
+                        className="flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white text-xs font-medium rounded-md hover:bg-red-700 transition-colors"
+                        title="Reject"
+                      >
+                        <XCircle className="w-3.5 h-3.5" />
+                        Reject
+                      </button>
+                    )}
+                    {claim.status === "Rejected" && (
+                      <button
+                        onClick={() => handleApprove(claim._id)}
+                        disabled={actionLoading}
+                        className="flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded-md hover:bg-green-700 transition-colors disabled:opacity-50"
+                        title="Approve"
+                      >
+                        <CheckCircle className="w-3.5 h-3.5" />
+                        Approve
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 mt-4 bg-white rounded-lg border border-gray-200">
+            <p className="text-xs text-gray-600">
+              Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, filteredClaims.length)} of {filteredClaims.length}
+            </p>
+            <div className="flex items-center gap-1">
                   <button
                     onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                     disabled={currentPage === 1}
@@ -414,10 +521,8 @@ function AllClaimsPage() {
                     Next
                   </button>
                 </div>
-              </div>
-            )}
-          </div>
-        )}
+            </div>
+          )}
 
         {/* View Detail Modal */}
         {viewModal && (
@@ -445,6 +550,59 @@ function AllClaimsPage() {
                 </button>
               </div>
               <div className="p-6 space-y-5">
+                {/* Reviewer Tracking Section */}
+                {(viewModal.approvedByName || viewModal.rejectedByName || viewModal.releasedByName) && (
+                  <div className="bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 rounded-lg p-4">
+                    <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Review History
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {viewModal.approvedByName && (
+                        <div className="bg-white rounded-lg p-3 border border-green-200">
+                          <div className="flex items-center gap-2 mb-2">
+                            <CheckCircle className="w-4 h-4 text-green-600" />
+                            <span className="text-xs font-semibold text-green-800 uppercase">Approved</span>
+                          </div>
+                          <p className="text-sm font-medium text-gray-900">{viewModal.approvedByName}</p>
+                          <p className="text-xs text-gray-600 capitalize">{viewModal.approvedByRole}</p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {viewModal.approvedAt ? new Date(viewModal.approvedAt).toLocaleString() : ""}
+                          </p>
+                        </div>
+                      )}
+                      {viewModal.rejectedByName && (
+                        <div className="bg-white rounded-lg p-3 border border-red-200">
+                          <div className="flex items-center gap-2 mb-2">
+                            <XCircle className="w-4 h-4 text-red-600" />
+                            <span className="text-xs font-semibold text-red-800 uppercase">Rejected</span>
+                          </div>
+                          <p className="text-sm font-medium text-gray-900">{viewModal.rejectedByName}</p>
+                          <p className="text-xs text-gray-600 capitalize">{viewModal.rejectedByRole}</p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {viewModal.rejectedAt ? new Date(viewModal.rejectedAt).toLocaleString() : ""}
+                          </p>
+                        </div>
+                      )}
+                      {viewModal.releasedByName && (
+                        <div className="bg-white rounded-lg p-3 border border-blue-200">
+                          <div className="flex items-center gap-2 mb-2">
+                            <CheckCircle className="w-4 h-4 text-blue-600" />
+                            <span className="text-xs font-semibold text-blue-800 uppercase">Released</span>
+                          </div>
+                          <p className="text-sm font-medium text-gray-900">{viewModal.releasedByName}</p>
+                          <p className="text-xs text-gray-600 capitalize">{viewModal.releasedByRole}</p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {viewModal.releasedAt ? new Date(viewModal.releasedAt).toLocaleString() : ""}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {/* Patient & Insurance Info */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>

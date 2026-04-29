@@ -585,6 +585,34 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
   const [claimDepartments, setClaimDepartments] = useState<any[]>([]);
   const [claimServices, setClaimServices] = useState<any[]>([]);
   const [claimDoctors, setClaimDoctors] = useState<any[]>([]);
+  // New claim form state
+  const [showNewClaimForm, setShowNewClaimForm] = useState(false);
+  const [newClaimSubmitting, setNewClaimSubmitting] = useState(false);
+  const [newClaimUploadingFiles, setNewClaimUploadingFiles] = useState(false);
+  const [newClaimData, setNewClaimData] = useState<any>({
+    insuranceProvider: "",
+    policyNumber: "",
+    expiryDate: "",
+    insuranceCardFile: "",
+    tableOfBenefitsFile: "",
+    departmentId: "",
+    departmentName: "",
+    serviceId: "",
+    serviceName: "",
+    doctorId: "",
+    doctorName: "",
+    claimAmount: "",
+    claimType: "Paid",
+    coPayPercent: "",
+    coPayType: "Patient Pays",
+    notes: "",
+    documentFiles: [],
+    advanceStatus: "Full Pay",
+    advanceAmount: 0,
+  });
+  const [newClaimDepartments, setNewClaimDepartments] = useState<any[]>([]);
+  const [newClaimServices, setNewClaimServices] = useState<any[]>([]);
+  const [newClaimDoctors, setNewClaimDoctors] = useState<any[]>([]);
   
   // Financial snapshot state - initialized from patientData.initialBalance if available
   const [financialData, setFinancialData] = useState({
@@ -597,6 +625,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
   const [balance, setBalance] = useState({
     pendingBalance: Number(patientData?.initialBalance?.pendingBalance || 0),
     advanceBalance: Number(patientData?.initialBalance?.advanceBalance || 0),
+    pendingClaim: Number(patientData?.initialBalance?.pendingClaim || 0),
     pastAdvanceBalance: Number(patientData?.initialBalance?.pastAdvanceBalance || 0),
     pastAdvance50PercentBalance: Number(patientData?.initialBalance?.pastAdvance50PercentBalance || 0),
     pastAdvance54PercentBalance: Number(patientData?.initialBalance?.pastAdvance54PercentBalance || 0),
@@ -1335,7 +1364,6 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
       color: 'text-purple-600',
       bgColor: 'bg-purple-100'
     },
-    
     {
       label: 'Insurance Claims Pending',
       value: loadingStats ? '...' : statsData.insuranceClaimsPending,
@@ -2522,6 +2550,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
       return {
         pendingBalance: Number(data.pendingBalance || 0),
         advanceBalance: Number(data.advanceBalance || 0),
+        pendingClaim: Number(data.pendingClaim || 0),
         pastAdvanceBalance: Number(data.pastAdvanceBalance || 0),
         pastAdvance50PercentBalance: Number(data.pastAdvance50PercentBalance || 0),
         pastAdvance54PercentBalance: Number(data.pastAdvance54PercentBalance || 0),
@@ -2529,12 +2558,13 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
         pendingBalanceImages: Array.isArray(data.pendingBalanceImages) ? data.pendingBalanceImages : [],
       };
     } catch {
-      return { 
-        pendingBalance: 0, 
-        advanceBalance: 0, 
-        pastAdvanceBalance: 0, 
-        pastAdvance50PercentBalance: 0, 
-        pastAdvance54PercentBalance: 0, 
+      return {
+        pendingBalance: 0,
+        advanceBalance: 0,
+        pendingClaim: 0,
+        pastAdvanceBalance: 0,
+        pastAdvance50PercentBalance: 0,
+        pastAdvance54PercentBalance: 0,
         pastAdvance159FlatBalance: 0,
         pendingBalanceImages: [],
       };
@@ -2622,6 +2652,197 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
     });
     setClaimEditModal(claim);
     fetchClaimDropdowns();
+  };
+
+  // Fetch dropdowns for new claim form
+  const fetchNewClaimDropdowns = async () => {
+    try {
+      const headers = getAuthHeaders();
+      if (!headers) return;
+      const [deptRes, svcRes, docRes] = await Promise.all([
+        axios.get("/api/clinic/departments", { headers }),
+        axios.get("/api/clinic/services", { headers }),
+        axios.get("/api/admin/get-all-doctor-staff", { headers }),
+      ]);
+      if (deptRes.data.success) setNewClaimDepartments(deptRes.data.departments || []);
+      if (svcRes.data.success) setNewClaimServices(svcRes.data.services || []);
+      if (docRes.data.success) setNewClaimDoctors(docRes.data.data || []);
+    } catch (err) {
+      console.error("Error fetching new claim dropdowns:", err);
+    }
+  };
+
+  // Handle new claim field changes
+  const handleNewClaimChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setNewClaimData((prev: any) => {
+      const updated = { ...prev, [name]: value };
+      if (name === "claimAmount" || name === "advanceStatus") {
+        const amt = name === "claimAmount" ? parseFloat(value) || 0 : parseFloat(prev.claimAmount) || 0;
+        const status = name === "advanceStatus" ? value : prev.advanceStatus;
+        if (prev.claimType === "Advance") {
+          updated.advanceAmount = status === "Full Pay" ? amt : amt * 0.5;
+        }
+      }
+      if (name === "claimType" && value !== "Advance") {
+        updated.advanceStatus = "Full Pay";
+        updated.advanceAmount = 0;
+      }
+      if (name === "claimType" && value === "Advance") {
+        const amt = parseFloat(prev.claimAmount) || 0;
+        updated.advanceAmount = prev.advanceStatus === "Full Pay" ? amt : amt * 0.5;
+      }
+      return updated;
+    });
+  };
+
+  const handleNewClaimDepartmentChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const deptId = e.target.value;
+    const dept = newClaimDepartments.find((d: any) => d._id === deptId);
+    setNewClaimData((prev: any) => ({
+      ...prev,
+      departmentId: deptId,
+      departmentName: dept ? dept.name : "",
+      serviceId: "",
+      serviceName: "",
+    }));
+  };
+
+  const handleNewClaimServiceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const svcId = e.target.value;
+    const svc = newClaimServices.find((s: any) => s._id === svcId);
+    setNewClaimData((prev: any) => ({
+      ...prev,
+      serviceId: svcId,
+      serviceName: svc ? svc.name : "",
+    }));
+  };
+
+  const handleNewClaimDoctorChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const docId = e.target.value;
+    const doc = newClaimDoctors.find((d: any) => d._id === docId);
+    setNewClaimData((prev: any) => ({
+      ...prev,
+      doctorId: docId,
+      doctorName: doc ? doc.name : "",
+    }));
+  };
+
+  const handleNewClaimFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: string) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setNewClaimUploadingFiles(true);
+      const headers = getAuthHeaders();
+      const uploadFormData = new FormData();
+      uploadFormData.append(field, file);
+      const res = await fetch("/api/clinic/insurance-claims/upload", {
+        method: "POST",
+        headers: { Authorization: (headers as any)?.Authorization || "" },
+        body: uploadFormData,
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (field === "insuranceCard") {
+          setNewClaimData((prev: any) => ({ ...prev, insuranceCardFile: data.data.insuranceCardFile }));
+        } else if (field === "tableOfBenefits") {
+          setNewClaimData((prev: any) => ({ ...prev, tableOfBenefitsFile: data.data.tableOfBenefitsFile }));
+        } else if (field === "documents") {
+          setNewClaimData((prev: any) => ({ ...prev, documentFiles: [...prev.documentFiles, ...data.data.documentFiles] }));
+        }
+      }
+    } catch (err) {
+      console.error("File upload error:", err);
+    } finally {
+      setNewClaimUploadingFiles(false);
+    }
+  };
+
+  const handleNewClaimDocumentsUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    try {
+      setNewClaimUploadingFiles(true);
+      const headers = getAuthHeaders();
+      const uploadFormData = new FormData();
+      files.forEach(f => uploadFormData.append("documents", f));
+      const res = await fetch("/api/clinic/insurance-claims/upload", {
+        method: "POST",
+        headers: { Authorization: (headers as any)?.Authorization || "" },
+        body: uploadFormData,
+      });
+      const data = await res.json();
+      if (data.success && data.data.documentFiles) {
+        setNewClaimData((prev: any) => ({ ...prev, documentFiles: [...prev.documentFiles, ...data.data.documentFiles] }));
+      }
+    } catch (err) {
+      console.error("Document upload error:", err);
+    } finally {
+      setNewClaimUploadingFiles(false);
+    }
+  };
+
+  const submitNewClaim = async () => {
+    if (!patientData?._id) return;
+
+    // Calculate total pending claim from all insurance claims
+    const totalPendingClaim = insuranceClaims.reduce((sum, claim) => sum + Number(claim.pendingClaim || 0), 0);
+
+    // Check if patient has pending claim
+    if (totalPendingClaim > 0) {
+      alert(`Cannot create new claim. This patient has a pending claim of ${formatAED(totalPendingClaim)}. Please clear the pending claim first.`);
+      return;
+    }
+
+    try {
+      setNewClaimSubmitting(true);
+      const headers = getAuthHeaders();
+      const res = await fetch("/api/clinic/insurance-claims", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(headers as any) },
+        body: JSON.stringify({
+          patientId: patientData._id,
+          insuranceProvider: newClaimData.insuranceProvider,
+          policyNumber: newClaimData.policyNumber,
+          expiryDate: newClaimData.expiryDate,
+          insuranceCardFile: newClaimData.insuranceCardFile,
+          tableOfBenefitsFile: newClaimData.tableOfBenefitsFile,
+          departmentId: newClaimData.departmentId,
+          departmentName: newClaimData.departmentName,
+          serviceId: newClaimData.serviceId,
+          serviceName: newClaimData.serviceName,
+          doctorId: newClaimData.doctorId,
+          doctorName: newClaimData.doctorName,
+          claimAmount: newClaimData.claimAmount,
+          claimType: newClaimData.claimType,
+          coPayPercent: newClaimData.coPayPercent,
+          coPayType: newClaimData.coPayType,
+          notes: newClaimData.notes,
+          documentFiles: newClaimData.documentFiles,
+          advanceStatus: newClaimData.advanceStatus,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setShowNewClaimForm(false);
+        setNewClaimData({
+          insuranceProvider: "", policyNumber: "", expiryDate: "",
+          insuranceCardFile: "", tableOfBenefitsFile: "",
+          departmentId: "", departmentName: "", serviceId: "", serviceName: "",
+          doctorId: "", doctorName: "", claimAmount: "", claimType: "Paid",
+          coPayPercent: "", coPayType: "Patient Pays", notes: "",
+          documentFiles: [], advanceStatus: "Full Pay", advanceAmount: 0,
+        });
+        fetchInsuranceClaims();
+      } else {
+        alert(data.message || "Failed to create insurance claim");
+      }
+    } catch (err) {
+      console.error("Claim submission error:", err);
+      alert("Failed to create insurance claim");
+    } finally {
+      setNewClaimSubmitting(false);
+    }
   };
 
   // Commented out - not currently used in the UI
@@ -5318,14 +5539,186 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                       <Shield className="w-4 h-4 text-teal-600" />
                     </div>
                     <h3 className="text-base font-semibold text-gray-900">Insurance & Claims</h3>
-                    {patientData?.insurance === 'Yes' ? (
-                      <span className="ml-auto px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">Active</span>
+                    {(patientData?.insurance === 'Yes' || insuranceClaims.length > 0) ? (
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">Active</span>
                     ) : (
-                      <span className="ml-auto px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">Not Enrolled</span>
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">Not Enrolled</span>
                     )}
+                    <button
+                      onClick={() => {
+                        setShowNewClaimForm(v => !v);
+                        if (!showNewClaimForm) fetchNewClaimDropdowns();
+                      }}
+                      className="ml-auto flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-semibold transition-colors"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      New Claim
+                    </button>
                   </div>
 
-                  {patientData?.insurance === 'Yes' ? (
+                  {/* New Claim Form */}
+                  {showNewClaimForm && (
+                    <div className="border-b border-gray-200 bg-gray-50 p-4">
+                      <div className="text-sm font-semibold text-gray-900 mb-3">Create New Insurance Claim</div>
+
+                      {/* Section A: Insurance Details */}
+                      <div className="mb-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                        <div className="text-xs font-semibold text-blue-800 mb-2">Insurance Details (Required)</div>
+                        <div className="flex flex-wrap gap-2 items-end">
+                          <div className="flex-1 min-w-[140px]">
+                            <label className="block text-xs mb-0.5 font-medium text-gray-700">Insurance Provider <span className="text-red-500">*</span></label>
+                            <input type="text" name="insuranceProvider" value={newClaimData.insuranceProvider} onChange={handleNewClaimChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 text-gray-900" placeholder="Provider name" />
+                          </div>
+                          <div className="flex-1 min-w-[140px]">
+                            <label className="block text-xs mb-0.5 font-medium text-gray-700">Policy Number <span className="text-red-500">*</span></label>
+                            <input type="text" name="policyNumber" value={newClaimData.policyNumber} onChange={handleNewClaimChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 text-gray-900" placeholder="Policy number" />
+                          </div>
+                          <div className="flex-1 min-w-[130px]">
+                            <label className="block text-xs mb-0.5 font-medium text-gray-700">Expiry Date <span className="text-red-500">*</span></label>
+                            <input type="date" name="expiryDate" value={newClaimData.expiryDate} onChange={handleNewClaimChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 text-gray-900" />
+                          </div>
+                          <div className="flex-1 min-w-[140px]">
+                            <label className="block text-xs mb-0.5 font-medium text-gray-700">Insurance Card</label>
+                            <input type="file" accept="image/*,.pdf" onChange={(e) => handleNewClaimFileUpload(e, 'insuranceCard')} className="w-full px-1 py-0.5 text-[9px] border border-gray-300 rounded-md text-gray-700 file:mr-1 file:py-0.5 file:px-2 file:rounded file:text-[8px] file:bg-blue-100 file:text-blue-700 file:border-0" disabled={newClaimUploadingFiles} />
+                            {newClaimData.insuranceCardFile && (
+                              <a href={newClaimData.insuranceCardFile} target="_blank" rel="noreferrer" className="text-[9px] text-blue-600 underline mt-0.5 block">View uploaded file</a>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-[140px]">
+                            <label className="block text-xs mb-0.5 font-medium text-gray-700">Table of Benefits</label>
+                            <input type="file" accept="image/*,.pdf" onChange={(e) => handleNewClaimFileUpload(e, 'tableOfBenefits')} className="w-full px-1 py-0.5 text-[9px] border border-gray-300 rounded-md text-gray-700 file:mr-1 file:py-0.5 file:px-2 file:rounded file:text-[8px] file:bg-blue-100 file:text-blue-700 file:border-0" disabled={newClaimUploadingFiles} />
+                            {newClaimData.tableOfBenefitsFile && (
+                              <a href={newClaimData.tableOfBenefitsFile} target="_blank" rel="noreferrer" className="text-[9px] text-blue-600 underline mt-0.5 block">View uploaded file</a>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Section B: Claim Source */}
+                      <div className="mb-3 p-3 bg-green-50 rounded-lg border border-green-200">
+                        <div className="text-xs font-semibold text-green-800 mb-2">Claim Source</div>
+                        <div className="flex flex-wrap gap-2 items-end">
+                          <div className="flex-1 min-w-[140px]">
+                            <label className="block text-xs mb-0.5 font-medium text-gray-700">Department</label>
+                            <select name="departmentId" value={newClaimData.departmentId} onChange={handleNewClaimDepartmentChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-green-500 text-gray-900">
+                              <option value="">Select Department</option>
+                              {newClaimDepartments.map((d: any) => (
+                                <option key={d._id} value={d._id}>{d.name}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="flex-1 min-w-[140px]">
+                            <label className="block text-xs mb-0.5 font-medium text-gray-700">Service</label>
+                            <select name="serviceId" value={newClaimData.serviceId} onChange={handleNewClaimServiceChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-green-500 text-gray-900">
+                              <option value="">Select Service</option>
+                              {newClaimServices.filter((s: any) => !newClaimData.departmentId || String(s.departmentId) === String(newClaimData.departmentId)).map((s: any) => (
+                                <option key={s._id} value={s._id}>{s.name}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="flex-1 min-w-[140px]">
+                            <label className="block text-xs mb-0.5 font-medium text-gray-700">Doctor <span className="text-red-500">*</span></label>
+                            <select name="doctorId" value={newClaimData.doctorId} onChange={handleNewClaimDoctorChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-green-500 text-gray-900">
+                              <option value="">Select Doctor</option>
+                              {newClaimDoctors.map((d: any) => (
+                                <option key={d._id} value={d._id}>{d.name}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="flex-1 min-w-[120px]">
+                            <label className="block text-xs mb-0.5 font-medium text-gray-700">Claim Amount <span className="text-red-500">*</span></label>
+                            <input type="number" name="claimAmount" value={newClaimData.claimAmount} onChange={handleNewClaimChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-green-500 text-gray-900" placeholder="0" min="0" step="0.01" />
+                          </div>
+                          <div className="flex-1 min-w-[120px]">
+                            <label className="block text-xs mb-0.5 font-medium text-gray-700">Claim Type <span className="text-red-500">*</span></label>
+                            <select name="claimType" value={newClaimData.claimType} onChange={handleNewClaimChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-green-500 text-gray-900">
+                              <option value="Paid">Paid</option>
+                              <option value="Advance">Advance</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Section C: Claim Details */}
+                      <div className="mb-3 p-3 bg-purple-50 rounded-lg border border-purple-200">
+                        <div className="text-xs font-semibold text-purple-800 mb-2">Claim Details</div>
+                        <div className="flex flex-wrap gap-2 items-end">
+                          <div className="flex-1 min-w-[120px]">
+                            <label className="block text-xs mb-0.5 font-medium text-gray-700">Co-Pay %</label>
+                            <input type="number" name="coPayPercent" value={newClaimData.coPayPercent} onChange={handleNewClaimChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-purple-500 text-gray-900" placeholder="0-100" min="0" max="100" />
+                          </div>
+                          <div className="flex-1 min-w-[140px]">
+                            <label className="block text-xs mb-0.5 font-medium text-gray-700">Co-Pay Type</label>
+                            <select name="coPayType" value={newClaimData.coPayType} onChange={handleNewClaimChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-purple-500 text-gray-900">
+                              <option value="Patient Pays">Patient Pays</option>
+                              <option value="Deduct from Claim">Deduct from Claim</option>
+                              <option value="Clinic Adjusts">Clinic Adjusts</option>
+                            </select>
+                          </div>
+                          <div className="flex-1 min-w-[140px]">
+                            <label className="block text-xs mb-0.5 font-medium text-gray-700">Notes</label>
+                            <input type="text" name="notes" value={newClaimData.notes} onChange={handleNewClaimChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-purple-500 text-gray-900" placeholder="Additional notes" />
+                          </div>
+                          <div className="flex-1 min-w-[140px]">
+                            <label className="block text-xs mb-0.5 font-medium text-gray-700">Documents</label>
+                            <input type="file" multiple accept="image/*,.pdf" onChange={handleNewClaimDocumentsUpload} className="w-full px-1 py-0.5 text-[9px] border border-gray-300 rounded-md text-gray-700 file:mr-1 file:py-0.5 file:px-2 file:rounded file:text-[8px] file:bg-purple-100 file:text-purple-700 file:border-0" disabled={newClaimUploadingFiles} />
+                            {newClaimData.documentFiles.length > 0 && (
+                              <span className="text-[9px] text-gray-600">{newClaimData.documentFiles.length} file(s) uploaded</span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Advance-specific fields */}
+                        {newClaimData.claimType === 'Advance' && (
+                          <div className="flex flex-wrap gap-2 items-end mt-2 pt-2 border-t border-purple-200">
+                            <div className="flex-1 min-w-[140px]">
+                              <label className="block text-xs mb-0.5 font-medium text-gray-700">Advance Status</label>
+                              <select name="advanceStatus" value={newClaimData.advanceStatus} onChange={handleNewClaimChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-purple-500 text-gray-900">
+                                <option value="Full Pay">Full Pay</option>
+                                <option value="Partial Pay">Partial Pay</option>
+                              </select>
+                            </div>
+                            <div className="flex-1 min-w-[140px]">
+                              <label className="block text-xs mb-0.5 font-medium text-gray-700">Advance Amount (Auto)</label>
+                              <input type="text" value={newClaimData.advanceAmount.toFixed(2)} disabled className="w-full px-2 py-1 text-xs bg-gray-100 border border-gray-300 rounded-md text-gray-900 font-semibold" />
+                            </div>
+                            <div className="flex-1 min-w-[120px]">
+                              <label className="block text-xs mb-0.5 font-medium text-gray-700">Status</label>
+                              <div className="px-2 py-1 text-xs bg-yellow-50 border border-yellow-300 rounded-md text-yellow-800 font-semibold">Under Review</div>
+                            </div>
+                          </div>
+                        )}
+
+                        {newClaimData.claimType === 'Paid' && (
+                          <div className="flex flex-wrap gap-2 items-end mt-2 pt-2 border-t border-purple-200">
+                            <div className="flex-1 min-w-[120px]">
+                              <label className="block text-xs mb-0.5 font-medium text-gray-700">Status</label>
+                              <div className="px-2 py-1 text-xs bg-yellow-50 border border-yellow-300 rounded-md text-yellow-800 font-semibold">Under Review</div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Form action buttons */}
+                      <div className="flex items-center justify-end gap-3 pt-2">
+                        <button
+                          onClick={() => setShowNewClaimForm(false)}
+                          className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={submitNewClaim}
+                          disabled={newClaimSubmitting || newClaimUploadingFiles}
+                          className="px-6 py-2 text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 rounded-lg transition-colors disabled:opacity-50"
+                        >
+                          {newClaimSubmitting ? 'Submitting...' : 'Submit Claim'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {(patientData?.insurance === 'Yes' || insuranceClaims.length > 0) ? (
                     <div className="p-6">
                       {/* Insurance Info */}
                       {insuranceClaims.length > 0 && (
@@ -5368,7 +5761,15 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
 
                       {/* Claims Table */}
                       <div>
-                        <h4 className="text-sm font-semibold text-gray-800 mb-3">Claims</h4>
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="text-sm font-semibold text-gray-800">Claims</h4>
+                          {balance.pendingClaim > 0 && (
+                            <div className="px-3 py-1 bg-orange-50 border border-orange-200 rounded-lg">
+                              <span className="text-xs text-orange-700 font-medium">Pending from Claims: </span>
+                              <span className="text-xs text-orange-800 font-bold">{formatAED(balance.pendingClaim)}</span>
+                            </div>
+                          )}
+                        </div>
                         {claimsLoading ? (
                           <div className="flex justify-center py-8">
                             <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-300 border-t-teal-600"></div>
@@ -5387,6 +5788,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Department</th>
                                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Doctor</th>
                                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Amount</th>
+                                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Pending Claim</th>
                                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Co-Pay</th>
                                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
                                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Created</th>
@@ -5404,6 +5806,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">{claim.departmentName || '-'}</td>
                                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">{claim.doctorName || '-'}</td>
                                     <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-gray-900">{claim.claimAmount?.toLocaleString()}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-orange-700">{claim.pendingClaim > 0 ? claim.pendingClaim.toLocaleString() : '-'}</td>
                                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">{claim.coPayPercent}% ({claim.coPayType})</td>
                                     <td className="px-4 py-3 whitespace-nowrap">
                                       <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
@@ -6720,6 +7123,12 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                          
                           <span className="text-xs font-bold text-emerald-700">Advance: {formatAED(balance.advanceBalance)}</span>
                         </div>
+                        {/* Pending Claim */}
+                        {balance.pendingClaim > 0 && (
+                          <div className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-orange-50 border border-orange-200">
+                            <span className="text-xs font-bold text-orange-700">Pending Claim: {formatAED(balance.pendingClaim)}</span>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -6804,6 +7213,23 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                           </div>
                         </div>
                       </div>
+
+                      {/* Pending Claim */}
+                      {balance.pendingClaim > 0 && (
+                        <div className="flex items-center justify-between p-2 bg-orange-50 border border-orange-100 rounded-md">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-orange-100 flex items-center justify-center">
+                              <svg className="w-3.5 h-3.5 text-orange-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                              </svg>
+                            </div>
+                            <div>
+                              <div className="text-xs text-gray-600 font-medium">Pending Claim</div>
+                              <div className="text-lg font-bold text-orange-700">{formatAED(balance.pendingClaim)}</div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
 
                   {/* Bundle Offers - Earned Free Sessions */}
                   {!loadingBilling && billingHistory && (

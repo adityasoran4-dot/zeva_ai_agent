@@ -131,13 +131,15 @@ export default async function handler(req, res) {
         return res.status(400).json({ success: false, message: "Patient not found" });
       }
 
-      // Calculate advanceAmount
+      // Calculate advanceAmount and pendingClaim
       let advanceAmount = 0;
+      let pendingClaim = 0;
       if (claimType === "Advance" && advanceStatus) {
         if (advanceStatus === "Full Pay") {
           advanceAmount = parseFloat(claimAmount);
         } else if (advanceStatus === "Partial Pay") {
           advanceAmount = parseFloat(claimAmount) * 0.5;
+          pendingClaim = parseFloat(claimAmount) * 0.5;
         }
       }
 
@@ -167,6 +169,7 @@ export default async function handler(req, res) {
         documentFiles: documentFiles || [],
         advanceStatus: claimType === "Advance" ? (advanceStatus || "Full Pay") : null,
         advanceAmount,
+        pendingClaim,
         status: "Under Review",
         patientFirstName: patient.firstName || "",
         patientLastName: patient.lastName || "",
