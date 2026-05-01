@@ -5657,16 +5657,14 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                           fetchNewClaimDropdowns();
                           // Pre-fill insurance details from patient data or existing claims
                           const provider = insuranceClaims[0]?.insuranceProvider || patientData?.insuranceType;
-                          const policy = insuranceClaims[0]?.policyNumber;
                           const expiry = insuranceClaims[0]?.expiryDate ? new Date(insuranceClaims[0].expiryDate).toISOString().split('T')[0] : "";
                           const cardFile = insuranceClaims[0]?.insuranceCardFile;
                           const benefitsFile = insuranceClaims[0]?.tableOfBenefitsFile;
                           
-                          if (provider || policy || expiry || cardFile || benefitsFile) {
+                          if (provider || expiry || cardFile || benefitsFile) {
                             setNewClaimData((prev: any) => ({
                               ...prev,
                               ...(provider && { insuranceProvider: provider }),
-                              ...(policy && { policyNumber: policy }),
                               ...(expiry && { expiryDate: expiry }),
                               ...(cardFile && { insuranceCardFile: cardFile }),
                               ...(benefitsFile && { tableOfBenefitsFile: benefitsFile })
@@ -5704,33 +5702,95 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                           </div>
                           <div className="flex-1 min-w-[140px]">
                             <label className="block text-xs mb-0.5 font-medium text-gray-700">Insurance Card </label>
-                            <input type="file" accept="image/*,.pdf" onChange={(e) => handleNewClaimFileUpload(e, 'insuranceCard')} className="w-full px-1 py-1.5 text-[9px] border border-gray-300 rounded-md text-gray-700 file:mr-1 file:py-0.5 file:px-2 file:rounded file:text-[8px] file:bg-blue-100 file:text-blue-700 file:border-0" disabled={newClaimUploadingFiles} />
-                            {newClaimData.insuranceCardFile && (
-                              <div className="mt-1">
-                                <button
-                                  type="button"
-                                  onClick={() => setDocViewerUrl(newClaimData.insuranceCardFile)}
-                                  className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 border border-blue-200 rounded text-[9px] font-medium text-blue-700 hover:bg-blue-200 transition-colors"
-                                >
-                                  <Shield className="w-2.5 h-2.5" /> View Card
-                                </button>
-                              </div>
-                            )}
+                            <div className="relative group">
+                              <input 
+                                id="insurance-card-upload"
+                                type="file" 
+                                accept="image/*,.pdf" 
+                                onChange={(e) => handleNewClaimFileUpload(e, 'insuranceCard')} 
+                                className="hidden" 
+                                disabled={newClaimUploadingFiles} 
+                              />
+                              <label 
+                                htmlFor="insurance-card-upload"
+                                className={`w-full flex items-center gap-2 px-2 py-1.5 text-[9px] border border-gray-300 rounded-md cursor-pointer transition-all ${newClaimData.insuranceCardFile ? 'bg-blue-50 border-blue-400 ring-1 ring-blue-400 shadow-sm' : 'bg-white hover:border-blue-400'}`}
+                              >
+                                <div className="flex-shrink-0 w-4 h-4 rounded bg-gray-50 border border-gray-200 flex items-center justify-center overflow-hidden">
+                                  {newClaimData.insuranceCardFile ? (
+                                    newClaimData.insuranceCardFile.toLowerCase().endsWith('.pdf') ? (
+                                      <FileText className="w-2.5 h-2.5 text-blue-600" />
+                                    ) : (
+                                      <img src={newClaimData.insuranceCardFile} alt="" className="w-full h-full object-cover" />
+                                    )
+                                  ) : (
+                                    <FileImage className="w-2.5 h-2.5 text-gray-400" />
+                                  )}
+                                </div>
+                                <span className={`truncate flex-1 ${newClaimData.insuranceCardFile ? 'text-blue-700 font-semibold' : 'text-gray-400'}`} onClick={() => newClaimData.insuranceCardFile && setDocViewerUrl(newClaimData.insuranceCardFile)}>
+                                  {newClaimData.insuranceCardFile ? (newClaimData.insuranceCardFile.split('/').pop()?.split('-').pop() || 'File selected') : 'No file chosen'}
+                                </span>
+                                {newClaimData.insuranceCardFile && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      setNewClaimData((prev: any) => ({ ...prev, insuranceCardFile: "" }));
+                                    }}
+                                    className="p-0.5 hover:bg-blue-100 rounded-full text-blue-600 transition-colors"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                )}
+                                {newClaimUploadingFiles && <Loader2 className="w-2.5 h-2.5 animate-spin text-blue-600" />}
+                              </label>
+                            </div>
                           </div>
                           <div className="flex-1 min-w-[140px]">
                             <label className="block text-xs mb-0.5 font-medium text-gray-700">Table of Benefits</label>
-                            <input type="file" accept="image/*,.pdf" onChange={(e) => handleNewClaimFileUpload(e, 'tableOfBenefits')} className="w-full px-1 py-1.5 text-[9px] border border-gray-300 rounded-md text-gray-700 file:mr-1 file:py-0.5 file:px-2 file:rounded file:text-[8px] file:bg-blue-100 file:text-blue-700 file:border-0" disabled={newClaimUploadingFiles} />
-                            {newClaimData.tableOfBenefitsFile && (
-                              <div className="mt-1">
-                                <button
-                                  type="button"
-                                  onClick={() => setDocViewerUrl(newClaimData.tableOfBenefitsFile)}
-                                  className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 border border-blue-200 rounded text-[9px] font-medium text-blue-700 hover:bg-blue-200 transition-colors"
-                                >
-                                  <FileText className="w-2.5 h-2.5" /> View Benefits
-                                </button>
-                              </div>
-                            )}
+                            <div className="relative group">
+                              <input 
+                                id="table-of-benefits-upload"
+                                type="file" 
+                                accept="image/*,.pdf" 
+                                onChange={(e) => handleNewClaimFileUpload(e, 'tableOfBenefits')} 
+                                className="hidden" 
+                                disabled={newClaimUploadingFiles} 
+                              />
+                              <label 
+                                htmlFor="table-of-benefits-upload"
+                                className={`w-full flex items-center gap-2 px-2 py-1.5 text-[9px] border border-gray-300 rounded-md cursor-pointer transition-all ${newClaimData.tableOfBenefitsFile ? 'bg-blue-50 border-blue-400 ring-1 ring-blue-400 shadow-sm' : 'bg-white hover:border-blue-400'}`}
+                              >
+                                <div className="flex-shrink-0 w-4 h-4 rounded bg-gray-50 border border-gray-200 flex items-center justify-center overflow-hidden">
+                                  {newClaimData.tableOfBenefitsFile ? (
+                                    newClaimData.tableOfBenefitsFile.toLowerCase().endsWith('.pdf') ? (
+                                      <FileText className="w-2.5 h-2.5 text-blue-600" />
+                                    ) : (
+                                      <img src={newClaimData.tableOfBenefitsFile} alt="" className="w-full h-full object-cover" />
+                                    )
+                                  ) : (
+                                    <FileImage className="w-2.5 h-2.5 text-gray-400" />
+                                  )}
+                                </div>
+                                <span className={`truncate flex-1 ${newClaimData.tableOfBenefitsFile ? 'text-blue-700 font-semibold' : 'text-gray-400'}`} onClick={() => newClaimData.tableOfBenefitsFile && setDocViewerUrl(newClaimData.tableOfBenefitsFile)}>
+                                  {newClaimData.tableOfBenefitsFile ? (newClaimData.tableOfBenefitsFile.split('/').pop()?.split('-').pop() || 'File selected') : 'No file chosen'}
+                                </span>
+                                {newClaimData.tableOfBenefitsFile && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      setNewClaimData((prev: any) => ({ ...prev, tableOfBenefitsFile: "" }));
+                                    }}
+                                    className="p-0.5 hover:bg-blue-100 rounded-full text-blue-600 transition-colors"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                )}
+                                {newClaimUploadingFiles && <Loader2 className="w-2.5 h-2.5 animate-spin text-blue-600" />}
+                              </label>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -5802,19 +5862,72 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                           </div>
                           <div className="flex-1 min-w-[140px]">
                             <label className="block text-xs mb-0.5 font-medium text-gray-700">Documents</label>
-                            <input type="file" multiple accept="image/*,.pdf" onChange={handleNewClaimDocumentsUpload} className="w-full px-1 py-0.5 text-[9px] border border-gray-300 rounded-md text-gray-700 file:mr-1 file:py-0.5 file:px-2 file:rounded file:text-[8px] file:bg-purple-100 file:text-purple-700 file:border-0" disabled={newClaimUploadingFiles} />
+                            <div className="relative group">
+                              <input 
+                                id="claim-documents-upload"
+                                type="file" 
+                                multiple
+                                accept="image/*,.pdf" 
+                                onChange={handleNewClaimDocumentsUpload} 
+                                className="hidden" 
+                                disabled={newClaimUploadingFiles} 
+                              />
+                              <label 
+                                htmlFor="claim-documents-upload"
+                                className={`w-full flex items-center gap-2 px-2 py-1.5 text-[9px] border border-gray-300 rounded-md cursor-pointer transition-all ${newClaimData.documentFiles.length > 0 ? 'bg-purple-50 border-purple-400 ring-1 ring-purple-400 shadow-sm' : 'bg-white hover:border-purple-400'}`}
+                              >
+                                <div className="flex-shrink-0 w-4 h-4 rounded bg-gray-50 border border-gray-200 flex items-center justify-center overflow-hidden">
+                                  {newClaimData.documentFiles.length > 0 ? (
+                                    <Paperclip className="w-2.5 h-2.5 text-purple-600" />
+                                  ) : (
+                                    <FileImage className="w-2.5 h-2.5 text-gray-400" />
+                                  )}
+                                </div>
+                                <span className={`truncate flex-1 ${newClaimData.documentFiles.length > 0 ? 'text-purple-700 font-semibold' : 'text-gray-400'}`}>
+                                  {newClaimData.documentFiles.length > 0 ? `${newClaimData.documentFiles.length} file(s) selected` : 'No file chosen'}
+                                </span>
+                                {newClaimData.documentFiles.length > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      setNewClaimData((prev: any) => ({ ...prev, documentFiles: [] }));
+                                    }}
+                                    className="p-0.5 hover:bg-purple-100 rounded-full text-purple-600 transition-colors"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                )}
+                                {newClaimUploadingFiles && <Loader2 className="w-2.5 h-2.5 animate-spin text-purple-600" />}
+                              </label>
+                            </div>
                             {newClaimData.documentFiles.length > 0 && (
                               <div className="mt-1 flex flex-wrap gap-1">
-                                <span className="text-[9px] text-gray-600 w-full mb-0.5">{newClaimData.documentFiles.length} file(s) uploaded:</span>
                                 {newClaimData.documentFiles.map((f: string, i: number) => (
-                                  <button
-                                    key={i}
-                                    type="button"
-                                    onClick={() => setDocViewerUrl(f)}
-                                    className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 border border-purple-200 rounded text-[9px] font-medium text-purple-700 hover:bg-purple-200 transition-colors"
-                                  >
-                                    <Paperclip className="w-2.5 h-2.5" /> Doc {i + 1}
-                                  </button>
+                                  <div key={i} className="flex items-center gap-1 px-2 py-1 bg-purple-100 border border-purple-200 rounded text-[9px] font-medium text-purple-700">
+                                    <button
+                                      type="button"
+                                      onClick={() => setDocViewerUrl(f)}
+                                      className="hover:underline flex items-center gap-1"
+                                    >
+                                      <Paperclip className="w-2.5 h-2.5" /> Doc {i + 1}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setNewClaimData((prev: any) => ({
+                                          ...prev,
+                                          documentFiles: prev.documentFiles.filter((_: any, index: number) => index !== i)
+                                        }));
+                                      }}
+                                      className="ml-1 p-0.5 hover:bg-purple-200 rounded-full text-purple-600 transition-colors"
+                                    >
+                                      <X className="w-2 h-2" />
+                                    </button>
+                                  </div>
                                 ))}
                               </div>
                             )}
