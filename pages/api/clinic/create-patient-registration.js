@@ -161,6 +161,7 @@ export default async function handler(req, res) {
         pastAdvance,
         pastAdvanceUsed,
         applyPastAdvance,
+        pendingClaimUsed, // Track pending claim amount being paid
         pastAdvanceUsed50Percent,
         pastAdvanceUsed54Percent,
         pastAdvanceUsed159Flat,
@@ -469,6 +470,8 @@ export default async function handler(req, res) {
       pastAdvanceUsed159FlatNum;
     const pendingUsedNum =
       pendingUsed !== undefined ? Math.max(0, parseFloat(pendingUsed) || 0) : 0;
+    const pendingClaimUsedNum =
+      pendingClaimUsed !== undefined ? Math.max(0, parseFloat(pendingClaimUsed) || 0) : 0;
     const pendingNum = pending !== undefined ? parseFloat(pending) || 0 : 0;
     const advanceNum = advance !== undefined ? parseFloat(advance) || 0 : 0;
     const pastAdvanceNum =
@@ -571,6 +574,7 @@ export default async function handler(req, res) {
       advanceUsed: advanceUsedNum, // Use the parsed number
       claimAmountUsed: claimAmountUsedNum, // Use the parsed number
       pendingUsed: pendingUsedNum, // Use the parsed number
+      pendingClaimUsed: pendingClaimUsedNum, // Track pending claim amount paid
       pastAdvanceUsed: totalPastAdvanceUsed,
       pastAdvanceUsed50Percent: pastAdvanceUsed50PercentNum,
       pastAdvanceUsed54Percent: pastAdvanceUsed54PercentNum,
