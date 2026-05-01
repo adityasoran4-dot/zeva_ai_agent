@@ -172,8 +172,8 @@ export default async function handler(req, res) {
       ),
     );
 
-    // Aggregate insurance claim amounts
-    const claimMatch = { patientId };
+    // Aggregate insurance claim amounts - ONLY include "Released" claims
+    const claimMatch = { patientId, status: "Released" };
     if (clinicId) claimMatch.clinicId = clinicId;
     const claims = await InsuranceClaim.find(claimMatch)
       .select("claimAmount advanceAmount claimType status")

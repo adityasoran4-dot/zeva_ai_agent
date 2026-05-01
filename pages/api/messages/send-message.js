@@ -30,7 +30,7 @@ export default async function handler(req, res) {
       .json({ success: false, message: "Not authenticated" });
   }
 
-  if (!requireRole(me, ["clinic", "agent", "admin", "doctor"])) {
+  if (!requireRole(me, ["clinic", "agent", "admin", "doctor", "doctorStaff"])) {
     return res.status(403).json({ success: false, message: "Access denied" });
   }
 
@@ -52,11 +52,11 @@ export default async function handler(req, res) {
         .json({ success: false, message: "Agent not tied to a clinic" });
     }
     clinicId = me.clinicId;
-  } else if (me.role === "doctor") {
+  } else if (me.role === "doctor" || me.role === "doctorStaff") {
     if (!me.clinicId) {
       return res
         .status(400)
-        .json({ success: false, message: "Doctor not tied to a clinic" });
+        .json({ success: false, message: "Doctor/Staff not tied to a clinic" });
     }
     clinicId = me.clinicId;
   } else if (me.role === "admin") {

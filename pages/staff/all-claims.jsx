@@ -42,7 +42,7 @@ function AllClaimsPage() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [approvalModal, setApprovalModal] = useState(null);
   const [approvalStep, setApprovalStep] = useState(1);
-  const [appointmentData, setAppointmentData] = useState({ startDate: "", endDate: "", fromTime: "", toTime: "" });
+  const [appointmentData, setAppointmentData] = useState({ startDate: "", fromTime: "", toTime: "" });
   const [bookedAppointment, setBookedAppointment] = useState(null);
   const [existingAppointments, setExistingAppointments] = useState([]);
   const [loadingExistingAppointments, setLoadingExistingAppointments] = useState(false);
@@ -131,26 +131,16 @@ function AllClaimsPage() {
     }
   };
 
-  const openApprovalModal = async (claim) => {
-    setApprovalModal(claim);
-    setApprovalStep(1);
-    setAppointmentData({ startDate: "", endDate: "", fromTime: "", toTime: "" });
-    setBookedAppointment(null);
-    setProgressStatus(null);
-    setConsentStatus(null);
-    setAddTreatmentPlan(false);
-    setTreatmentPlanText("");
-
-    // Fetch existing appointments for this patient
+  // Function to fetch existing appointments for a patient
+  const fetchExistingAppointments = async (claim) => {
+    if (!claim?.patientId) return;
     setLoadingExistingAppointments(true);
     try {
       const headers = getAuthHeaders();
       const res = await axios.get(`/api/clinic/patient-appointment-history/${claim.patientId}`, { headers });
       if (res.data.success && res.data.appointments) {
-        // Sort by date descending and get the most recent one
         const appointments = res.data.appointments
           .sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
-        // Only store the most recent appointment
         setExistingAppointments(appointments.length > 0 ? [appointments[0]] : []);
       } else {
         setExistingAppointments([]);
@@ -163,9 +153,23 @@ function AllClaimsPage() {
     }
   };
 
+  const openApprovalModal = async (claim) => {
+    setApprovalModal(claim);
+    setApprovalStep(1);
+    setAppointmentData({ startDate: "", fromTime: "", toTime: "" });
+    setBookedAppointment(null);
+    setProgressStatus(null);
+    setConsentStatus(null);
+    setAddTreatmentPlan(false);
+    setTreatmentPlanText("");
+
+    // Fetch existing appointments for this patient
+    await fetchExistingAppointments(claim);
+  };
+
   const handleBookAppointment = async () => {
-    if (!appointmentData.startDate || !appointmentData.endDate || !appointmentData.fromTime || !appointmentData.toTime) {
-      alert("Please fill in all appointment fields (start date, end date, from time, to time)");
+    if (!appointmentData.startDate || !appointmentData.fromTime || !appointmentData.toTime) {
+      alert("Please fill in all appointment fields (start date, from time, to time)");
       return;
     }
     setActionLoading(true);
@@ -175,24 +179,26 @@ function AllClaimsPage() {
         "/api/clinic/appointments",
         {
           patientId: approvalModal.patientId,
-          doctorId: approvalModal.doctorId, // Doctor from the insurance claim
+          doctorId: approvalModal.doctorId,
           status: "booked",
-          referralas: "direct",
+          referral: "direct",
           emergency: "no",
           followType: "follow up",
           startDate: appointmentData.startDate,
-          endDate: appointmentData.endDate,
           fromTime: appointmentData.fromTime,
           toTime: appointmentData.toTime,
         },
         { headers }
       );
-      if (res.data.success) {
-        console.log("New appointment booked:", res.data.data._id);
-        setBookedAppointment(res.data.data);
+      if (res.data?.success) {
+        setBookedAppointment(res.data.appointment);
         setApprovalStep(2);
-        // Check progress status for the newly booked appointment
-        await checkProgressStatus(approvalModal.patientId, res.data.data._id);
+        setSuccessMsg("Appointment booked successfully!");
+        setTimeout(() => setSuccessMsg(""), 3000);
+        await fetchExistingAppointments(approvalModal);
+        await checkProgressStatus(approvalModal.patientId, res.data.appointment?._id);
+      } else {
+        alert(res.data?.message || "Failed to book appointment");
       }
     } catch (err) {
       alert(err.response?.data?.message || "Failed to book appointment");
@@ -1124,16 +1130,6 @@ function AllClaimsPage() {
                           />
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">End Date</label>
-                          <input
-                            type="date"
-                            value={appointmentData.endDate}
-                            onChange={(e) => setAppointmentData(prev => ({ ...prev, endDate: e.target.value }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-                            min={appointmentData.startDate || new Date().toISOString().split('T')[0]}
-                          />
-                        </div>
-                        <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">From Time</label>
                           <input
                             type="time"
@@ -1158,7 +1154,7 @@ function AllClaimsPage() {
                     <div className="flex gap-3">
                       <button
                         onClick={handleBookAppointment}
-                        disabled={actionLoading || !appointmentData.startDate || !appointmentData.endDate || !appointmentData.fromTime || !appointmentData.toTime}
+                        disabled={actionLoading || !appointmentData.startDate || !appointmentData.fromTime || !appointmentData.toTime}
                         className="flex-1 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50"
                       >
                         {actionLoading ? "Booking..." : "Book Appointment"}
