@@ -2,10 +2,34 @@
 import React, { useEffect, useState, useMemo } from "react";
 import axios from "axios";
 import ClinicLayout from "../../components/ClinicLayout";
+import AgentLayout from "../../components/AgentLayout";
 import withClinicAuth from "../../components/withClinicAuth";
+import withAgentAuth from "../../components/withAgentAuth";
 import { Search, Filter, CheckCircle, XCircle, Eye, FileText, Upload, X, AlertCircle, Clock, Shield, Calendar, Clock as ClockIcon, CheckSquare, Square, Activity, User } from "lucide-react";
 
 const TOKEN_PRIORITY = ["clinicToken", "doctorToken", "agentToken", "staffToken", "userToken", "adminToken"];
+
+// Helper function to get user role from token
+const getUserRole = () => {
+  if (typeof window === 'undefined') return null;
+  try {
+    for (const key of TOKEN_PRIORITY) {
+      const token = localStorage.getItem(key) || sessionStorage.getItem(key);
+      if (token) {
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          return payload.role || null;
+        } catch (e) {
+          continue;
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error getting user role:', error);
+    return null;
+  }
+  return null;
+};
 
 const getStoredToken = () => {
   if (typeof window === "undefined") return null;
@@ -1753,10 +1777,35 @@ function AllClaimsPage() {
 }
 
 AllClaimsPage.getLayout = function PageLayout(page) {
+  // Check user role and apply appropriate layout
+  const role = getUserRole();
+  
+  // For agent and doctorStaff roles, use AgentLayout
+  if (role === 'agent' || role === 'doctorStaff' || role === 'doctor') {
+    return <AgentLayout>{page}</AgentLayout>;
+  }
+  
+  // For clinic role, use ClinicLayout
   return <ClinicLayout>{page}</ClinicLayout>;
 };
 
-const ProtectedAllClaimsPage = withClinicAuth(AllClaimsPage);
+// Create protected versions for both auth types
+const ClinicProtectedAllClaimsPage = withClinicAuth(AllClaimsPage);
+const AgentProtectedAllClaimsPage = withAgentAuth(AllClaimsPage);
+
+// Main component that chooses which protected version to use
+const ProtectedAllClaimsPage = (props) => {
+  const role = getUserRole();
+  
+  // For agent and doctorStaff roles, use agent auth
+  if (role === 'agent' || role === 'doctorStaff' || role === 'doctor') {
+    return <AgentProtectedAllClaimsPage {...props} />;
+  }
+  
+  // For clinic role, use clinic auth
+  return <ClinicProtectedAllClaimsPage {...props} />;
+};
+
 ProtectedAllClaimsPage.getLayout = AllClaimsPage.getLayout;
 
 export default ProtectedAllClaimsPage;

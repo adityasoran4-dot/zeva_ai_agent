@@ -5655,21 +5655,28 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                         setShowNewClaimForm(opening);
                         if (opening) {
                           fetchNewClaimDropdowns();
-                          // Pre-fill insurance details from patient data or existing claims
-                          const provider = insuranceClaims[0]?.insuranceProvider || patientData?.insuranceType;
-                          const expiry = insuranceClaims[0]?.expiryDate ? new Date(insuranceClaims[0].expiryDate).toISOString().split('T')[0] : "";
-                          const cardFile = insuranceClaims[0]?.insuranceCardFile;
-                          const benefitsFile = insuranceClaims[0]?.tableOfBenefitsFile;
-                          
-                          if (provider || expiry || cardFile || benefitsFile) {
-                            setNewClaimData((prev: any) => ({
-                              ...prev,
-                              ...(provider && { insuranceProvider: provider }),
-                              ...(expiry && { expiryDate: expiry }),
-                              ...(cardFile && { insuranceCardFile: cardFile }),
-                              ...(benefitsFile && { tableOfBenefitsFile: benefitsFile })
-                            }));
-                          }
+                          // Reset form to empty values - no prefilling
+                          setNewClaimData({
+                            insuranceProvider: "",
+                            policyNumber: "",
+                            expiryDate: "",
+                            insuranceCardFile: "",
+                            tableOfBenefitsFile: "",
+                            departmentId: "",
+                            departmentName: "",
+                            serviceId: "",
+                            serviceName: "",
+                            doctorId: "",
+                            doctorName: "",
+                            claimAmount: "",
+                            claimType: "Paid",
+                            coPayPercent: "",
+                            coPayType: "Patient Pays",
+                            notes: "",
+                            documentFiles: [],
+                            advanceStatus: "Full Pay",
+                            advanceAmount: 0,
+                          });
                         }
                       }}
                       className="ml-auto flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-semibold transition-colors"

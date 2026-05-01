@@ -103,6 +103,11 @@ const InsuranceClaimSchema = new mongoose.Schema(
       default: "",
       trim: true,
     },
+    treatmentPlan: {
+      type: String,
+      default: "",
+      trim: true,
+    },
     documentFiles: [
       {
         type: String,

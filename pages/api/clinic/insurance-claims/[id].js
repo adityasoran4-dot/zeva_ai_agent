@@ -104,6 +104,7 @@ export default async function handler(req, res) {
         coPayPercent,
         coPayType,
         notes,
+        treatmentPlan,
         documentFiles,
         advanceStatus,
       } = req.body;
@@ -132,6 +133,7 @@ export default async function handler(req, res) {
       if (coPayPercent !== undefined) claim.coPayPercent = coPayPercent;
       if (coPayType !== undefined) claim.coPayType = coPayType;
       if (notes !== undefined) claim.notes = notes;
+      if (treatmentPlan !== undefined) claim.treatmentPlan = treatmentPlan;
       if (documentFiles !== undefined) claim.documentFiles = documentFiles;
 
       // Handle advance-specific fields
