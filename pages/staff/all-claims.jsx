@@ -1,9 +1,9 @@
 "use client";
 import React, { useEffect, useState, useMemo } from "react";
 import axios from "axios";
-import ClinicLayout from "../../components/staffLayout";
-import withClinicAuth from "../../components/withStaffAuth";
-import { Search, Filter, CheckCircle, XCircle, Eye, FileText, Upload, X, AlertCircle, Clock, Shield, Calendar, Clock as ClockIcon, CheckSquare, Square } from "lucide-react";
+import ClinicLayout from "../../components/ClinicLayout";
+import withClinicAuth from "../../components/withClinicAuth";
+import { Search, Filter, CheckCircle, XCircle, Eye, FileText, Upload, X, AlertCircle, Clock, Shield, Calendar, Clock as ClockIcon, CheckSquare, Square, Activity, User } from "lucide-react";
 
 const TOKEN_PRIORITY = ["clinicToken", "doctorToken", "agentToken", "staffToken", "userToken", "adminToken"];
 
@@ -38,6 +38,10 @@ function AllClaimsPage() {
   const [rejectionReason, setRejectionReason] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
+  const [showTracking, setShowTracking] = useState(false);
+  const [claimDetails, setClaimDetails] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [previewFile, setPreviewFile] = useState(null);
   const [rejectedNotifications, setRejectedNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [approvalModal, setApprovalModal] = useState(null);
@@ -79,6 +83,59 @@ function AllClaimsPage() {
       console.error("Fetch error:", err.response?.data || err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchClaimDetails = async (claimId) => {
+    setDetailLoading(true);
+    try {
+      const headers = getAuthHeaders();
+      const res = await axios.get(`/api/clinic/insurance-claims/${claimId}`, { headers });
+      if (res.data.success) {
+        setClaimDetails(res.data.data);
+      }
+    } catch (err) {
+      console.error("Fetch detail error:", err.response?.data || err.message);
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const handleViewClaim = (claim) => {
+    setViewModal(claim);
+    setShowTracking(false);
+    fetchClaimDetails(claim._id);
+  };
+
+  const handleRemoveFile = async (field, fileUrl = null) => {
+    if (!window.confirm("Are you sure you want to remove this document?")) return;
+    
+    setActionLoading(true);
+    try {
+      const headers = getAuthHeaders();
+      let updatedData = {};
+      
+      if (field === 'documentFiles') {
+        const newFiles = viewModal.documentFiles.filter(f => f !== fileUrl);
+        updatedData = { documentFiles: newFiles };
+      } else {
+        updatedData = { [field]: null };
+      }
+
+      const res = await axios.patch(`/api/clinic/insurance-claims/${viewModal._id}`, updatedData, { headers });
+      
+      if (res.data.success) {
+        setViewModal({ ...viewModal, ...updatedData });
+        setClaims(claims.map(c => c._id === viewModal._id ? { ...c, ...updatedData } : c));
+        setPreviewFile(null); // Close preview after deletion
+        setSuccessMsg("Document removed successfully");
+        setTimeout(() => setSuccessMsg(""), 3000);
+      }
+    } catch (err) {
+      console.error("Remove file error:", err.response?.data || err.message);
+      alert("Failed to remove documentd");
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -671,7 +728,7 @@ function AllClaimsPage() {
                   </span>
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => setViewModal(claim)}
+                      onClick={() => handleViewClaim(claim)}
                       className="flex items-center gap-1 px-3 py-1.5 bg-gray-600 text-white text-xs font-medium rounded-md hover:bg-gray-700 transition-colors"
                     >
                       <Eye className="w-3.5 h-3.5" />
@@ -771,12 +828,273 @@ function AllClaimsPage() {
               )}
               
               <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
-                <h2 className="text-lg font-bold text-gray-900">Claim Details</h2>
-                <button onClick={() => setViewModal(null)} className="p-2 hover:bg-gray-100 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <h2 className="text-lg font-bold text-gray-900">Claim Details</h2>
+                  <button
+                    onClick={() => setShowTracking(!showTracking)}
+                    className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase transition-all ${
+                      showTracking 
+                        ? "bg-gray-900 text-white shadow-lg" 
+                        : "bg-white/50 text-gray-700 hover:bg-white/80 border border-gray-200"
+                    }`}
+                  >
+                    <Activity className="w-3 h-3" />
+                    {showTracking ? "View Details" : "Track Claim"}
+                  </button>
+                </div>
+                <button onClick={() => {
+                  setViewModal(null);
+                  setClaimDetails(null);
+                }} className="p-2 hover:bg-gray-100 rounded-lg">
                   <X className="w-5 h-5 text-gray-500" />
                 </button>
               </div>
               <div className="p-6 space-y-5">
+                {showTracking ? (
+                  <div className="space-y-8 py-4">
+                    {detailLoading ? (
+                      <div className="flex flex-col items-center justify-center py-12">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600 mb-4"></div>
+                        <p className="text-sm text-gray-500 font-medium">Fetching tracking data...</p>
+                      </div>
+                    ) : (
+                      <div className="relative">
+                        {/* Vertical Line */}
+                        <div className="absolute left-[15px] top-2 bottom-2 w-0.5 bg-gray-100"></div>
+
+                        <div className="space-y-10 relative">
+                          {/* Approved Step */}
+                          {(claimDetails?.approvedAt || viewModal.approvedAt) && (
+                            <div className="flex gap-4 group">
+                              <div className="relative z-10 w-8 h-8 rounded-full bg-green-100 border-4 border-white flex items-center justify-center shadow-sm">
+                                <CheckCircle className="w-4 h-4 text-green-600" />
+                              </div>
+                              <div className="flex-1 pt-0.5">
+                                <div className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm group-hover:shadow-md transition-shadow">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <h4 className="text-sm font-bold text-gray-900">Claim Approved</h4>
+                                    <span className="text-[10px] font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full uppercase">Step 1</span>
+                                  </div>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-7 h-7 rounded-lg bg-gray-50 flex items-center justify-center">
+                                        <User className="w-3.5 h-3.5 text-gray-400" />
+                                      </div>
+                                      <div>
+                                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-tight">Reviewer</p>
+                                        <p className="text-xs font-semibold text-gray-700">
+                                          {claimDetails?.approvedByName || viewModal.approvedByName || viewModal.doctorName}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-7 h-7 rounded-lg bg-gray-50 flex items-center justify-center">
+                                        <Shield className="w-3.5 h-3.5 text-gray-400" />
+                                      </div>
+                                      <div>
+                                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-tight">Role</p>
+                                        <p className="text-xs font-semibold text-gray-700 capitalize">
+                                          {claimDetails?.approvedByRole || viewModal.approvedByRole || "Doctor"}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 col-span-full">
+                                      <div className="w-7 h-7 rounded-lg bg-gray-50 flex items-center justify-center">
+                                        <Clock className="w-3.5 h-3.5 text-gray-400" />
+                                      </div>
+                                      <div>
+                                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-tight">Date & Time</p>
+                                        <p className="text-xs font-semibold text-gray-700">
+                                          {new Date(claimDetails?.approvedAt || viewModal.approvedAt).toLocaleString()}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Rejected Step */}
+                          {(claimDetails?.rejectedAt || viewModal.rejectedAt) && (
+                            <div className="flex gap-4 group">
+                              <div className="relative z-10 w-8 h-8 rounded-full bg-red-100 border-4 border-white flex items-center justify-center shadow-sm">
+                                <XCircle className="w-4 h-4 text-red-600" />
+                              </div>
+                              <div className="flex-1 pt-0.5">
+                                <div className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm group-hover:shadow-md transition-shadow">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <h4 className="text-sm font-bold text-gray-900">Claim Rejected</h4>
+                                    <span className="text-[10px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full uppercase">Step 2</span>
+                                  </div>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-7 h-7 rounded-lg bg-gray-50 flex items-center justify-center">
+                                        <User className="w-3.5 h-3.5 text-gray-400" />
+                                      </div>
+                                      <div>
+                                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-tight">Reviewer</p>
+                                        <p className="text-xs font-semibold text-gray-700">
+                                          {claimDetails?.rejectedByName || viewModal.rejectedByName || viewModal.doctorName}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-7 h-7 rounded-lg bg-gray-50 flex items-center justify-center">
+                                        <Shield className="w-3.5 h-3.5 text-gray-400" />
+                                      </div>
+                                      <div>
+                                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-tight">Role</p>
+                                        <p className="text-xs font-semibold text-gray-700 capitalize">
+                                          {claimDetails?.rejectedByRole || viewModal.rejectedByRole || "Doctor"}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 col-span-full">
+                                      <div className="w-7 h-7 rounded-lg bg-gray-50 flex items-center justify-center">
+                                        <Clock className="w-3.5 h-3.5 text-gray-400" />
+                                      </div>
+                                      <div>
+                                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-tight">Date & Time</p>
+                                        <p className="text-xs font-semibold text-gray-700">
+                                          {new Date(claimDetails?.rejectedAt || viewModal.rejectedAt).toLocaleString()}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  {(claimDetails?.rejectionReason || viewModal.rejectionReason) && (
+                                    <div className="mt-4 p-3 bg-red-50/50 border border-red-100 rounded-lg">
+                                      <p className="text-[10px] font-bold text-red-600 uppercase mb-1">Reason</p>
+                                      <p className="text-xs text-red-800 leading-relaxed italic">
+                                        "{claimDetails?.rejectionReason || viewModal.rejectionReason}"
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Rejected from Pass Claims Step */}
+                          {claimDetails?.rejectedFromPassClaims && (
+                            <div className="flex gap-4 group">
+                              <div className="relative z-10 w-8 h-8 rounded-full bg-orange-100 border-4 border-white flex items-center justify-center shadow-sm">
+                                <AlertCircle className="w-4 h-4 text-orange-600" />
+                              </div>
+                              <div className="flex-1 pt-0.5">
+                                <div className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm group-hover:shadow-md transition-shadow">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <h4 className="text-sm font-bold text-gray-900">Rejected from Pass Claims</h4>
+                                    <span className="text-[10px] font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full uppercase">Step 3</span>
+                                  </div>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-7 h-7 rounded-lg bg-gray-50 flex items-center justify-center">
+                                        <User className="w-3.5 h-3.5 text-gray-400" />
+                                      </div>
+                                      <div>
+                                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-tight">Reviewer</p>
+                                        <p className="text-xs font-semibold text-gray-700">
+                                          {claimDetails?.rejectedFromPassClaimsByName}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-7 h-7 rounded-lg bg-gray-50 flex items-center justify-center">
+                                        <Shield className="w-3.5 h-3.5 text-gray-400" />
+                                      </div>
+                                      <div>
+                                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-tight">Role</p>
+                                        <p className="text-xs font-semibold text-gray-700 capitalize">
+                                          {claimDetails?.rejectedFromPassClaimsByRole || "Clinic Admin"}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 col-span-full">
+                                      <div className="w-7 h-7 rounded-lg bg-gray-50 flex items-center justify-center">
+                                        <Clock className="w-3.5 h-3.5 text-gray-400" />
+                                      </div>
+                                      <div>
+                                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-tight">Date & Time</p>
+                                        <p className="text-xs font-semibold text-gray-700">
+                                          {new Date(claimDetails?.rejectedFromPassClaimsAt).toLocaleString()}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Released Step */}
+                          {(claimDetails?.releasedAt || viewModal.releasedAt) && (
+                            <div className="flex gap-4 group">
+                              <div className="relative z-10 w-8 h-8 rounded-full bg-blue-100 border-4 border-white flex items-center justify-center shadow-sm">
+                                <CheckCircle className="w-4 h-4 text-blue-600" />
+                              </div>
+                              <div className="flex-1 pt-0.5">
+                                <div className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm group-hover:shadow-md transition-shadow">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <h4 className="text-sm font-bold text-gray-900">Claim Released</h4>
+                                    <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full uppercase">Final Step</span>
+                                  </div>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-7 h-7 rounded-lg bg-gray-50 flex items-center justify-center">
+                                        <User className="w-3.5 h-3.5 text-gray-400" />
+                                      </div>
+                                      <div>
+                                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-tight">Released By</p>
+                                        <p className="text-xs font-semibold text-gray-700">
+                                          {claimDetails?.releasedByName || viewModal.releasedByName}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-7 h-7 rounded-lg bg-gray-50 flex items-center justify-center">
+                                        <Shield className="w-3.5 h-3.5 text-gray-400" />
+                                      </div>
+                                      <div>
+                                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-tight">Role</p>
+                                        <p className="text-xs font-semibold text-gray-700 capitalize">
+                                          {claimDetails?.releasedByRole || viewModal.releasedByRole || "Clinic Admin"}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 col-span-full">
+                                      <div className="w-7 h-7 rounded-lg bg-gray-50 flex items-center justify-center">
+                                        <Clock className="w-3.5 h-3.5 text-gray-400" />
+                                      </div>
+                                      <div>
+                                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-tight">Date & Time</p>
+                                        <p className="text-xs font-semibold text-gray-700">
+                                          {new Date(claimDetails?.releasedAt || viewModal.releasedAt).toLocaleString()}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* If no tracking steps available */}
+                          {!claimDetails?.approvedAt && !viewModal.approvedAt && 
+                          !claimDetails?.rejectedAt && !viewModal.rejectedAt && 
+                          !claimDetails?.releasedAt && !viewModal.releasedAt && 
+                          !claimDetails?.rejectedFromPassClaims && (
+                            <div className="flex flex-col items-center justify-center py-12 text-center">
+                              <Activity className="w-12 h-12 text-gray-200 mb-4" />
+                              <p className="text-gray-500 font-medium">No tracking history available for this claim</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <>
                 {/* Reviewer Tracking Section */}
                 {(viewModal.approvedByName || viewModal.rejectedByName || viewModal.releasedByName) && (
                   <div className="bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 rounded-lg p-4">
@@ -855,14 +1173,20 @@ function AllClaimsPage() {
                     <h3 className="text-sm font-semibold text-gray-800 mb-2">Uploaded Files</h3>
                     <div className="flex flex-wrap gap-3">
                       {viewModal.insuranceCardFile && (
-                        <a href={viewModal.insuranceCardFile} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg text-xs font-medium text-blue-700 hover:bg-blue-100">
+                        <button 
+                          onClick={() => setPreviewFile({ url: viewModal.insuranceCardFile, name: "Insurance Card", field: "insuranceCardFile" })}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg text-xs font-medium text-blue-700 hover:bg-blue-100 transition-colors"
+                        >
                           <FileText className="w-3.5 h-3.5" /> Insurance Card
-                        </a>
+                        </button>
                       )}
                       {viewModal.tableOfBenefitsFile && (
-                        <a href={viewModal.tableOfBenefitsFile} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg text-xs font-medium text-blue-700 hover:bg-blue-100">
+                        <button 
+                          onClick={() => setPreviewFile({ url: viewModal.tableOfBenefitsFile, name: "Table of Benefits", field: "tableOfBenefitsFile" })}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg text-xs font-medium text-blue-700 hover:bg-blue-100 transition-colors"
+                        >
                           <FileText className="w-3.5 h-3.5" /> Table of Benefits
-                        </a>
+                        </button>
                       )}
                     </div>
                   </div>
@@ -931,9 +1255,13 @@ function AllClaimsPage() {
                     <h3 className="text-sm font-semibold text-gray-800 mb-2">Claim Documents</h3>
                     <div className="flex flex-wrap gap-2">
                       {viewModal.documentFiles.map((file, idx) => (
-                        <a key={idx} href={file} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 border border-purple-200 rounded-lg text-xs font-medium text-purple-700 hover:bg-purple-100">
+                        <button 
+                          key={idx} 
+                          onClick={() => setPreviewFile({ url: file, name: `Document ${idx + 1}`, field: "documentFiles" })}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 border border-purple-200 rounded-lg text-xs font-medium text-purple-700 hover:bg-purple-100 transition-colors"
+                        >
                           <FileText className="w-3.5 h-3.5" /> Document {idx + 1}
-                        </a>
+                        </button>
                       ))}
                     </div>
                   </div>
@@ -954,10 +1282,12 @@ function AllClaimsPage() {
                     {viewModal.reviewNotes && <p>Review notes: {viewModal.reviewNotes}</p>}
                   </div>
                 )}
-              </div>
-            </div>
+              </>
+            )}
           </div>
-        )}
+        </div>
+      </div>
+    )}
 
         {/* Reject Modal */}
         {rejectModal && (
@@ -1357,6 +1687,66 @@ function AllClaimsPage() {
             </div>
           </div>
         )}
+
+        {/* File Preview Modal */}
+        {previewFile && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl relative">
+              {/* Header */}
+              <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-2xl z-10">
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900">{previewFile.name}</h2>
+                  <p className="text-xs text-gray-500">Document Preview</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={() => handleRemoveFile(previewFile.field, previewFile.url)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 border border-red-200 rounded-lg text-xs font-bold hover:bg-red-100 transition-all"
+                  >
+                    <X className="w-3.5 h-3.5" /> Remove Document
+                  </button>
+                  <button onClick={() => setPreviewFile(null)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                    <X className="w-5 h-5 text-gray-500" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Content */}
+              <div className="p-4 flex justify-center items-center min-h-[400px] max-h-[80vh] overflow-auto">
+                {previewFile.url.toLowerCase().endsWith('.pdf') ? (
+                  <iframe 
+                    src={previewFile.url} 
+                    className="w-full h-[70vh] rounded-lg border border-gray-200"
+                    title="PDF Preview"
+                  />
+                ) : (
+                  <img 
+                    src={previewFile.url} 
+                    alt={previewFile.name} 
+                    className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-sm"
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = 'https://via.placeholder.com/400x300?text=Preview+Not+Available';
+                    }}
+                  />
+                )}
+              </div>
+              
+              {/* Footer */}
+              <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex justify-between items-center">
+                <p className="text-[10px] text-gray-400 font-medium">Claim ID: {viewModal?._id}</p>
+                <a 
+                  href={previewFile.url} 
+                  target="_blank" 
+                  rel="noreferrer"
+                  className="text-xs font-bold text-teal-600 hover:text-teal-700"
+                >
+                  Open in New Tab
+                </a>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1366,4 +1756,7 @@ AllClaimsPage.getLayout = function PageLayout(page) {
   return <ClinicLayout>{page}</ClinicLayout>;
 };
 
-export default withClinicAuth(AllClaimsPage);
+const ProtectedAllClaimsPage = withClinicAuth(AllClaimsPage);
+ProtectedAllClaimsPage.getLayout = AllClaimsPage.getLayout;
+
+export default ProtectedAllClaimsPage;

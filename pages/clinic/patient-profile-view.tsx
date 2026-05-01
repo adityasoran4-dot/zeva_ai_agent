@@ -2076,13 +2076,14 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
       oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
 
       // Fetch appointments, package-usage, and billing in parallel
-      const [appointmentsRes, packageUsageRes, billingRes] = await Promise.all([
+      const [appointmentsRes, packageUsageRes, billingRes, insuranceClaimsRes] = await Promise.all([
         axios.get(
           `/api/clinic/all-appointments?page=1&limit=1000&fromDate=${oneYearAgo.toISOString().split('T')[0]}&toDate=${today}`,
           { headers }
         ),
         axios.get(`/api/clinic/package-usage/${patientData._id}`, { headers }).catch(() => ({ data: { success: false } })),
-        fetchBillingHistory() // Use the unified function here
+        fetchBillingHistory(), // Use the unified function here
+        axios.get(`/api/clinic/insurance-claims?patientId=${patientData._id}`, { headers }).catch(() => ({ data: { success: false } }))
       ]);
 
       let totalVisits = 0;
@@ -2092,6 +2093,17 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
       let activePackages = 0;
       let pendingSessions = 0;
       let insuranceClaimsPending = 0;
+
+      // Insurance
+      if (insuranceClaimsRes.data.success) {
+        const claims = insuranceClaimsRes.data.data || [];
+        // Filter claims based on statuses that indicate they are still in the pipeline
+        insuranceClaimsPending = claims.filter((c: any) => 
+          ['Under Review', 'Approved'].includes(c.status)
+        ).length;
+      } else {
+        insuranceClaimsPending = patientData?.insurance === 'Yes' ? 1 : 0;
+      }
 
       // Calculate from appointments
       if (appointmentsRes.data.success) {
@@ -2169,9 +2181,6 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
           return isFullyPaid;
         }).length;
       }
-
-      // Insurance
-      insuranceClaimsPending = patientData?.insurance === 'Yes' ? 1 : 0;
 
       setStatsData({
         totalVisits,
@@ -5914,27 +5923,6 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                               <p className="text-sm font-semibold text-orange-900">{insuranceClaims.length}</p>
                             </div>
                           </div>
-                          {/* Uploaded files */}
-                          <div className="flex flex-wrap gap-2 mb-4">
-                            {insuranceClaims[0]?.insuranceCardFile ? (
-                              <a href={insuranceClaims[0].insuranceCardFile} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg text-xs font-medium text-blue-700 hover:bg-blue-100">
-                                <Shield className="w-3.5 h-3.5" /> Insurance Card 
-                              </a>
-                            ) : (
-                              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-medium text-gray-400">
-                                <Shield className="w-3.5 h-3.5" /> No Card
-                              </div>
-                            )}
-                            {insuranceClaims[0]?.tableOfBenefitsFile ? (
-                              <a href={insuranceClaims[0].tableOfBenefitsFile} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg text-xs font-medium text-blue-700 hover:bg-blue-100">
-                                <FileText className="w-3.5 h-3.5" /> Table of Benefits
-                              </a>
-                            ) : (
-                              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-medium text-gray-400">
-                                <FileText className="w-3.5 h-3.5" /> No Benefits
-                              </div>
-                            )}
-                          </div>
                         </div>
                       )}
 
@@ -5970,7 +5958,6 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Pending Claim</th>
                                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Co-Pay</th>
                                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
-                                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Files</th>
                                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Created</th>
                                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
                                 </tr>
@@ -5997,21 +5984,6 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                       }`}>
                                         {claim.status}
                                       </span>
-                                    </td>
-                                    <td className="px-4 py-3 whitespace-nowrap">
-                                      <div className="flex items-center gap-1.5">
-                                        {claim.insuranceCardFile && <Shield className="w-3.5 h-3.5 text-blue-500" title="Insurance Card" />}
-                                        {claim.tableOfBenefitsFile && <FileText className="w-3.5 h-3.5 text-teal-500" title="Table of Benefits" />}
-                                        {claim.documentFiles?.length > 0 && (
-                                          <div className="flex items-center gap-0.5">
-                                            <Paperclip className="w-3.5 h-3.5 text-purple-500" title="Support Documents" />
-                                            <span className="text-[10px] text-purple-600 font-bold">{claim.documentFiles.length}</span>
-                                          </div>
-                                        )}
-                                        {(!claim.insuranceCardFile && !claim.tableOfBenefitsFile && (!claim.documentFiles || claim.documentFiles.length === 0)) && (
-                                          <span className="text-gray-300">-</span>
-                                        )}
-                                      </div>
                                     </td>
                                     <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-500">{new Date(claim.createdAt).toLocaleDateString()}</td>
                                     <td className="px-4 py-3 whitespace-nowrap">
@@ -6099,7 +6071,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                   onClick={() => setDocViewerUrl(claimViewModal.insuranceCardFile)}
                                   className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-blue-200 rounded-lg text-xs font-medium text-blue-700 hover:bg-blue-50 transition-colors"
                                 >
-                                  <Eye className="w-3.5 h-3.5" /> View Card
+                                  <Shield className="w-3.5 h-3.5" /> View Card
                                 </button>
                               ) : (
                                 <span className="text-xs text-gray-400 italic">No card uploaded</span>

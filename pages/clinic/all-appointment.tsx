@@ -318,8 +318,14 @@
         token =
           localStorage.getItem("clinicToken") ||
           sessionStorage.getItem("clinicToken") ||
+          localStorage.getItem("doctorToken") ||
+          sessionStorage.getItem("doctorToken") ||
+          localStorage.getItem("adminToken") ||
+          sessionStorage.getItem("adminToken") ||
           localStorage.getItem("agentToken") ||
           sessionStorage.getItem("agentToken") ||
+          localStorage.getItem("staffToken") ||
+          sessionStorage.getItem("staffToken") ||
           localStorage.getItem("userToken") ||
           sessionStorage.getItem("userToken");
       }

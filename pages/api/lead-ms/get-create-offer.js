@@ -24,8 +24,8 @@ export default async function handler(req, res) {
         .json({ success: false, message: "User not authenticated" });
     }
 
-    // Allow clinics, agents, doctors, doctorStaff, and admins
-    if (!requireRole(user, ["clinic", "agent", "admin", "doctor", "doctorStaff"])) {
+    // Allow clinics, agents, doctors, doctorStaff, staff, and admins
+    if (!requireRole(user, ["clinic", "agent", "admin", "doctor", "doctorStaff", "staff"])) {
       return res.status(403).json({ success: false, message: "Access denied" });
     }
 
@@ -39,8 +39,8 @@ export default async function handler(req, res) {
           .json({ success: false, message: "Clinic not found for this user" });
       }
       clinicId = clinic._id;
-    } else if (user.role === "agent" || user.role === "doctorStaff") {
-      // agent and doctorStaff must have clinicId
+    } else if (user.role === "agent" || user.role === "doctorStaff" || user.role === "staff") {
+      // agent, doctorStaff, and staff must have clinicId
       if (!user.clinicId) {
         return res
           .status(403)
@@ -62,8 +62,8 @@ export default async function handler(req, res) {
       }
     }
 
-    // ✅ Check permission for reading offers (only for doctorStaff and agent, clinic/admin/doctor bypass)
-    if (!["admin", "clinic", "doctor"].includes(user.role) && clinicId) {
+    // ✅ Check permission for reading offers (only for doctorStaff and agent, clinic/admin/doctor/staff bypass)
+    if (!["admin", "clinic", "doctor", "staff"].includes(user.role) && clinicId) {
       // If user is doctorStaff or agent, check read permission for create_offers module
       if (['agent', 'doctorStaff'].includes(user.role)) {
         const { hasPermission, error: permissionError } = await checkAgentPermission(
