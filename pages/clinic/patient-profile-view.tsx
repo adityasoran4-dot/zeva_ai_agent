@@ -36,7 +36,7 @@ const getStoredToken = () => {
 
 const getAuthHeaders = () => {
   const token = getStoredToken();
-  return token ? { Authorization: `Bearer ${token}` } : null;
+  return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
 const getUserRole = () => {

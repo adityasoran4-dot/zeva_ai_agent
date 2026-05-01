@@ -75,7 +75,6 @@ export default function AppointmentBookingModal({
   onClose,
   onSuccess,
   doctorId,
-  doctorName,
   slotTime,
   slotDisplayTime: _slotDisplayTime,
   defaultDate,
@@ -1576,9 +1575,9 @@ export default function AppointmentBookingModal({
               <button
                 type="submit"
                 form="appointment-form"
-                disabled={loading}
+                disabled={!isFormValid}
                 className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-offset-1 transition-all duration-200 shadow-md ${
-                  loading
+                  !isFormValid
                     ? "bg-gray-400 dark:bg-gray-500 text-gray-200 dark:text-gray-300 cursor-not-allowed opacity-60 hover:scale-100 active:scale-100 shadow-none"
                     : "bg-gray-800 dark:bg-gray-700 hover:bg-gray-900 dark:hover:bg-gray-800 text-white hover:scale-105 active:scale-95 hover:shadow-lg focus:ring-gray-500 cursor-pointer"
                 }`}

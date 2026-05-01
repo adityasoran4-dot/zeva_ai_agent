@@ -321,7 +321,6 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
   const [applyAdvance, setApplyAdvance] = useState(false);
   const [applyClaimAmount, setApplyClaimAmount] = useState(false);
   const [insuranceAdvanceClaims, setInsuranceAdvanceClaims] = useState<any[]>([]);
-  const [loadingInsuranceAdvance, setLoadingInsuranceAdvance] = useState(false);
   const [applyPastAdvance50Percent] = useState(false);
   const [applyPastAdvance54Percent] = useState(false);
   const [applyPastAdvance159Flat, setApplyPastAdvance159Flat] = useState(false);
@@ -5024,7 +5023,7 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
                         </label>
 
                         {/* Insurance Advance Claims */}
-                        {!loadingInsuranceAdvance && insuranceAdvanceClaims.length > 0 && (() => {
+                        {insuranceAdvanceClaims.length > 0 && (() => {
                           const totalInsuranceAdvance = insuranceAdvanceClaims.reduce(
                             (sum: number, c: any) => sum + Number(c.claimAmount || 0), 0
                           );
