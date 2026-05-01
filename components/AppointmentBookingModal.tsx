@@ -29,7 +29,6 @@ interface AppointmentBookingModalProps {
   bookedFrom?: "doctor" | "room"; // Track which column the appointment is being booked from
   fromTime?: string; // For drag selection - start time
   toTime?: string; // For drag selection - end time
-  clinicEndTime?: string; // Global clinic closing time (e.g., "23:00")
   customTimeSlots?: { startTime: string; endTime: string }; // Custom time slot selection
   rooms: Array<{ _id: string; name: string }>;
   doctorStaff: Array<{ _id: string; name: string; email?: string }>;
@@ -81,7 +80,6 @@ export default function AppointmentBookingModal({
   defaultRoomId,
   bookedFrom, // No default - use the prop value directly
   customTimeSlots,
-  clinicEndTime,
   fromTime: propFromTime,
   toTime: propToTime,
   rooms,
@@ -126,12 +124,6 @@ export default function AppointmentBookingModal({
   );
   const [patientSearch, setPatientSearch] = useState<string>("");
   const [searchResults, setSearchResults] = useState<Patient[]>([]);
-
-  const timeStringToMinutes = (time24: string): number => {
-    if (!time24) return 0;
-    const [hourStr, minuteStr] = time24.split(":");
-    return parseInt(hourStr, 10) * 60 + parseInt(minuteStr, 10);
-  };
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [showAddPatient, setShowAddPatient] = useState(false);
   const [addPatientForm, setAddPatientForm] = useState<AddPatientForm>({
@@ -154,17 +146,7 @@ export default function AppointmentBookingModal({
   const calculateEndTime = (time: string) => {
     if (!time) return "";
     const [hour, min] = time.split(":").map(Number);
-    let totalMinutes = hour * 60 + min + SLOT_INTERVAL_MINUTES;
-    
-    // Cap at clinic closing time
-    const effectiveEndTime = customTimeSlots?.endTime || clinicEndTime;
-    if (effectiveEndTime) {
-      const closingMins = timeStringToMinutes(effectiveEndTime);
-      if (totalMinutes > closingMins) {
-        totalMinutes = closingMins;
-      }
-    }
-
+    const totalMinutes = hour * 60 + min + SLOT_INTERVAL_MINUTES;
     const newHour = Math.floor(totalMinutes / 60);
     const newMin = totalMinutes % 60;
     return `${String(newHour).padStart(2, "0")}:${String(newMin).padStart(
@@ -197,16 +179,16 @@ export default function AppointmentBookingModal({
   const [isServicesOpen, setIsServicesOpen] = useState(false);
   const [servicesSearch, setServicesSearch] = useState("");
   const servicesSearchRef = React.useRef<HTMLInputElement>(null);
-  
+ 
   // Filter services based on search
   const filteredServices = React.useMemo(() => {
     if (!servicesSearch.trim()) return services;
     const query = servicesSearch.toLowerCase();
-    return services.filter(svc => 
+    return services.filter(svc =>
       svc.name.toLowerCase().includes(query)
     );
   }, [services, servicesSearch]);
-  
+ 
   // Auto-focus search input when dropdown opens
   React.useEffect(() => {
     if (isServicesOpen && servicesSearchRef.current) {
@@ -464,7 +446,7 @@ export default function AppointmentBookingModal({
     if (!selectedPatient) {
       clientErrors.patientId = "Please select a patient";
     }
-    
+   
     // REQUIRE both room AND doctor as per user request
     if (!roomId) {
       clientErrors.roomId = "Room is not filled";
@@ -478,7 +460,7 @@ export default function AppointmentBookingModal({
       clientErrors.status = "Status is not filled";
       toast.error("Please select a status, it is mandatory", { id: "status-mandatory-toast" });
     }
-    
+   
     if (!followType) {
       clientErrors.followType = "Please select a follow type";
     }
@@ -490,24 +472,6 @@ export default function AppointmentBookingModal({
     }
     if (!toTime) {
       clientErrors.toTime = "Please select a to time";
-    }
-
-    // Validate times against clinic closing time
-    const effectiveEndTime = customTimeSlots?.endTime || clinicEndTime;
-    if (effectiveEndTime && (fromTime || toTime)) {
-      const closingMins = timeStringToMinutes(effectiveEndTime);
-      if (fromTime) {
-        const fromMins = timeStringToMinutes(fromTime);
-        if (fromMins >= closingMins) {
-          clientErrors.fromTime = `Appointment cannot start after clinic closing time (${effectiveEndTime})`;
-        }
-      }
-      if (toTime) {
-        const toMins = timeStringToMinutes(toTime);
-        if (toMins > closingMins) {
-          clientErrors.toTime = `Appointment cannot end after clinic closing time (${effectiveEndTime})`;
-        }
-      }
     }
 
     if (Object.keys(clientErrors).length > 0) {
@@ -611,10 +575,10 @@ export default function AppointmentBookingModal({
     } catch (err: any) {
       const status = err.response?.status;
       const errorData = err.response?.data;
-      
+     
       // Handle 403 authentication error
       if (status === 403) {
-        toast.error("Session expired. Please login again.", { 
+        toast.error("Session expired. Please login again.", {
           duration: 4000,
           style: {
             background: '#fef2f2',
@@ -627,7 +591,7 @@ export default function AppointmentBookingModal({
         setError("Authentication failed. Please login again.");
         return;
       }
-      
+     
       if (errorData?.errors) {
         // Field-level errors from API
         setFieldErrors(errorData.errors);
@@ -693,7 +657,7 @@ export default function AppointmentBookingModal({
   // Note: BOTH doctorId AND roomId are required as per user request
   const isFormValid = Boolean(
     selectedPatient &&
-      roomId && 
+      roomId &&
       selectedDoctorId &&
       status &&
       followType &&
@@ -1021,7 +985,7 @@ export default function AppointmentBookingModal({
                       />
                     </div>
                   </div>
-                  
+                 
                   {/* Services List */}
                   <div className="overflow-y-auto flex-1 max-h-[200px]">
                     {servicesLoading ? (
