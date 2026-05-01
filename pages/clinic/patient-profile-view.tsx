@@ -587,6 +587,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
   const [claimsLoading, setClaimsLoading] = useState(false);
   const [claimViewModal, setClaimViewModal] = useState<any>(null);
   const [claimEditModal, setClaimEditModal] = useState<any>(null);
+    const [claimTrackingModal, setClaimTrackingModal] = useState<any>(null);
   const [claimEditData, setClaimEditData] = useState<any>({});
   const [claimEditLoading, setClaimEditLoading] = useState(false);
   const [claimEditUploadingFiles, setClaimEditUploadingFiles] = useState(false);
@@ -5995,6 +5996,13 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                         >
                                           <Eye className="w-4 h-4" />
                                         </button>
+                                        <button
+                                          onClick={() => setClaimTrackingModal(claim)}
+                                          className="p-1.5 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                                          title="Track Claim"
+                                        >
+                                          <Activity className="w-4 h-4" />
+                                        </button>
                                         {['Under Review', 'Rejected'].includes(claim.status) && (
                                           <button
                                             onClick={() => openClaimEditModal(claim)}
@@ -6197,6 +6205,194 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                           Created: {new Date(claimViewModal.createdAt).toLocaleString()}
                           {claimViewModal.reviewedAt && <> | Reviewed: {new Date(claimViewModal.reviewedAt).toLocaleString()}</>}
                         </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Claim Tracking Modal */}
+                {claimTrackingModal && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                      <div className="sticky top-0 bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-4 flex items-center justify-between z-10">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+                            <Activity className="w-5 h-5 text-white" />
+                          </div>
+                          <div>
+                            <h2 className="text-lg font-bold text-white">Claim Tracking</h2>
+                            <p className="text-xs text-white/80">View claim approval & rejection history</p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => setClaimTrackingModal(null)}
+                          className="p-2 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-colors"
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
+                      </div>
+                      
+                      <div className="p-6">
+                        {/* Timeline Container */}
+                        <div className="relative">
+                          {/* Vertical Line */}
+                          <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-gradient-to-b from-purple-300 via-blue-300 to-green-300"></div>
+                          
+                          {/* Timeline Items */}
+                          <div className="space-y-6">
+                            {/* 1. Claim Created */}
+                            <div className="relative flex items-start gap-4">
+                              <div className="relative z-10 w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-lg">
+                                <FileText className="w-5 h-5 text-white" />
+                              </div>
+                              <div className="flex-1 bg-purple-50 border border-purple-200 rounded-xl p-4 ml-2">
+                                <div className="flex items-center justify-between mb-2">
+                                  <h3 className="text-sm font-bold text-purple-900">Claim Created</h3>
+                                  <span className="text-xs font-semibold text-purple-600 bg-purple-100 px-2 py-1 rounded-full">
+                                    {new Date(claimTrackingModal.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-purple-700">
+                                  Insurance claim created with amount <strong>{claimTrackingModal.claimAmount?.toLocaleString()}</strong>
+                                </p>
+                                <p className="text-xs text-purple-600 mt-1">
+                                  Type: <span className="font-semibold">{claimTrackingModal.claimType}</span>
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* 2. Pass Claims Review (if rejected from pass claims) */}
+                            {claimTrackingModal.rejectedFromPassClaims && (
+                              <div className="relative flex items-start gap-4">
+                                <div className="relative z-10 w-12 h-12 rounded-full bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center shadow-lg">
+                                  <XCircle className="w-5 h-5 text-white" />
+                                </div>
+                                <div className="flex-1 bg-red-50 border border-red-200 rounded-xl p-4 ml-2">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <h3 className="text-sm font-bold text-red-900">Rejected from Pass Claims</h3>
+                                    <span className="text-xs font-semibold text-red-600 bg-red-100 px-2 py-1 rounded-full">
+                                      {claimTrackingModal.rejectedFromPassClaimsAt ? new Date(claimTrackingModal.rejectedFromPassClaimsAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A'}
+                                    </span>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <p className="text-xs text-red-700">
+                                      <strong>Rejected By:</strong> {claimTrackingModal.rejectedFromPassClaimsByName || 'N/A'}
+                                    </p>
+                                    <p className="text-xs text-red-700">
+                                      <strong>Role:</strong> <span className="font-semibold capitalize">{claimTrackingModal.rejectedFromPassClaimsByRole || 'N/A'}</span>
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* 3. Approval (if approved) */}
+                            {claimTrackingModal.approvedBy && (
+                              <div className="relative flex items-start gap-4">
+                                <div className="relative z-10 w-12 h-12 rounded-full bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center shadow-lg">
+                                  <CheckCircle className="w-5 h-5 text-white" />
+                                </div>
+                                <div className="flex-1 bg-green-50 border border-green-200 rounded-xl p-4 ml-2">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <h3 className="text-sm font-bold text-green-900">Claim Approved</h3>
+                                    <span className="text-xs font-semibold text-green-600 bg-green-100 px-2 py-1 rounded-full">
+                                      {claimTrackingModal.approvedAt ? new Date(claimTrackingModal.approvedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A'}
+                                    </span>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <p className="text-xs text-green-700">
+                                      <strong>Approved By:</strong> {claimTrackingModal.approvedByName || 'N/A'}
+                                    </p>
+                                    <p className="text-xs text-green-700">
+                                      <strong>Role:</strong> <span className="font-semibold capitalize">{claimTrackingModal.approvedByRole || 'N/A'}</span>
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* 4. Rejection (if rejected) */}
+                            {claimTrackingModal.rejectedBy && (
+                              <div className="relative flex items-start gap-4">
+                                <div className="relative z-10 w-12 h-12 rounded-full bg-gradient-to-br from-red-500 to-rose-500 flex items-center justify-center shadow-lg">
+                                  <XCircle className="w-5 h-5 text-white" />
+                                </div>
+                                <div className="flex-1 bg-red-50 border border-red-200 rounded-xl p-4 ml-2">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <h3 className="text-sm font-bold text-red-900">Claim Rejected</h3>
+                                    <span className="text-xs font-semibold text-red-600 bg-red-100 px-2 py-1 rounded-full">
+                                      {claimTrackingModal.rejectedAt ? new Date(claimTrackingModal.rejectedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A'}
+                                    </span>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <p className="text-xs text-red-700">
+                                      <strong>Rejected By:</strong> {claimTrackingModal.rejectedByName || 'N/A'}
+                                    </p>
+                                    <p className="text-xs text-red-700">
+                                      <strong>Role:</strong> <span className="font-semibold capitalize">{claimTrackingModal.rejectedByRole || 'N/A'}</span>
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* 5. Release (if released) */}
+                            {claimTrackingModal.releasedBy && (
+                              <div className="relative flex items-start gap-4">
+                                <div className="relative z-10 w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shadow-lg">
+                                  <DollarSign className="w-5 h-5 text-white" />
+                                </div>
+                                <div className="flex-1 bg-blue-50 border border-blue-200 rounded-xl p-4 ml-2">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <h3 className="text-sm font-bold text-blue-900">Claim Released</h3>
+                                    <span className="text-xs font-semibold text-blue-600 bg-blue-100 px-2 py-1 rounded-full">
+                                      {claimTrackingModal.releasedAt ? new Date(claimTrackingModal.releasedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A'}
+                                    </span>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <p className="text-xs text-blue-700">
+                                      <strong>Released By:</strong> {claimTrackingModal.releasedByName || 'N/A'}
+                                    </p>
+                                    <p className="text-xs text-blue-700">
+                                      <strong>Role:</strong> <span className="font-semibold capitalize">{claimTrackingModal.releasedByRole || 'N/A'}</span>
+                                    </p>
+                                    <p className="text-xs text-blue-700 mt-2 pt-2 border-t border-blue-200">
+                                      <strong>Advance Amount:</strong> {claimTrackingModal.advanceAmount?.toLocaleString() || 'N/A'}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Current Status Badge */}
+                            <div className="relative flex items-start gap-4">
+                              <div className="relative z-10 w-12 h-12 rounded-full bg-gradient-to-br from-gray-500 to-gray-600 flex items-center justify-center shadow-lg">
+                                <AlertCircle className="w-5 h-5 text-white" />
+                              </div>
+                              <div className="flex-1 bg-gray-50 border border-gray-200 rounded-xl p-4 ml-2">
+                                <h3 className="text-sm font-bold text-gray-900 mb-2">Current Status</h3>
+                                <span className={`inline-flex px-3 py-1.5 rounded-full text-xs font-bold border ${
+                                  claimTrackingModal.status === 'Under Review' ? 'bg-yellow-100 text-yellow-800 border-yellow-300' :
+                                  claimTrackingModal.status === 'Approved' ? 'bg-green-100 text-green-800 border-green-300' :
+                                  claimTrackingModal.status === 'Rejected' ? 'bg-red-100 text-red-800 border-red-300' :
+                                  'bg-blue-100 text-blue-800 border-blue-300'
+                                }`}>
+                                  {claimTrackingModal.status}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Footer */}
+                      <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4 flex justify-end">
+                        <button
+                          onClick={() => setClaimTrackingModal(null)}
+                          className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-medium"
+                        >
+                          Close
+                        </button>
                       </div>
                     </div>
                   </div>
