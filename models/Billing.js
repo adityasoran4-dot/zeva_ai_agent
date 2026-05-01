@@ -139,6 +139,12 @@ const billingSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+    // Amount of pending claim cleared in this invoice
+    pendingClaimUsed: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
     pending: {
       type: Number,
       required: true,
