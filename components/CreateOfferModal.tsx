@@ -37,9 +37,7 @@ export default function CreateOfferModal({
     timezone: "Asia/Kolkata",
     status: "draft" as "draft" | "active" | "paused" | "expired" | "archived",
     enabled: true,
-    maxUses: null as number | null,
     usesCount: 0,
-    perUserLimit: 1,
     
     // Applicability Control
     applyOnType: "all_services" as "all_services" | "selected_services" | "selected_departments" | "selected_doctors",
@@ -301,9 +299,7 @@ export default function CreateOfferModal({
         timezone: offer.timezone || "Asia/Kolkata",
         status: offer.status || "draft",
         enabled: offer.enabled ?? true,
-        maxUses: offer.maxUses || null,
         usesCount: offer.usesCount || 0,
-        perUserLimit: offer.perUserLimit || 1,
         
         applyOnType: offer.applyOnAllServices ? "all_services" : 
                     offer.departmentIds?.length > 0 ? "selected_departments" :
@@ -372,8 +368,8 @@ export default function CreateOfferModal({
       setErrors({ ...errors, [baseKey]: "" });
     }
 
-    if (["discountValue", "perUserLimit", "maxUses", "cashbackAmount", "cashbackExpiryDays", "buyQty", "freeQty", "maxBenefitCap", "minimumBillAmount", "marginThresholdPercent"].includes(name)) {
-      setForm((prev) => ({ ...prev, [name]: value ? Number(value) : (name === "maxUses" ? null : 0) }));
+    if (["discountValue", "cashbackAmount", "cashbackExpiryDays", "buyQty", "freeQty", "maxBenefitCap", "minimumBillAmount", "marginThresholdPercent"].includes(name)) {
+      setForm((prev) => ({ ...prev, [name]: value ? Number(value) : 0 }));
       return;
     }
 
@@ -781,29 +777,6 @@ export default function CreateOfferModal({
                     required
                   />
                   {errors.endsAt && <p className="text-red-500 text-[10px] mt-1">{errors.endsAt}</p>}
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-medium text-teal-700 mb-1">Total Usage Limit (Global)</label>
-                  <input
-                    type="number"
-                    name="maxUses"
-                    value={form.maxUses || ""}
-                    onChange={handleChange}
-                    className="text-gray-900 w-full border border-gray-200 rounded-lg px-2.5 py-2 text-xs sm:text-sm"
-                    placeholder="Unlimited"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-medium text-teal-700 mb-1">Usage Limit Per Patient</label>
-                  <input
-                    type="number"
-                    name="perUserLimit"
-                    value={form.perUserLimit}
-                    onChange={handleChange}
-                    className="text-gray-900 w-full border border-gray-200 rounded-lg px-2.5 py-2 text-xs sm:text-sm"
-                  />
                 </div>
 
                 <div>

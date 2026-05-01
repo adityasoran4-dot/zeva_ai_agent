@@ -205,8 +205,6 @@ export default async function handler(req, res) {
       offer.startsAt = data.startsAt ? new Date(data.startsAt) : offer.startsAt;
       offer.endsAt = data.endsAt ? new Date(data.endsAt) : offer.endsAt;
       offer.timezone = data.timezone ?? offer.timezone;
-      offer.maxUses = data.maxUses !== undefined ? (data.maxUses ? Number(data.maxUses) : null) : offer.maxUses;
-      offer.perUserLimit = data.perUserLimit !== undefined ? Number(data.perUserLimit) : offer.perUserLimit;
       offer.status = data.status ?? offer.status;
       offer.enabled = data.enabled !== undefined ? Boolean(data.enabled) : offer.enabled;
 

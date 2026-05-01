@@ -97,11 +97,9 @@ export default function AppointmentBookingModal({
     preSelectedPatient: preSelectedPatient ? preSelectedPatient.fullName : null,
   });
 
-  const [roomId, setRoomId] = useState<string>(defaultRoomId || "");
-  const [selectedDoctorId, setSelectedDoctorId] = useState<string>(
-    doctorId || ""
-  );
-  const [status, setStatus] = useState<string>("booked");
+  const [roomId, setRoomId] = useState<string>("");
+  const [selectedDoctorId, setSelectedDoctorId] = useState<string>("");
+  const [status, setStatus] = useState<string>("");
   // Use useRef to capture bookedFrom when modal opens - this ensures it doesn't change
   const bookedFromRef = React.useRef<"doctor" | "room">("doctor");
 
@@ -180,6 +178,26 @@ export default function AppointmentBookingModal({
   const [servicesLoading, setServicesLoading] = useState(false);
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
   const [isServicesOpen, setIsServicesOpen] = useState(false);
+  const [servicesSearch, setServicesSearch] = useState("");
+  const servicesSearchRef = React.useRef<HTMLInputElement>(null);
+  
+  // Filter services based on search
+  const filteredServices = React.useMemo(() => {
+    if (!servicesSearch.trim()) return services;
+    const query = servicesSearch.toLowerCase();
+    return services.filter(svc => 
+      svc.name.toLowerCase().includes(query)
+    );
+  }, [services, servicesSearch]);
+  
+  // Auto-focus search input when dropdown opens
+  React.useEffect(() => {
+    if (isServicesOpen && servicesSearchRef.current) {
+      setTimeout(() => {
+        servicesSearchRef.current?.focus();
+      }, 100);
+    }
+  }, [isServicesOpen]);
 
   // Whenever the selected slot changes (or modal reopens), sync the times
   useEffect(() => {
@@ -194,15 +212,12 @@ export default function AppointmentBookingModal({
         setReferral("No");
       }
       setStartDate(defaultDate || new Date().toISOString().split("T")[0]);
-      setSelectedDoctorId(doctorId || "");
-      setRoomId(defaultRoomId || "");
+      // Reset mandatory fields to empty to force manual selection as per user request
+      setSelectedDoctorId("");
+      setRoomId("");
+      setStatus("");
 
-      console.log("Modal opened with values:", {
-        doctorId,
-        defaultRoomId,
-        selectedDoctorId: doctorId || "",
-        roomId: defaultRoomId || "",
-      });
+      console.log("Modal opened - mandatory fields reset to empty");
       // Always update bookedFrom from prop when modal opens - this ensures it's correct
       // CRITICAL: Use the prop value directly if it's explicitly "room" or "doctor"
       let newBookedFrom: "doctor" | "room";
@@ -432,18 +447,21 @@ export default function AppointmentBookingModal({
     if (!selectedPatient) {
       clientErrors.patientId = "Please select a patient";
     }
-    // Only require room OR doctor, not both - set error for the appropriate field
-    if (!roomId && !selectedDoctorId) {
-      // If we know the expected type from bookedFrom, set error for that field
-      if (bookedFrom === "room" || (defaultRoomId && !doctorId)) {
-        clientErrors.roomId = "Please select a room";
-      } else {
-        clientErrors.doctorId = "Please select a doctor";
-      }
+    
+    // REQUIRE both room AND doctor as per user request
+    if (!roomId) {
+      clientErrors.roomId = "Room is not filled";
+      toast.error("Please select the room, it is mandatory", { id: "room-mandatory-toast" });
+    }
+    if (!selectedDoctorId) {
+      clientErrors.doctorId = "Doctor is not filled";
+      toast.error("Please select a doctor, it is mandatory", { id: "doctor-mandatory-toast" });
     }
     if (!status) {
-      clientErrors.status = "Please select a status";
+      clientErrors.status = "Status is not filled";
+      toast.error("Please select a status, it is mandatory", { id: "status-mandatory-toast" });
     }
+    
     if (!followType) {
       clientErrors.followType = "Please select a follow type";
     }
@@ -459,7 +477,7 @@ export default function AppointmentBookingModal({
 
     if (Object.keys(clientErrors).length > 0) {
       setFieldErrors(clientErrors);
-      setError("Please fill all required fields");
+      setError("Mandatory sections are not filled: Room, Doctor, and Status are required");
       return;
     }
 
@@ -549,7 +567,7 @@ export default function AppointmentBookingModal({
 
       if (res.data.success) {
         onSuccess();
-        onClose();
+        handleClose();
         // Reset form
         resetForm();
       } else {
@@ -600,9 +618,9 @@ export default function AppointmentBookingModal({
   };
 
   const resetForm = () => {
-    setRoomId(defaultRoomId || "");
-    setSelectedDoctorId(doctorId || "");
-    setStatus("booked");
+    setRoomId("");
+    setSelectedDoctorId("");
+    setStatus("");
     setPatientSearch("");
     setSearchResults([]);
     setSelectedPatient(null);
@@ -617,6 +635,14 @@ export default function AppointmentBookingModal({
     setSelectedServiceIds([]);
     setError("");
     setFieldErrors({});
+    setServicesSearch("");
+    setIsServicesOpen(false);
+  };
+
+  // Wrap onClose to reset form when modal closes
+  const handleClose = () => {
+    resetForm();
+    onClose();
   };
 
   if (!isOpen) return null;
@@ -629,10 +655,11 @@ export default function AppointmentBookingModal({
       : [];
 
   // Check if all required fields are filled
-  // Note: Either doctorId OR roomId is required, not both
+  // Note: BOTH doctorId AND roomId are required as per user request
   const isFormValid = Boolean(
     selectedPatient &&
-      (roomId || selectedDoctorId) && // Require either room or doctor
+      roomId && 
+      selectedDoctorId &&
       status &&
       followType &&
       startDate &&
@@ -647,7 +674,7 @@ export default function AppointmentBookingModal({
         className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm transition-all duration-300 animate-in fade-in"
         onClick={(e) => {
           if (e.target === e.currentTarget) {
-            onClose();
+            handleClose();
           }
         }}
         role="dialog"
@@ -674,7 +701,7 @@ export default function AppointmentBookingModal({
               </div>
             </div>
             <button
-              onClick={onClose}
+              onClick={handleClose}
               className="p-1.5 hover:bg-gray-800 dark:hover:bg-gray-600 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 text-white hover:scale-110 active:scale-95"
               aria-label="Close modal"
             >
@@ -705,7 +732,7 @@ export default function AppointmentBookingModal({
                   <p className="text-xs font-medium text-gray-700 dark:text-gray-800 mb-1">
                     Selected Doctor:{" "}
                     <span className="font-semibold text-gray-900 dark:text-gray-900">
-                      {selectedDoctor?.name || doctorName || "Select a doctor"}
+                      {selectedDoctor?.name || "Select a doctor"}
                     </span>
                     {selectedDoctor && (
                       <span className="ml-2 text-[10px] text-green-600 dark:text-green-700 font-medium">
@@ -876,6 +903,7 @@ export default function AppointmentBookingModal({
                     fieldErrors.status ? "status-error" : undefined
                   }
                 >
+                  <option value="">Select a status</option>
                   {APPOINTMENT_STATUS_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>
                       {opt.label}
@@ -903,7 +931,12 @@ export default function AppointmentBookingModal({
                 className={`w-full border border-gray-300 dark:border-gray-300 rounded-lg px-3 py-2.5 text-xs bg-white dark:bg-gray-100 text-gray-900 dark:text-gray-900 cursor-pointer flex justify-between items-center transition-all hover:border-gray-400 dark:hover:border-gray-500 hover:shadow-sm ${
                   isServicesOpen ? "ring-2 ring-gray-500 dark:ring-gray-600 border-gray-500 dark:border-gray-600" : ""
                 }`}
-                onClick={() => setIsServicesOpen(!isServicesOpen)}
+                onClick={() => {
+                  if (!isServicesOpen) {
+                    setServicesSearch(""); // Clear search when opening
+                  }
+                  setIsServicesOpen(!isServicesOpen);
+                }}
               >
                 <div className="flex flex-wrap gap-1">
                   {selectedServiceIds.length > 0 ? (
@@ -935,47 +968,71 @@ export default function AppointmentBookingModal({
               </div>
 
               {isServicesOpen && (
-                <div className="absolute z-[1002] mt-1 w-full bg-white dark:bg-gray-50 border border-gray-200 dark:border-gray-300 rounded-lg shadow-xl max-h-60 overflow-y-auto animate-in fade-in slide-in-from-top-1">
-                  {servicesLoading ? (
-                    <div className="p-3 text-center text-xs text-gray-500">
-                      <Loader2 className="w-4 h-4 animate-spin inline mr-2" />
-                      Loading treatments...
+                <div className="absolute z-[1002] mt-1 w-full bg-white dark:bg-gray-50 border border-gray-200 dark:border-gray-300 rounded-lg shadow-xl max-h-60 overflow-hidden animate-in fade-in slide-in-from-top-1 flex flex-col">
+                  {/* Search Input */}
+                  <div className="p-2 border-b border-gray-200 dark:border-gray-300 flex-shrink-0">
+                    <div className="relative">
+                      <svg className="absolute left-2.5 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                      <input
+                        type="text"
+                        ref={servicesSearchRef}
+                        value={servicesSearch}
+                        onChange={(e) => setServicesSearch(e.target.value)}
+                        placeholder="Search treatments..."
+                        className="w-full pl-8 pr-3 py-1.5 text-xs border border-gray-300 dark:border-gray-400 rounded-md focus:ring-1 focus:ring-gray-500 dark:focus:ring-gray-600 focus:border-gray-500 dark:focus:border-gray-600 bg-white dark:bg-gray-100 text-gray-900 dark:text-gray-900 placeholder-gray-400"
+                        onClick={(e) => e.stopPropagation()}
+                      />
                     </div>
-                  ) : services.length > 0 ? (
-                    <div className="py-1">
-                      {services.map((svc) => {
-                        const isSelected = selectedServiceIds.includes(svc._id);
-                        return (
-                          <div
-                            key={svc._id}
-                            className={`px-3 py-2 text-xs cursor-pointer flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-200 ${
-                              isSelected ? "bg-gray-50 dark:bg-gray-100 text-gray-900 font-medium" : "text-gray-700 dark:text-gray-800"
-                            }`}
-                            onClick={() => {
-                              if (isSelected) {
-                                setSelectedServiceIds(selectedServiceIds.filter((id) => id !== svc._id));
-                              } else {
-                                setSelectedServiceIds([...selectedServiceIds, svc._id]);
-                              }
-                            }}
-                          >
-                            <span>{svc.name}</span>
-                            {isSelected && <Check className="w-3.5 h-3.5 text-green-600" />}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="p-3 text-center text-xs text-gray-500 italic">
-                      No treatments found
-                    </div>
-                  )}
+                  </div>
+                  
+                  {/* Services List */}
+                  <div className="overflow-y-auto flex-1 max-h-[200px]">
+                    {servicesLoading ? (
+                      <div className="p-3 text-center text-xs text-gray-500">
+                        <Loader2 className="w-4 h-4 animate-spin inline mr-2" />
+                        Loading treatments...
+                      </div>
+                    ) : filteredServices.length > 0 ? (
+                      <div className="py-1">
+                        {filteredServices.map((svc) => {
+                          const isSelected = selectedServiceIds.includes(svc._id);
+                          return (
+                            <div
+                              key={svc._id}
+                              className={`px-3 py-2 text-xs cursor-pointer flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-200 ${
+                                isSelected ? "bg-gray-50 dark:bg-gray-100 text-gray-900 font-medium" : "text-gray-700 dark:text-gray-800"
+                              }`}
+                              onClick={() => {
+                                if (isSelected) {
+                                  setSelectedServiceIds(selectedServiceIds.filter((id) => id !== svc._id));
+                                } else {
+                                  setSelectedServiceIds([...selectedServiceIds, svc._id]);
+                                }
+                              }}
+                            >
+                              <span>{svc.name}</span>
+                              {isSelected && <Check className="w-3.5 h-3.5 text-green-600" />}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="p-3 text-center text-xs text-gray-500 italic">
+                        {servicesSearch ? 'No treatments match your search' : 'No treatments found'}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
               {isServicesOpen && (
                 <div
                   className="fixed inset-0 z-[1001]"
-                  onClick={() => setIsServicesOpen(false)}
+                  onClick={() => {
+                    setIsServicesOpen(false);
+                    setServicesSearch(""); // Clear search when closing
+                  }}
                 />
               )}
             </div>
@@ -1475,7 +1532,7 @@ export default function AppointmentBookingModal({
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={onClose}
+                onClick={handleClose}
                 className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-400 rounded-lg text-xs font-medium text-gray-700 dark:text-gray-900 bg-white dark:bg-gray-100 hover:bg-gray-50 dark:hover:bg-gray-200 hover:border-gray-400 dark:hover:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-400 dark:focus:ring-gray-500 transition-all duration-200 hover:scale-105 active:scale-95 shadow-sm hover:shadow-md"
               >
                 Cancel
@@ -1483,11 +1540,11 @@ export default function AppointmentBookingModal({
               <button
                 type="submit"
                 form="appointment-form"
-                disabled={!isFormValid}
+                disabled={loading}
                 className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-offset-1 transition-all duration-200 shadow-md ${
-                  isFormValid
-                    ? "bg-gray-800 dark:bg-gray-700 hover:bg-gray-900 dark:hover:bg-gray-800 text-white hover:scale-105 active:scale-95 hover:shadow-lg focus:ring-gray-500 cursor-pointer"
-                    : "bg-gray-400 dark:bg-gray-500 text-gray-200 dark:text-gray-300 cursor-not-allowed opacity-60 hover:scale-100 active:scale-100 shadow-none"
+                  loading
+                    ? "bg-gray-400 dark:bg-gray-500 text-gray-200 dark:text-gray-300 cursor-not-allowed opacity-60 hover:scale-100 active:scale-100 shadow-none"
+                    : "bg-gray-800 dark:bg-gray-700 hover:bg-gray-900 dark:hover:bg-gray-800 text-white hover:scale-105 active:scale-95 hover:shadow-lg focus:ring-gray-500 cursor-pointer"
                 }`}
               >
                 {loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { ChromePicker } from 'react-color';
 import { ModalPortal } from "../../lib/modalPortal";

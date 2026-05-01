@@ -165,6 +165,17 @@ const CountryPhoneInput = ({ countryCode, phone, onCountryChange, onPhoneChange 
     );
   }, [query]);
   const selected = useMemo(() => COUNTRY_CODES.find(c => c.code === countryCode) || COUNTRY_CODES.find(c => c.code === "+971"), [countryCode]);
+  
+  // Extract local number (without country code) for display
+  const localNumber = useMemo(() => {
+    if (!phone) return '';
+    if (phone.startsWith(countryCode)) {
+      return phone.slice(countryCode.length);
+    }
+    // If it doesn't start with country code, return as is
+    return phone.replace(/^\+\d+/, '');
+  }, [phone, countryCode]);
+  
   return (
     <div className="relative w-full">
       <div className={`flex items-center border border-gray-300 rounded-md overflow-hidden focus-within:ring-1 focus-within:ring-teal-600`}>
@@ -181,7 +192,7 @@ const CountryPhoneInput = ({ countryCode, phone, onCountryChange, onPhoneChange 
         </button>
         <input
           type="tel"
-          value={phone}
+          value={localNumber}
           onChange={e => onPhoneChange(e.target.value)}
           maxLength={15}
           inputMode="numeric"
@@ -225,7 +236,7 @@ const CountryPhoneInput = ({ countryCode, phone, onCountryChange, onPhoneChange 
 
 const INITIAL_FORM_DATA = {
   invoiceNumber: "", emrNumber: "", firstName: "", lastName: "", email: "",
-  mobileNumber: "+91", countryCode: "+91", gender: "", patientType: "New", referredBy: "No",
+  mobileNumber: "", countryCode: "+91", gender: "", patientType: "New", referredBy: "No",
   insurance: "No", advanceGivenAmount: "", coPayPercent: "", advanceClaimStatus: "Pending",
   insuranceType: "Paid",
   membership: "No", membershipStartDate: "", membershipEndDate: "", membershipId: "",
@@ -1176,28 +1187,25 @@ return (
                     phone={formData.mobileNumber}
                     onCountryChange={(code) => {
                       setFormData(prev => {
-                        // If number already starts with the old code, replace it
-                        // Otherwise, just prepend the new code if the number is empty or doesn't have a code
-                        let newMobile = prev.mobileNumber;
-                        const oldCode = prev.countryCode;
-                        
-                        if (newMobile.startsWith(oldCode)) {
-                          newMobile = code + newMobile.slice(oldCode.length);
-                        } else if (!newMobile.startsWith('+')) {
-                          newMobile = code + newMobile;
+                        // Extract local number from current mobileNumber
+                        let localNum = prev.mobileNumber;
+                        if (localNum.startsWith(prev.countryCode)) {
+                          localNum = localNum.slice(prev.countryCode.length);
                         } else {
-                          // If it starts with a different code already (maybe manual entry), just replace it
-                          // but this is complex, let's keep it simple: always use the new code as prefix
-                          newMobile = code + newMobile.replace(/^\+\d+/, '');
+                          localNum = localNum.replace(/^\+\d+/, '');
                         }
                         
+                        // Prepend new country code
+                        const newMobile = code + localNum;
                         return { ...prev, countryCode: code, mobileNumber: newMobile };
                       });
                     }}
                     onPhoneChange={(val) => {
-                      // Allow digits and the leading '+'
-                      const sanitized = val.replace(/[^\d+]/g, "").slice(0, 15);
-                      setFormData(prev => ({ ...prev, mobileNumber: sanitized }));
+                      // Allow only digits (no + sign in the local number)
+                      const sanitized = val.replace(/[^\d]/g, "").slice(0, 15);
+                      // Prepend country code to the local number
+                      const fullNumber = formData.countryCode + sanitized;
+                      setFormData(prev => ({ ...prev, mobileNumber: fullNumber }));
                       if (errors.mobileNumber) setErrors(prev => ({ ...prev, mobileNumber: "" }));
                     }}
                   />

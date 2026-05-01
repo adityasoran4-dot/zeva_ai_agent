@@ -182,8 +182,6 @@ export default async function handler(req, res) {
       timezone: data.timezone || "Asia/Kolkata",
       status: data.status || "draft",
       enabled: data.enabled ?? true,
-      maxUses: data.maxUses ? Number(data.maxUses) : null,
-      perUserLimit: data.perUserLimit ? Number(data.perUserLimit) : 1,
 
       // Applicability
       applyOnAllServices: data.applyOnAllServices ?? true,
