@@ -45,53 +45,139 @@ export default async function handler(req, res) {
     let totalCashbackRefunded = 0;
     let totalCashbackWalletReversed = 0;
     const freeSessionsRefunded = [];
+    const freeSessionsRestored = [];
 
-    // Handle Bundle Offer - Restore Free Sessions
+    // Case 1: This billing CONSUMED free sessions (usedFreeSessions)
+    // When refunded, we need to restore those sessions back to the original billings
+    if (billing.usedFreeSessions && billing.usedFreeSessions.length > 0) {
+      console.log('[RefundAPI] Billing consumed free sessions, restoring them:', billing.usedFreeSessions);
+      
+      // Find all billings for this patient that have free sessions available
+      const patientBillings = await Billing.find({
+        patientId: billing.patientId,
+        offerType: 'bundle',
+        offerFreeSession: { $exists: true },
+        _id: { $ne: billing._id } // Exclude current billing
+      }).sort({ createdAt: 1 }); // Oldest first (FIFO)
+
+      // Restore sessions to the original billing records (reverse of consumption)
+      let sessionsToRestore = [...billing.usedFreeSessions];
+      
+      for (const prevBilling of patientBillings) {
+        if (sessionsToRestore.length === 0) break;
+        
+        const currentFreeSessions = prevBilling.offerFreeSession || [];
+        const restoredSessions = [...currentFreeSessions];
+        let restoredCount = 0;
+        
+        // Add back the sessions that were consumed
+        for (const session of sessionsToRestore) {
+          // Restore session by adding it back to offerFreeSession
+          restoredSessions.push(session);
+          restoredCount++;
+          freeSessionsRestored.push(session);
+          console.log(`[RefundAPI] Restoring free session "${session}" to billing ${prevBilling.invoiceNumber}`);
+        }
+        
+        // Remove restored sessions from the list
+        sessionsToRestore = sessionsToRestore.slice(restoredCount);
+        
+        // Update the billing with restored sessions
+        if (restoredCount > 0) {
+          await Billing.findByIdAndUpdate(prevBilling._id, {
+            $set: {
+              offerFreeSession: restoredSessions,
+              freeOfferSessionCount: restoredSessions.length
+            }
+          });
+          console.log(`[RefundAPI] Restored ${restoredCount} sessions to billing ${prevBilling.invoiceNumber}`);
+        }
+      }
+
+      if (sessionsToRestore.length > 0) {
+        console.warn('[RefundAPI] Warning: Could not restore all sessions:', sessionsToRestore);
+      }
+    }
+
+    // Case 2: This billing GRANTED free sessions (bundle offer)
+    // When refunded, we remove the free sessions from this billing
     if (billing.offerType === 'bundle' && billing.offerFreeSession?.length > 0) {
       freeSessionsRefunded.push(...billing.offerFreeSession);
+      
+      // Remove free sessions from this billing (they're being refunded)
+      await Billing.findByIdAndUpdate(billing._id, {
+        $set: {
+          offerFreeSession: [],
+          freeOfferSessionCount: 0
+        }
+      });
+      
+      console.log(`[RefundAPI] Removed ${billing.offerFreeSession.length} free sessions from billing ${billing.invoiceNumber}`);
+      
       refundedOffers.push({
         offerType: 'bundle',
         offerId: billing.offerId || null,
         offerName: billing.offerName || 'Bundle Offer',
         amount: 0,
         freeSessionsRefunded: [...billing.offerFreeSession],
+        freeSessionsRestored: [...freeSessionsRestored],
+        cashbackRefunded: 0,
+        cashbackWalletUsageReversed: 0
+      });
+    } else if (freeSessionsRestored.length > 0) {
+      // Only restored sessions, no bundle offer on this billing
+      refundedOffers.push({
+        offerType: 'bundle',
+        offerId: null,
+        offerName: 'Free Session Restoration',
+        amount: 0,
+        freeSessionsRefunded: [],
+        freeSessionsRestored: [...freeSessionsRestored],
         cashbackRefunded: 0,
         cashbackWalletUsageReversed: 0
       });
     }
 
-    // Handle Cashback Earned - Refund to Patient Wallet
+    // Handle Cashback Earned - REVOKE/REMOVE from Patient Wallet
+    // When refunding a billing where cashback was EARNED, we need to remove that cashback from wallet
     if (billing.isCashbackApplied && billing.cashbackAmount > 0) {
       const patient = await PatientRegistration.findById(billing.patientId);
       if (!patient) {
         return res.status(404).json({ success: false, message: 'Patient not found' });
       }
 
-      const refundAmount = billing.cashbackAmount;
-      patient.walletBalance = (patient.walletBalance || 0) + refundAmount;
+      const revokeAmount = billing.cashbackAmount;
+      
+      // DEDUCT the earned cashback from wallet (revoke it)
+      const currentWalletBalance = patient.walletBalance || 0;
+      const newWalletBalance = Math.max(0, currentWalletBalance - revokeAmount);
+      
+      patient.walletBalance = newWalletBalance;
       patient.walletTransactions = patient.walletTransactions || [];
       patient.walletTransactions.push({
-        amount: refundAmount,
-        type: 'credit',
+        amount: revokeAmount,
+        type: 'debit',  // Debit because we're removing cashback
         source: 'refund',
         offerId: billing.cashbackOfferId || null,
-        offerName: billing.cashbackOfferName || 'Cashback Refund',
+        offerName: billing.cashbackOfferName || 'Cashback Revoked',
         billingId: billing._id,
         invoiceNumber: billing.invoiceNumber,
-        description: `Cashback refund for invoice ${billing.invoiceNumber}`,
+        description: `Cashback revoked due to refund of invoice ${billing.invoiceNumber}`,
         createdAt: new Date()
       });
       
       await patient.save();
-      totalCashbackRefunded = refundAmount;
+      totalCashbackRefunded = revokeAmount;
+      
+      console.log(`[RefundAPI] Revoked ${revokeAmount} cashback from wallet for patient ${patient._id}`);
       
       refundedOffers.push({
         offerType: 'cashback',
         offerId: billing.cashbackOfferId || null,
         offerName: billing.cashbackOfferName || 'Cashback Offer',
-        amount: refundAmount,
+        amount: revokeAmount,
         freeSessionsRefunded: [],
-        cashbackRefunded: refundAmount,
+        cashbackRefunded: revokeAmount,
         cashbackWalletUsageReversed: 0
       });
     }
@@ -169,12 +255,18 @@ export default async function handler(req, res) {
       data: {
         billingId: billing._id,
         invoiceNumber: billing.invoiceNumber,
-        freeSessionsRestored: freeSessionsRefunded.length,
-        freeSessionNames: freeSessionsRefunded,
-        cashbackRefunded: totalCashbackRefunded,
-        cashbackWalletReversed: totalCashbackWalletReversed,
+        freeSessionsRestored: freeSessionsRestored.length,
+        freeSessionNames: freeSessionsRestored,
+        freeSessionsRemoved: freeSessionsRefunded.length,
+        freeSessionsRemovedNames: freeSessionsRefunded,
+        cashbackRevoked: totalCashbackRefunded,  // Cashback that was revoked (earned but now removed)
+        cashbackRestored: totalCashbackWalletReversed,  // Cashback that was restored (used but now returned)
         totalRefunded: totalRefundedAmount,
-        refundedOffers
+        refundedOffers,
+        summary: {
+          cashbackAction: totalCashbackRefunded > 0 ? 'REVOKED' : (totalCashbackWalletReversed > 0 ? 'RESTORED' : 'NONE'),
+          cashbackAmount: totalCashbackRefunded > 0 ? totalCashbackRefunded : totalCashbackWalletReversed
+        }
       }
     });
 

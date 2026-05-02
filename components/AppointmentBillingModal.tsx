@@ -1065,8 +1065,13 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
             const today = new Date();
             today.setHours(0, 0, 0, 0);
             
-            // Calculate total earned cashback (still valid)
+            // Calculate total earned cashback (still valid, excluding refunded)
             const cashbackEarnedBillings = (response.data.billings || []).filter((billing: any) => {
+              // Skip refunded billings
+              if (billing.isOfferRefunded) {
+                return false;
+              }
+              
               if (!billing.isCashbackApplied || !billing.cashbackAmount || billing.cashbackAmount <= 0) {
                 return false;
               }
@@ -1084,10 +1089,12 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
               return sum + (billing.cashbackAmount || 0);
             }, 0);
             
-            // Calculate total used cashback
-            const totalCashbackUsed = (response.data.billings || []).reduce((sum: number, billing: any) => {
-              return sum + (billing.cashbackWalletUsed || 0);
-            }, 0);
+            // Calculate total used cashback (excluding refunded billings)
+            const totalCashbackUsed = (response.data.billings || [])
+              .filter((billing: any) => !billing.isOfferRefunded)
+              .reduce((sum: number, billing: any) => {
+                return sum + (billing.cashbackWalletUsed || 0);
+              }, 0);
             
             // Available cashback = Earned - Used
             const availableCashbackAmount = Math.max(0, totalCashbackEarned - totalCashbackUsed);

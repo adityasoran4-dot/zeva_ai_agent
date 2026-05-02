@@ -64,6 +64,10 @@ interface OfferTrackItem {
   refundedAt?: string;
   refundedBy?: string;
   refundedAmount?: number;
+  // Used free sessions
+  usedFreeSessions?: string[];
+  usedFreeSessionCount?: number;
+  usedFreeSessionNames?: string;
 }
 
 interface Summary {
@@ -223,14 +227,33 @@ export default function OfferTrackReport({ startDate, endDate, headers }: Props)
       const json = await response.json();
 
       if (response.ok && json.success) {
-        setRefundSuccess(`Refund processed successfully! Total refunded: ${currency(json.data.totalRefunded)}`);
+        const summary = json.data?.summary;
+        let successMsg = 'Refund processed successfully!';
+        
+        if (summary) {
+          if (summary.cashbackAction === 'REVOKED') {
+            successMsg += ` ${currency(summary.cashbackAmount)} cashback revoked from wallet.`;
+          } else if (summary.cashbackAction === 'RESTORED') {
+            successMsg += ` ${currency(summary.cashbackAmount)} cashback restored to wallet.`;
+          }
+        }
+        
+        if (json.data.freeSessionsRestored > 0) {
+          successMsg += ` ${json.data.freeSessionsRestored} free session(s) restored.`;
+        }
+        
+        if (json.data.freeSessionsRemoved > 0) {
+          successMsg += ` ${json.data.freeSessionsRemoved} free session(s) removed.`;
+        }
+        
+        setRefundSuccess(successMsg);
         
         // Refresh the data after successful refund
         setTimeout(() => {
           fetchData();
           setShowRefundModal(false);
           setSelectedBilling(null);
-        }, 2000);
+        }, 3000);
       } else {
         setRefundError(json.message || 'Failed to process refund');
       }
@@ -366,6 +389,7 @@ export default function OfferTrackReport({ startDate, endDate, headers }: Props)
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Agent Disc.</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Cashback</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Free Sessions</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Free Sessions Used</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Applied By</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Original</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Final</th>
@@ -375,7 +399,7 @@ export default function OfferTrackReport({ startDate, endDate, headers }: Props)
             <tbody className="bg-white divide-y divide-gray-100">
               {filteredData.length === 0 ? (
                 <tr>
-                  <td colSpan={14} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={15} className="px-4 py-8 text-center text-gray-500">
                     No offer track records found
                   </td>
                 </tr>
@@ -423,6 +447,9 @@ export default function OfferTrackReport({ startDate, endDate, headers }: Props)
                     </td>
                     <td className="px-4 py-2 text-sm text-purple-600">
                       {item.freeSessionNames || (item.bundleSessionsAdded > 0 ? `${item.bundleSessionsAdded} sessions` : "-")}
+                    </td>
+                    <td className="px-4 py-2 text-sm text-purple-600">
+                      {item.usedFreeSessionNames || (item.usedFreeSessionCount && item.usedFreeSessionCount > 0 ? `${item.usedFreeSessionCount} sessions` : "-")}
                     </td>
                     <td className="px-4 py-2 text-sm">
                       <span className="font-medium text-teal-600">{item.offerAppliedBy || "-"}</span>
@@ -497,19 +524,22 @@ export default function OfferTrackReport({ startDate, endDate, headers }: Props)
                 </div>
 
                 <div className="bg-amber-50 border border-amber-200 rounded p-3">
-                  <p className="text-sm text-amber-800 font-medium mb-2">The following will be refunded:</p>
+                  <p className="text-sm text-amber-800 font-medium mb-2">The following will happen on refund:</p>
                   <ul className="text-sm text-amber-700 space-y-1">
                     {selectedBilling.cashbackEarned > 0 && (
-                      <li>+ Cashback earned: {currency(selectedBilling.cashbackEarned)} back to wallet</li>
+                      <li className="text-red-600">⚠️ Cashback earned: {currency(selectedBilling.cashbackEarned)} will be REVOKED from wallet</li>
                     )}
                     {selectedBilling.cashbackWalletUsed > 0 && (
-                      <li>+ Cashback wallet usage: {currency(selectedBilling.cashbackWalletUsed)} reversed</li>
+                      <li className="text-green-600">✓ Cashback wallet usage: {currency(selectedBilling.cashbackWalletUsed)} will be RESTORED to wallet</li>
                     )}
                     {selectedBilling.offerType === 'bundle' && selectedBilling.freeSessionNames && (
-                      <li>+ Free sessions restored: {selectedBilling.freeSessionNames}</li>
+                      <li className="text-red-600">⚠️ Free sessions granted: {selectedBilling.freeSessionNames} will be REMOVED</li>
+                    )}
+                    {selectedBilling.usedFreeSessionNames && (
+                      <li className="text-green-600">✓ Used free sessions will be RESTORED: {selectedBilling.usedFreeSessionNames}</li>
                     )}
                     {selectedBilling.offerDiscountAmount > 0 && (
-                      <li>+ Discount recorded: {currency(selectedBilling.offerDiscountAmount)}</li>
+                      <li>ℹ️ Discount recorded: {currency(selectedBilling.offerDiscountAmount)}</li>
                     )}
                   </ul>
                 </div>

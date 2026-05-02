@@ -331,6 +331,18 @@ freeOfferSessionCount: {
   min: 0
 },
 
+// Free sessions consumed in this billing (redemptions from previous bundle offers)
+usedFreeSessions: {
+  type: [String],
+  default: []
+},
+
+usedFreeSessionCount: {
+  type: Number,
+  default: 0,
+  min: 0
+},
+
 // Offer refund tracking fields
 isOfferRefunded: {
   type: Boolean,
@@ -375,6 +387,10 @@ refundedOffers: [{
     default: 0
   },
   freeSessionsRefunded: {
+    type: [String],
+    default: []
+  },
+  freeSessionsRestored: {
     type: [String],
     default: []
   },
