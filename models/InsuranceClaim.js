@@ -55,16 +55,20 @@ const InsuranceClaimSchema = new mongoose.Schema(
       default: "",
       trim: true,
     },
-    serviceId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Service",
-      default: null,
-    },
-    serviceName: {
-      type: String,
-      default: "",
-      trim: true,
-    },
+    services: [
+      {
+        serviceId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Service",
+          default: null,
+        },
+        serviceName: {
+          type: String,
+          default: "",
+          trim: true,
+        },
+      },
+    ],
     doctorId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",

@@ -608,6 +608,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
     departmentName: "",
     serviceId: "",
     serviceName: "",
+    services: [], // Array to store multiple services
     doctorId: "",
     doctorName: "",
     claimAmount: "",
@@ -2685,6 +2686,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
       departmentName: claim.departmentName || "",
       serviceId: claim.serviceId || "",
       serviceName: claim.serviceName || "",
+      services: claim.services || [],
       doctorId: claim.doctorId || "",
       doctorName: claim.doctorName || "",
       claimAmount: claim.claimAmount || "",
@@ -2748,16 +2750,23 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
       departmentName: dept ? dept.name : "",
       serviceId: "",
       serviceName: "",
+      services: [], // Clear services when department changes
     }));
   };
 
   const handleNewClaimServiceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const svcId = e.target.value;
-    const svc = newClaimServices.find((s: any) => s._id === svcId);
+    // Get all selected options
+    const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
+    const selectedServices = newClaimServices
+      .filter((s: any) => selectedOptions.includes(s._id))
+      .map((s: any) => ({ serviceId: s._id, serviceName: s.name }));
+    
     setNewClaimData((prev: any) => ({
       ...prev,
-      serviceId: svcId,
-      serviceName: svc ? svc.name : "",
+      services: selectedServices,
+      // Keep backward compatibility with single service fields
+      serviceId: selectedServices.length > 0 ? selectedServices[selectedServices.length - 1].serviceId : "",
+      serviceName: selectedServices.length > 0 ? selectedServices[selectedServices.length - 1].serviceName : "",
     }));
   };
 
@@ -2908,6 +2917,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
           departmentName: newClaimData.departmentName,
           serviceId: newClaimData.serviceId,
           serviceName: newClaimData.serviceName,
+          services: newClaimData.services, // Send the services array
           doctorId: newClaimData.doctorId,
           doctorName: newClaimData.doctorName,
           claimAmount: newClaimData.claimAmount,
@@ -2927,6 +2937,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
           insuranceProvider: "", policyNumber: "", expiryDate: "",
           insuranceCardFile: "", tableOfBenefitsFile: "",
           departmentId: "", departmentName: "", serviceId: "", serviceName: "",
+          services: [],
           doctorId: "", doctorName: "", claimAmount: "", claimType: "Paid",
           coPayPercent: "", coPayType: "Patient Pays", notes: "",
           documentFiles: [], advanceStatus: "Full Pay", advanceAmount: 0,
@@ -5666,6 +5677,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                             departmentName: "",
                             serviceId: "",
                             serviceName: "",
+                            services: [],
                             doctorId: "",
                             doctorName: "",
                             claimAmount: "",
@@ -5815,14 +5827,64 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                               ))}
                             </select>
                           </div>
-                          <div className="flex-1 min-w-[140px]">
-                            <label className="block text-xs mb-0.5 font-medium text-gray-700">Service</label>
-                            <select name="serviceId" value={newClaimData.serviceId} onChange={handleNewClaimServiceChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-green-500 text-gray-900">
-                              <option value="">Select Service</option>
-                              {newClaimServices.filter((s: any) => !newClaimData.departmentId || String(s.departmentId) === String(newClaimData.departmentId)).map((s: any) => (
-                                <option key={s._id} value={s._id}>{s.name}</option>
-                              ))}
-                            </select>
+                          <div className="flex-1 min-w-[180px]">
+                            <label className="block text-xs mb-0.5 font-medium text-gray-700">
+                              Services {newClaimData.services.length > 0 && (
+                                <span className="text-blue-600 font-semibold ml-1">
+                                  ({newClaimData.services.length} selected)
+                                </span>
+                              )}
+                            </label>
+                            <div className="relative">
+                              <select 
+                                multiple
+                                value={newClaimData.services.map((s: any) => s.serviceId)} 
+                                onChange={handleNewClaimServiceChange} 
+                                className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-green-500 text-gray-900 min-h-[80px] bg-white"
+                              >
+                                {newClaimServices
+                                  .filter((s: any) => !newClaimData.departmentId || String(s.departmentId) === String(newClaimData.departmentId))
+                                  .map((s: any) => (
+                                    <option 
+                                      key={s._id} 
+                                      value={s._id}
+                                      className="py-1"
+                                    >
+                                      {s.name}
+                                    </option>
+                                  ))}
+                              </select>
+                            </div>
+                            <p className="text-[9px] text-gray-500 mt-1">
+                              💡 Hold <kbd className="px-1 py-0.5 bg-gray-100 border border-gray-300 rounded text-[8px] font-mono">Ctrl</kbd> (Windows) or <kbd className="px-1 py-0.5 bg-gray-100 border border-gray-300 rounded text-[8px] font-mono">Cmd</kbd> (Mac) to select multiple
+                            </p>
+                            {newClaimData.services.length > 0 && (
+                              <div className="mt-1.5 flex flex-wrap gap-1">
+                                {newClaimData.services.map((svc: any, idx: number) => (
+                                  <span 
+                                    key={idx} 
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-medium bg-green-100 text-green-800 border border-green-200"
+                                  >
+                                    {svc.serviceName}
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const updatedServices = newClaimData.services.filter((_: any, i: number) => i !== idx);
+                                        setNewClaimData((prev: any) => ({
+                                          ...prev,
+                                          services: updatedServices,
+                                          serviceId: updatedServices.length > 0 ? updatedServices[updatedServices.length - 1].serviceId : "",
+                                          serviceName: updatedServices.length > 0 ? updatedServices[updatedServices.length - 1].serviceName : "",
+                                        }));
+                                      }}
+                                      className="hover:bg-green-200 rounded-full p-0.5 transition-colors"
+                                    >
+                                      <X className="w-2.5 h-2.5" />
+                                    </button>
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                           </div>
                           <div className="flex-1 min-w-[140px]">
                             <label className="block text-xs mb-0.5 font-medium text-gray-700">Doctor <span className="text-red-500">*</span></label>
@@ -6074,6 +6136,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                 <tr>
                                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Claim Type</th>
                                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Department</th>
+                                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Services</th>
                                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Doctor</th>
                                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Amount</th>
                                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Pending Claim</th>
@@ -6092,6 +6155,19 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                       </span>
                                     </td>
                                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">{claim.departmentName || '-'}</td>
+                                    <td className="px-4 py-3 text-sm text-gray-700">
+                                      {claim.services && claim.services.length > 0 ? (
+                                        <div className="flex flex-wrap gap-1">
+                                          {claim.services.map((svc: any, idx: number) => (
+                                            <span key={idx} className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                              {svc.serviceName || 'Service'}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      ) : (
+                                        <span className="text-gray-400">-</span>
+                                      )}
+                                    </td>
                                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">{claim.doctorName || '-'}</td>
                                     <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-gray-900">{claim.claimAmount?.toLocaleString()}</td>
                                     <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-orange-700">{claim.pendingClaim > 0 ? claim.pendingClaim.toLocaleString() : '-'}</td>
@@ -6233,8 +6309,18 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                               <p className="text-sm font-semibold text-green-900">{claimViewModal.departmentName || '-'}</p>
                             </div>
                             <div>
-                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Service</p>
-                              <p className="text-sm font-semibold text-green-900">{claimViewModal.serviceName || '-'}</p>
+                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Services</p>
+                              {claimViewModal.services && claimViewModal.services.length > 0 ? (
+                                <div className="flex flex-wrap gap-1">
+                                  {claimViewModal.services.map((svc: any, idx: number) => (
+                                    <span key={idx} className="inline-flex px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                                      {svc.serviceName || 'Service'}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="text-sm font-semibold text-green-900">-</p>
+                              )}
                             </div>
                             <div>
                               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Doctor</p>
@@ -6583,24 +6669,83 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                           <h3 className="text-sm font-semibold text-green-800 mb-3">Claim Source & Type</h3>
                           <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-5 gap-3">
                             <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-1">Department</label>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">
+                                Department
+                              </label>
                               <select value={claimEditData.departmentId || ''} onChange={(e) => {
                                 const dept = claimDepartments.find((d: any) => d._id === e.target.value);
-                                setClaimEditData((prev: any) => ({ ...prev, departmentId: e.target.value, departmentName: dept?.name || '', serviceId: '', serviceName: '' }));
+                                setClaimEditData((prev: any) => ({ 
+                                  ...prev, 
+                                  departmentId: e.target.value, 
+                                  departmentName: dept?.name || '', 
+                                  serviceId: '', 
+                                  serviceName: '',
+                                  services: [] // Clear services when department changes
+                                }));
                               }} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500">
                                 <option value="">Select Department</option>
                                 {claimDepartments.map((d: any) => <option key={d._id} value={d._id}>{d.name}</option>)}
                               </select>
                             </div>
                             <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-1">Service</label>
-                              <select value={claimEditData.serviceId || ''} onChange={(e) => {
-                                const svc = claimServices.find((s: any) => s._id === e.target.value);
-                                setClaimEditData((prev: any) => ({ ...prev, serviceId: e.target.value, serviceName: svc?.name || '' }));
-                              }} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500">
-                                <option value="">Select Service</option>
-                                {claimServices.filter((s: any) => !claimEditData.departmentId || String(s.departmentId) === String(claimEditData.departmentId)).map((s: any) => <option key={s._id} value={s._id}>{s.name}</option>)}
+                              <label className="block text-xs font-medium text-gray-700 mb-1">
+                                Services {claimEditData.services && claimEditData.services.length > 0 && (
+                                  <span className="text-blue-600 font-semibold ml-1">
+                                    ({claimEditData.services.length} selected)
+                                  </span>
+                                )}
+                              </label>
+                              <select 
+                                multiple
+                                value={(claimEditData.services || []).map((s: any) => s.serviceId)} 
+                                onChange={(e) => {
+                                  const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
+                                  const selectedServices = claimServices
+                                    .filter((s: any) => selectedOptions.includes(s._id))
+                                    .map((s: any) => ({ serviceId: s._id, serviceName: s.name }));
+                                  
+                                  setClaimEditData((prev: any) => ({
+                                    ...prev,
+                                    services: selectedServices,
+                                    serviceId: selectedServices.length > 0 ? selectedServices[selectedServices.length - 1].serviceId : "",
+                                    serviceName: selectedServices.length > 0 ? selectedServices[selectedServices.length - 1].serviceName : "",
+                                  }));
+                                }} 
+                                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 min-h-[80px]"
+                              >
+                                {claimServices
+                                  .filter((s: any) => !claimEditData.departmentId || String(s.departmentId) === String(claimEditData.departmentId))
+                                  .map((s: any) => (
+                                    <option key={s._id} value={s._id}>{s.name}</option>
+                                  ))}
                               </select>
+                              {claimEditData.services && claimEditData.services.length > 0 && (
+                                <div className="mt-1.5 flex flex-wrap gap-1">
+                                  {claimEditData.services.map((svc: any, idx: number) => (
+                                    <span 
+                                      key={idx} 
+                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-medium bg-green-100 text-green-800 border border-green-200"
+                                    >
+                                      {svc.serviceName}
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const updatedServices = claimEditData.services.filter((_: any, i: number) => i !== idx);
+                                          setClaimEditData((prev: any) => ({
+                                            ...prev,
+                                            services: updatedServices,
+                                            serviceId: updatedServices.length > 0 ? updatedServices[updatedServices.length - 1].serviceId : "",
+                                            serviceName: updatedServices.length > 0 ? updatedServices[updatedServices.length - 1].serviceName : "",
+                                          }));
+                                        }}
+                                        className="hover:bg-green-200 rounded-full p-0.5 transition-colors"
+                                      >
+                                        <X className="w-2.5 h-2.5" />
+                                      </button>
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                             <div>
                               <label className="block text-xs font-medium text-gray-700 mb-1">Doctor <span className="text-red-500">*</span></label>

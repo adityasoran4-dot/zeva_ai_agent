@@ -97,6 +97,7 @@ export default async function handler(req, res) {
         departmentName,
         serviceId,
         serviceName,
+        services,
         doctorId,
         doctorName,
         claimAmount,
@@ -117,8 +118,16 @@ export default async function handler(req, res) {
       if (tableOfBenefitsFile !== undefined) claim.tableOfBenefitsFile = tableOfBenefitsFile;
       if (departmentId !== undefined) claim.departmentId = departmentId || null;
       if (departmentName !== undefined) claim.departmentName = departmentName;
-      if (serviceId !== undefined) claim.serviceId = serviceId || null;
-      if (serviceName !== undefined) claim.serviceName = serviceName;
+      
+      // Handle services - support both old format (serviceId/serviceName) and new format (services array)
+      if (services !== undefined && Array.isArray(services)) {
+        // New format: array of services
+        claim.services = services;
+      } else if (serviceId !== undefined) {
+        // Old format: single service (backward compatibility)
+        claim.services = [{ serviceId: serviceId || null, serviceName: serviceName || "" }];
+      }
+      
       if (doctorId !== undefined) {
         // Validate new doctor
         const doctor = await User.findById(doctorId);

@@ -85,6 +85,7 @@ export default async function handler(req, res) {
         departmentName,
         serviceId,
         serviceName,
+        services,
         doctorId,
         doctorName,
         claimAmount,
@@ -149,6 +150,16 @@ export default async function handler(req, res) {
       // Get doctor name
       const resolvedDoctorName = doctorName || `${doctor.name || ''}`.trim() || doctor.email;
 
+      // Build services array - support both old format (serviceId/serviceName) and new format (services array)
+      let servicesArray = [];
+      if (services && Array.isArray(services) && services.length > 0) {
+        // New format: array of {serviceId, serviceName}
+        servicesArray = services;
+      } else if (serviceId) {
+        // Old format: single serviceId/serviceName (backward compatibility)
+        servicesArray = [{ serviceId: serviceId, serviceName: serviceName || "" }];
+      }
+
       const newClaim = await InsuranceClaim.create({
         clinicId: clinicIdToUse,
         patientId,
@@ -160,8 +171,7 @@ export default async function handler(req, res) {
         tableOfBenefitsFile: tableOfBenefitsFile || "",
         departmentId: departmentId || null,
         departmentName: departmentName || "",
-        serviceId: serviceId || null,
-        serviceName: serviceName || "",
+        services: servicesArray,
         doctorId,
         doctorName: resolvedDoctorName,
         claimAmount: parseFloat(claimAmount),
