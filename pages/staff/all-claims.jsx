@@ -1273,6 +1273,16 @@ function AllClaimsPage() {
                   </div>
                 )}
 
+                {/* Treatment Plan */}
+                {(viewModal.treatmentPlan || claimDetails?.treatmentPlan) && (String(viewModal.treatmentPlan || "").trim() !== "" || String(claimDetails?.treatmentPlan || "").trim() !== "") && (
+                  <div className="mt-4">
+                    <h3 className="text-sm font-semibold text-gray-800 mb-2">Treatment Plan</h3>
+                    <div className="text-sm text-gray-700 bg-purple-50 border border-purple-100 rounded-lg p-3 whitespace-pre-wrap leading-relaxed">
+                      {claimDetails?.treatmentPlan || viewModal.treatmentPlan}
+                    </div>
+                  </div>
+                )}
+
                 {/* Document files */}
                 {viewModal.documentFiles && viewModal.documentFiles.length > 0 && (
                   <div>
@@ -1306,6 +1316,41 @@ function AllClaimsPage() {
                     {viewModal.reviewNotes && <p>Review notes: {viewModal.reviewNotes}</p>}
                   </div>
                 )}
+
+                {/* Administrative Details */}
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mt-4">
+                  <h3 className="text-[10px] font-bold text-gray-400 uppercase mb-3 tracking-widest">Administrative Details</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2 text-[10px]">
+                    <div className="flex justify-between border-b border-gray-200 pb-1">
+                      <span className="text-gray-500">Clinic Name:</span>
+                      <span className="font-semibold text-gray-700">{viewModal.clinicName || (typeof window !== 'undefined' ? localStorage.getItem('clinicName') : 'Clinic')}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-gray-200 pb-1">
+                      <span className="text-gray-500">Patient Name:</span>
+                      <span className="font-semibold text-gray-700">{viewModal.patientFirstName} {viewModal.patientLastName}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-gray-200 pb-1">
+                      <span className="text-gray-500">Doctor Name:</span>
+                      <span className="font-semibold text-gray-700">{viewModal.doctorName || "-"}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-gray-200 pb-1">
+                      <span className="text-gray-500">Insurance Provider:</span>
+                      <span className="font-semibold text-gray-700">{viewModal.insuranceProvider}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-gray-200 pb-1">
+                      <span className="text-gray-500">Claim Type:</span>
+                      <span className="font-semibold text-gray-700">{viewModal.claimType}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-gray-200 pb-1">
+                      <span className="text-gray-500">Created At:</span>
+                      <span className="text-gray-700">{new Date(viewModal.createdAt).toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-gray-200 pb-1">
+                      <span className="text-gray-500">Last Updated:</span>
+                      <span className="text-gray-700">{new Date(viewModal.updatedAt).toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
               </>
             )}
           </div>
