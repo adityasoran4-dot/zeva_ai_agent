@@ -560,7 +560,7 @@ function MyApp({ Component, pageProps }: AppPropsWithLayout) {
         containerStyle={{
           top: 8,
           right: 8,
-          zIndex: 9999,
+          zIndex: 10000,
         }}
         toastOptions={{
           duration: 4000,

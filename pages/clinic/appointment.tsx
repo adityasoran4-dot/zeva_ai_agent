@@ -3375,6 +3375,14 @@ useEffect(() => {
                                             showErrorToast("You do not have permission to book appointments");
                                             return;
                                           }
+                                          if (!canBookSlot) {
+                                             const limitTime = lastBookableMinutes !== null ? minutesToDisplay(lastBookableMinutes + SLOT_INTERVAL_MINUTES) : "";
+                                             const msg = !slotWithinClosing 
+                                               ? `Booking is not allowed after ${limitTime}. Slots are available only until ${limitTime}.` 
+                                               : "This slot cannot be booked. Check date/time or availability.";
+                                             showErrorToast(msg);
+                                             return;
+                                          }
                                           if (canBookSlot && !timeDragSelection.isDragging && !draggedAppointmentId) {
                                             setBookingModal({
                                               isOpen: true,
@@ -3387,8 +3395,6 @@ useEffect(() => {
                                               selectedDate,
                                               bookedFrom: "doctor",
                                             });
-                                          } else if (!canBookSlot) {
-                                             showErrorToast("This slot cannot be booked. Check date/time or availability.");
                                           }
                                         }}
                                       />
@@ -3651,6 +3657,14 @@ useEffect(() => {
                                             showErrorToast("You do not have permission to book appointments");
                                             return;
                                           }
+                                          if (!canBookSlot) {
+                                             const limitTime = lastBookableMinutes !== null ? minutesToDisplay(lastBookableMinutes + SLOT_INTERVAL_MINUTES) : "";
+                                             const msg = !slotWithinClosing 
+                                               ? `Booking is not allowed after ${limitTime}. Slots are available only until ${limitTime}.` 
+                                               : "This slot cannot be booked. Check date/time or availability.";
+                                             showErrorToast(msg);
+                                             return;
+                                          }
                                           if (canBookSlot && !roomDragSelection.isDragging && !draggedAppointmentId) {
                                             setBookingModal({
                                               isOpen: true,
@@ -3663,8 +3677,6 @@ useEffect(() => {
                                               selectedDate,
                                               bookedFrom: "room",
                                             });
-                                          } else if (!canBookSlot) {
-                                             showErrorToast("This slot cannot be booked. Check date/time or availability.");
                                           }
                                         }}
                                       />
@@ -4303,6 +4315,9 @@ useEffect(() => {
     {/* Toast Notification Container */}
     <Toaster
       position="top-right"
+      containerStyle={{
+        zIndex: 10000,
+      }}
       toastOptions={{
         duration: 3000,
         success: {

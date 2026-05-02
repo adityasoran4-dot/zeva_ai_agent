@@ -311,9 +311,46 @@ export default function AppointmentBookingModal({
   };
 
   const handleFromTimeChange = (value: string) => {
+    // Check against custom time slots if available
+    if (customTimeSlots?.endTime) {
+      const selectedMinutes = timeStringToMinutes(value);
+      const endMinutes = timeStringToMinutes(customTimeSlots.endTime);
+      if (selectedMinutes >= endMinutes) {
+        toast.error(`Booking is not allowed after ${formatTime(customTimeSlots.endTime)}. Slots are available only until ${formatTime(customTimeSlots.endTime)}.`);
+        return;
+      }
+    }
     setFromTime(value);
     setToTime(calculateEndTime(value));
     setFieldErrors((prev) => ({ ...prev, fromTime: "", toTime: "" }));
+  };
+
+  const handleToTimeChange = (value: string) => {
+    // Check against custom time slots if available
+    if (customTimeSlots?.endTime) {
+      const selectedMinutes = timeStringToMinutes(value);
+      const endMinutes = timeStringToMinutes(customTimeSlots.endTime);
+      if (selectedMinutes > endMinutes) {
+        toast.error(`Booking is not allowed after ${formatTime(customTimeSlots.endTime)}. Slots are available only until ${formatTime(customTimeSlots.endTime)}.`);
+        return;
+      }
+    }
+    setToTime(value);
+    setFieldErrors((prev) => ({ ...prev, toTime: "" }));
+  };
+
+  const timeStringToMinutes = (time: string): number => {
+    if (!time) return 0;
+    const [h, m] = time.split(":").map(Number);
+    return h * 60 + m;
+  };
+
+  const formatTime = (time: string): string => {
+    if (!time) return "";
+    const [h, m] = time.split(":").map(Number);
+    const ampm = h >= 12 ? "PM" : "AM";
+    const hours = h % 12 || 12;
+    return `${hours}:${String(m).padStart(2, "0")} ${ampm}`;
   };
 
   const handleAddPatient = async () => {
@@ -1488,12 +1525,7 @@ export default function AppointmentBookingModal({
                 <input
                   type="time"
                   value={toTime}
-                  onChange={(e) => {
-                    setToTime(e.target.value);
-                    if (fieldErrors.toTime) {
-                      setFieldErrors({ ...fieldErrors, toTime: "" });
-                    }
-                  }}
+                  onChange={(e) => handleToTimeChange(e.target.value)}
                   className={`w-full border rounded-lg px-3 py-2.5 text-xs bg-white dark:bg-gray-100 text-gray-900 dark:text-gray-900 border-gray-300 dark:border-gray-300 focus:ring-2 focus:ring-gray-500 dark:focus:ring-gray-600 focus:border-gray-500 dark:focus:border-gray-600 transition-all hover:border-gray-400 dark:hover:border-gray-500 hover:shadow-sm ${
                     fieldErrors.toTime
                       ? "border-red-500 dark:border-red-500 ring-2 ring-red-200 dark:ring-red-300"
