@@ -1345,26 +1345,6 @@ function OffersPage() {
                           </span>
                         </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-[10px] font-semibold text-teal-700 mb-1.5">Margin Threshold (%)</p>
-                          <span className="inline-flex items-center px-3 py-2 bg-teal-50 text-teal-800 rounded-lg text-xs border border-teal-200 font-medium">
-                            {viewingOffer.marginThresholdPercent ?? "—"}%
-                          </span>
-                        </div>
-                        <div>
-                          <p className="text-[10px] font-semibold text-teal-700 mb-1.5">Same Day Reuse Blocked</p>
-                          <span className="inline-flex items-center px-3 py-2 bg-teal-50 text-teal-800 rounded-lg text-xs border border-teal-200 font-medium">
-                            {viewingOffer.sameDayReuseBlocked !== false ? "Yes" : "No"}
-                          </span>
-                        </div>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-semibold text-teal-700 mb-1.5">Partial Payment Allowed</p>
-                        <span className="inline-flex items-center px-3 py-2 bg-teal-50 text-teal-800 rounded-lg text-xs border border-teal-200 font-medium">
-                          {viewingOffer.partialPaymentAllowed ? "Yes" : "No"}
-                        </span>
-                      </div>
                     </div>
                   </div>
 

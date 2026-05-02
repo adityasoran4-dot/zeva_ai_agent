@@ -1047,6 +1047,20 @@ export default function CreateOfferModal({
                   <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">
                     <input
                       type="checkbox"
+                      name="autoApplyBestOffer"
+                      checked={form.autoApplyBestOffer}
+                      onChange={handleChange}
+                      className="w-4 h-4 text-teal-600 rounded"
+                    />
+                    <div className="flex flex-col">
+                      <span className="text-xs font-semibold text-teal-900">Auto Apply Best Offer</span>
+                      <span className="text-[10px] text-gray-500">System automatically picks highest benefit</span>
+                    </div>
+                  </label>
+
+                  <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">
+                    <input
+                      type="checkbox"
                       name="allowCombiningWithOtherOffers"
                       checked={form.allowCombiningWithOtherOffers}
                       onChange={handleChange}
@@ -1103,36 +1117,7 @@ export default function CreateOfferModal({
               </div>
             </section>
 
-            {/* 4. SMART TOGGLES - COMMENTED OUT */}
-             <section className="space-y-4">
-              <h3 className="text-sm font-bold text-teal-800 border-b border-gray-200 pb-1.5 flex items-center gap-2">
-                <span className="bg-teal-100 text-teal-800 px-2 py-0.5 rounded text-[10px]">4</span>
-                SMART TOGGLES
-              </h3>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {[
-                  { name: "autoApplyBestOffer", label: "Auto Apply Best Offer", sub: "System automatically picks highest benefit" },
-                  { name: "allowManualOverride", label: "Allow Manual Override", sub: "Restricted manual selection by staff" },
-                  { name: "requireApprovalForOverride", label: "Require Approval for Override", sub: "Admin PIN required for manual changes" },
-                  { name: "blockIfProfitMarginBelowX", label: "Block if Margin Low", sub: "Prevent loss-making discounts" }
-                ].map((toggle) => (
-                  <label key={toggle.name} className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">
-                    <input
-                      type="checkbox"
-                      name={toggle.name}
-                      checked={(form as any)[toggle.name]}
-                      onChange={handleChange}
-                      className="w-4 h-4 text-teal-600 rounded"
-                    />
-                    <div className="flex flex-col">
-                      <span className="text-xs font-semibold text-teal-900">{toggle.label}</span>
-                      <span className="text-[10px] text-gray-500">{toggle.sub}</span>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            </section> 
+ 
 
           </div>
 
