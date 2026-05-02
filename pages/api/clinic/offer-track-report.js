@@ -63,7 +63,9 @@ export default async function handler(req, res) {
       { cashbackWalletUsed: { $gt: 0 } },  // Patient used cashback wallet
       { offerDiscountAmount: { $gt: 0 } },  // Any offer discount applied
       { offerType: { $in: ['instant_discount', 'cashback', 'bundle'] } },
+      { offerFreeSession: { $exists: true, $not: { $size: 0 } } },  // Has free sessions (bundle offers)
       { usedFreeSessions: { $exists: true, $not: { $size: 0 } } },  // Free sessions were consumed
+      { cashbackAmount: { $gt: 0 } },  // Cashback was earned
     ];
 
     if (Object.keys(dateFilter).length > 0) {
@@ -185,8 +187,11 @@ export default async function handler(req, res) {
 
       // Check if patient USED cashback wallet (spending earned cashback)
       if (billing.cashbackWalletUsed > 0 && !billing.isCashbackApplied) {
-        offerDetails.offerType = 'cashback';
-        offerDetails.offerName = 'Cashback Wallet Used';
+        // Only set if not already set by cashback earned
+        if (!offerDetails.offerType) {
+          offerDetails.offerType = 'cashback';
+          offerDetails.offerName = 'Cashback Wallet Used';
+        }
         offerDetails.cashbackAmount = 0; // Not earning, just using
       }
 
@@ -240,6 +245,9 @@ export default async function handler(req, res) {
         ? billing.offerFreeSession.join(', ')
         : '';
 
+      // Used free session names (consumed in this billing)
+      const usedFreeSessionNames = usedFreeSessions.join(', ');
+
       return {
         _id: billing._id,
         invoiceNumber: billing.invoiceNumber,
@@ -257,6 +265,10 @@ export default async function handler(req, res) {
         cashbackWalletUsed: billing.cashbackWalletUsed || 0,
         freeSessionNames: freeSessionNames,
         bundleSessionsAdded: offerDetails.bundleSessionsAdded,
+        // Used free sessions (redemptions)
+        usedFreeSessions: usedFreeSessions,
+        usedFreeSessionCount: usedFreeSessionCount,
+        usedFreeSessionNames: usedFreeSessionNames,
         // Discounts
         agentDiscount,
         doctorDiscount,
@@ -284,10 +296,6 @@ export default async function handler(req, res) {
         refundedAt: billing.refundedAt,
         refundedBy: billing.refundedBy,
         refundedAmount: billing.refundedAmount,
-        // Used free sessions
-        usedFreeSessions: usedFreeSessions,
-        usedFreeSessionCount: usedFreeSessionCount,
-        usedFreeSessionNames: usedFreeSessions.join(', '),
       };
     });
 

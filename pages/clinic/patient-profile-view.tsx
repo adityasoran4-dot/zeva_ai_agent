@@ -1937,8 +1937,14 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
           today: today.toISOString()
         });
        
-        // Find all billings with valid cashback
+        // Find all billings with valid cashback (excluding refunded ones)
         const cashbackBillings = billings.filter((billing: any) => {
+          // Skip refunded billings
+          if (billing.isOfferRefunded) {
+            console.log('[CashbackProfile] Skipping refunded billing:', billing.invoiceNumber);
+            return false;
+          }
+          
           if (!billing.isCashbackApplied || !billing.cashbackAmount || billing.cashbackAmount <= 0) {
             return false;
           }
@@ -1951,7 +1957,8 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
             console.log('[CashbackProfile] Billing:', billing.invoiceNumber, {
               cashbackAmount: billing.cashbackAmount,
               endDate: billing.cashbackEndDate,
-              isValid
+              isValid,
+              isRefunded: billing.isOfferRefunded
             });
             return isValid; // Not expired
           }
@@ -1966,10 +1973,12 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
           return sum + (billing.cashbackAmount || 0);
         }, 0);
        
-        // Calculate total USED cashback (from all billings)
-        const totalCashbackUsed = billings.reduce((sum: number, billing: any) => {
-          return sum + (billing.cashbackWalletUsed || 0);
-        }, 0);
+        // Calculate total USED cashback (from non-refunded billings only)
+        const totalCashbackUsed = billings
+          .filter((billing: any) => !billing.isOfferRefunded)  // Exclude refunded
+          .reduce((sum: number, billing: any) => {
+            return sum + (billing.cashbackWalletUsed || 0);
+          }, 0);
        
         // Calculate AVAILABLE cashback = Earned - Used
         const availableCashbackAmount = Math.max(0, totalCashbackEarned - totalCashbackUsed);
