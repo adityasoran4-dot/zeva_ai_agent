@@ -2260,27 +2260,66 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
         );
        
         if (response.data.success && response.data.billings) {
-          // Extract bundle offers with free sessions
-          const freeSessions = response.data.billings
+          // Extract bundle offers with free sessions and calculate remaining (unused) sessions
+          const allBillings = response.data.billings;
+          
+          // Build a map of used free sessions across all billings
+          const usedSessionsMap = new Map<string, number>();
+          allBillings.forEach((billing: any) => {
+            if (billing.usedFreeSessions && Array.isArray(billing.usedFreeSessions)) {
+              billing.usedFreeSessions.forEach((session: string) => {
+                const sessionKey = session.toLowerCase();
+                usedSessionsMap.set(sessionKey, (usedSessionsMap.get(sessionKey) || 0) + 1);
+              });
+            }
+          });
+
+          // Filter billings that offer free sessions and calculate remaining
+          const freeSessions = allBillings
             .filter((billing: any) => 
               billing.offerType === 'bundle' && 
               billing.offerFreeSession && 
               billing.offerFreeSession.length > 0 &&
               billing.freeOfferSessionCount > 0
             )
-            .map((billing: any) => ({
-              billingId: billing._id,
-              offerName: billing.offerName || billing.offerTitle || 'Bundle Offer',
-              offerFreeSession: billing.offerFreeSession || [],
-              freeOfferSessionCount: billing.freeOfferSessionCount || 0,
-              invoiceNumber: billing.invoiceNumber,
-              invoicedDate: billing.invoicedDate,
-              purchasedTreatment: billing.treatment,
-              amount: billing.amount
-            }));
+            .map((billing: any) => {
+              const offeredSessions = billing.offerFreeSession || [];
+              const offeredCount = billing.freeOfferSessionCount || 0;
+              
+              // Calculate how many of these sessions have been used
+              let usedCount = 0;
+              offeredSessions.forEach((session: string) => {
+                const sessionKey = session.toLowerCase();
+                usedCount += usedSessionsMap.get(sessionKey) || 0;
+              });
+              
+              // Calculate remaining sessions
+              const remainingCount = Math.max(0, offeredCount - usedCount);
+              const remainingSessions = offeredSessions.filter((session: string) => {
+                const sessionKey = session.toLowerCase();
+                const usedForThisSession = usedSessionsMap.get(sessionKey) || 0;
+                return usedForThisSession < offeredCount;
+              });
+
+              return {
+                billingId: billing._id,
+                offerName: billing.offerName || billing.offerTitle || 'Bundle Offer',
+                offerFreeSession: remainingSessions,
+                freeOfferSessionCount: remainingCount,
+                originalOfferedSessions: offeredSessions,
+                originalOfferedCount: offeredCount,
+                usedCount: usedCount,
+                remainingCount: remainingCount,
+                invoiceNumber: billing.invoiceNumber,
+                invoicedDate: billing.invoicedDate,
+                purchasedTreatment: billing.treatment,
+                amount: billing.amount
+              };
+            })
+            .filter((session: any) => session.remainingCount > 0);
           
           setAvailableFreeSessions(freeSessions);
-          console.log('[FreeSessions] Available free sessions:', freeSessions);
+          console.log('[FreeSessions] Available free sessions (after filtering used):', freeSessions);
         } else {
           setAvailableFreeSessions([]);
         }
@@ -3644,6 +3683,10 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
       console.log("[BundleDebug] bundleFreeSessionCount:", bundleFreeSessionCount);
       console.log("[BundleDebug] offerFreeSession in payload:", payload.offerFreeSession);
       console.log("[BundleDebug] freeOfferSessionCount in payload:", payload.freeOfferSessionCount);
+      console.log("[FreeSessionDebug] selectedTreatments:", selectedTreatments);
+      console.log("[FreeSessionDebug] usedFreeSessions in payload:", payload.usedFreeSessions);
+      console.log("[FreeSessionDebug] usedFreeSessionCount in payload:", payload.usedFreeSessionCount);
+      console.log("[FreeSessionDebug] availableFreeSessions:", availableFreeSessions);
       console.log('[CashbackDebug] Current state - isCashbackApplied:', isCashbackApplied);
       console.log('[CashbackDebug] Current state - appliedCashbackAmount:', appliedCashbackAmount);
       console.log('[CashbackDebug] Current state - matchedCashbackOffer:', matchedCashbackOffer ? matchedCashbackOffer.title : null);
@@ -3711,23 +3754,59 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
               );
               
               if (freeSessionsResponse.data.success && freeSessionsResponse.data.billings) {
-                const freeSessions = freeSessionsResponse.data.billings
+                // Same logic as above - calculate remaining free sessions
+                const allBillings = freeSessionsResponse.data.billings;
+                
+                const usedSessionsMap = new Map<string, number>();
+                allBillings.forEach((billing: any) => {
+                  if (billing.usedFreeSessions && Array.isArray(billing.usedFreeSessions)) {
+                    billing.usedFreeSessions.forEach((session: string) => {
+                      const sessionKey = session.toLowerCase();
+                      usedSessionsMap.set(sessionKey, (usedSessionsMap.get(sessionKey) || 0) + 1);
+                    });
+                  }
+                });
+
+                const freeSessions = allBillings
                   .filter((billing: any) => 
                     billing.offerType === 'bundle' && 
                     billing.offerFreeSession && 
                     billing.offerFreeSession.length > 0 &&
                     billing.freeOfferSessionCount > 0
                   )
-                  .map((billing: any) => ({
-                    billingId: billing._id,
-                    offerName: billing.offerName || billing.offerTitle || 'Bundle Offer',
-                    offerFreeSession: billing.offerFreeSession || [],
-                    freeOfferSessionCount: billing.freeOfferSessionCount || 0,
-                    invoiceNumber: billing.invoiceNumber,
-                    invoicedDate: billing.invoicedDate,
-                    purchasedTreatment: billing.treatment,
-                    amount: billing.amount
-                  }));
+                  .map((billing: any) => {
+                    const offeredSessions = billing.offerFreeSession || [];
+                    const offeredCount = billing.freeOfferSessionCount || 0;
+                    
+                    let usedCount = 0;
+                    offeredSessions.forEach((session: string) => {
+                      const sessionKey = session.toLowerCase();
+                      usedCount += usedSessionsMap.get(sessionKey) || 0;
+                    });
+                    
+                    const remainingCount = Math.max(0, offeredCount - usedCount);
+                    const remainingSessions = offeredSessions.filter((session: string) => {
+                      const sessionKey = session.toLowerCase();
+                      const usedForThisSession = usedSessionsMap.get(sessionKey) || 0;
+                      return usedForThisSession < offeredCount;
+                    });
+
+                    return {
+                      billingId: billing._id,
+                      offerName: billing.offerName || billing.offerTitle || 'Bundle Offer',
+                      offerFreeSession: remainingSessions,
+                      freeOfferSessionCount: remainingCount,
+                      originalOfferedSessions: offeredSessions,
+                      originalOfferedCount: offeredCount,
+                      usedCount: usedCount,
+                      remainingCount: remainingCount,
+                      invoiceNumber: billing.invoiceNumber,
+                      invoicedDate: billing.invoicedDate,
+                      purchasedTreatment: billing.treatment,
+                      amount: billing.amount
+                    };
+                  })
+                  .filter((session: any) => session.remainingCount > 0);
                 
                 setAvailableFreeSessions(freeSessions);
                 console.log('[FreeSessions] Refreshed available free sessions after billing:', freeSessions);

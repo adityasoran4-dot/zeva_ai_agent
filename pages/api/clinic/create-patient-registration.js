@@ -627,6 +627,9 @@ export default async function handler(req, res) {
       // Bundle offer tracking fields
       offerFreeSession: Array.isArray(offerFreeSession) ? offerFreeSession : [],
       freeOfferSessionCount: freeOfferSessionCount || 0,
+      // Free sessions being REDEEMED in this billing (consumed from previous billings)
+      usedFreeSessions: Array.isArray(usedFreeSessions) ? usedFreeSessions : [],
+      usedFreeSessionCount: usedFreeSessionCount || 0,
       // Cashback offer tracking fields
       isCashbackApplied: isCashbackApplied || false,
       cashbackOfferId: cashbackOfferId || null,
@@ -644,8 +647,10 @@ export default async function handler(req, res) {
     // console.log('[BundleAPI] billingData.freeOfferSessionCount:', billingData.freeOfferSessionCount);
     // console.log('[BundleAPI] typeof billingData.offerFreeSession:', typeof billingData.offerFreeSession);
     // console.log('[BundleAPI] Array.isArray(billingData.offerFreeSession):', Array.isArray(billingData.offerFreeSession));
-    // console.log('[BundleAPI] usedFreeSessions (being redeemed):', usedFreeSessions);
-    // console.log('[BundleAPI] usedFreeSessionCount:', usedFreeSessionCount);
+    console.log('[BundleAPI] usedFreeSessions (being redeemed):', usedFreeSessions);
+    console.log('[BundleAPI] usedFreeSessionCount:', usedFreeSessionCount);
+    console.log('[BundleAPI] billingData.usedFreeSessions:', billingData.usedFreeSessions);
+    console.log('[BundleAPI] billingData.usedFreeSessionCount:', billingData.usedFreeSessionCount);
 
     const billing = await Billing.create(billingData);
     
@@ -660,6 +665,10 @@ export default async function handler(req, res) {
     console.log('[CashbackAPI] Saved billing cashbackEndDate:', savedBilling?.cashbackEndDate);
     console.log('[CashbackAPI] Saved billing has cashbackStartDate key:', 'cashbackStartDate' in (savedBilling || {}));
     console.log('[CashbackAPI] Saved billing has cashbackEndDate key:', 'cashbackEndDate' in (savedBilling || {}));
+    console.log('[FreeSessionAPI] Saved billing usedFreeSessions:', savedBilling?.usedFreeSessions);
+    console.log('[FreeSessionAPI] Saved billing usedFreeSessionCount:', savedBilling?.usedFreeSessionCount);
+    console.log('[FreeSessionAPI] Saved billing offerFreeSession:', savedBilling?.offerFreeSession);
+    console.log('[FreeSessionAPI] Saved billing freeOfferSessionCount:', savedBilling?.freeOfferSessionCount);
 
     // If free sessions are being REDEEMED, update previous billings to remove them
     if (usedFreeSessions && Array.isArray(usedFreeSessions) && usedFreeSessions.length > 0) {
