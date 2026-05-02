@@ -361,6 +361,22 @@ function PassClaimsPage() {
                           <p className="text-xs font-semibold text-gray-900 truncate">{claim.departmentName || "N/A"}</p>
                         </div>
                       </div>
+
+                      {/* Services */}
+                      <div className="bg-gray-50 rounded-lg p-2.5 border border-gray-100">
+                        <p className="text-[10px] text-gray-500 uppercase font-bold tracking-tight mb-1">Services</p>
+                        <div className="flex flex-wrap gap-1">
+                          {claim.services && claim.services.length > 0 ? (
+                            claim.services.map((svc, idx) => (
+                              <span key={idx} className="inline-flex px-1 py-0.5 rounded-full text-[8px] font-bold bg-teal-100 text-teal-800 border border-teal-200">
+                                {svc.serviceName}
+                              </span>
+                            ))
+                          ) : (
+                            <p className="text-xs font-semibold text-gray-900 truncate">{claim.serviceName || "N/A"}</p>
+                          )}
+                        </div>
+                      </div>
                     </div>
 
                     {/* Rejection Reason (if rejected) */}
@@ -524,7 +540,7 @@ function PassClaimsPage() {
       {/* View Modal */}
       {viewModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-gray-200">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-y-auto border border-gray-200">
             <div className={`px-6 py-4 border-b sticky top-0 bg-white z-10 flex items-center justify-between ${getStatusBadge(viewModal.status)}`}>
               <div className="flex items-center gap-3">
                 <h2 className="text-lg font-bold">
@@ -918,30 +934,43 @@ function PassClaimsPage() {
                           <p className="text-xs text-gray-500">Department</p>
                           <p className="text-sm font-semibold text-gray-900">{viewModal.departmentName || "-"}</p>
                         </div>
-                        <div className="bg-gray-50 rounded-lg p-3">
-                          <p className="text-xs text-gray-500">Service</p>
-                          <p className="text-sm font-semibold text-gray-900">{viewModal.serviceName || "-"}</p>
+                        <div className="bg-gray-50 rounded-lg p-3 col-span-2 sm:col-span-1">
+                          <p className="text-xs text-gray-500 mb-1">Services</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {viewModal.services && viewModal.services.length > 0 ? (
+                              viewModal.services.map((svc, idx) => (
+                              <span 
+                                key={idx} 
+                                className="inline-flex items-center px-1.5 py-0.5 rounded bg-teal-50 text-teal-700 border border-teal-200 text-[9px] font-bold whitespace-nowrap shadow-sm"
+                              >
+                                {svc.serviceName}
+                              </span>
+                            ))
+                            ) : (
+                              <p className="text-sm font-semibold text-gray-900">{viewModal.serviceName || "-"}</p>
+                            )}
+                          </div>
                         </div>
                         <div className="bg-gray-50 rounded-lg p-3">
-                          <p className="text-xs text-gray-500">Co-Pay</p>
-                          <p className="text-sm font-semibold text-gray-900">{viewModal.coPayPercent}% ({viewModal.coPayType})</p>
+                          <p className="text-xs text-gray-500">Co-Pay %</p>
+                          <p className="text-sm font-semibold text-gray-900">{viewModal.coPayPercent}%</p>
                         </div>
-                        {viewModal.claimType === "Advance" && (
+                        {(viewModal.claimType === "Advance" || viewModal.claimType === "Paid") && (
                           <>
                             <div className="bg-gray-50 rounded-lg p-3">
-                              <p className="text-xs text-gray-500">Advance Status</p>
+                              <p className="text-xs text-gray-500">{viewModal.claimType} Status</p>
                               <p className="text-sm font-semibold text-gray-900">{viewModal.advanceStatus || "-"}</p>
                             </div>
                             <div className="bg-gray-50 rounded-lg p-3">
-                              <p className="text-xs text-gray-500">Advance Amount</p>
-                              <p className="text-sm font-semibold text-gray-900">₹{viewModal.advanceAmount?.toLocaleString('en-IN')}</p>
+                              <p className="text-xs text-gray-500">Paid Amount</p>
+                              <p className="text-sm font-semibold text-gray-900">₹{viewModal.advanceAmount?.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
                             </div>
                           </>
                         )}
-                        {viewModal.pendingClaim !== undefined && (
+                        {viewModal.pendingClaim > 0 && (
                           <div className="bg-gray-50 rounded-lg p-3">
                             <p className="text-xs text-gray-500">Pending Claim</p>
-                            <p className="text-sm font-semibold text-gray-900">{viewModal.pendingClaim}</p>
+                            <p className="text-sm font-semibold text-orange-600 font-bold">₹{viewModal.pendingClaim?.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
                           </div>
                         )}
                         <div className="bg-gray-50 rounded-lg p-3">
@@ -1049,10 +1078,6 @@ function PassClaimsPage() {
                     <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                       <h3 className="text-[10px] font-bold text-gray-400 uppercase mb-3 tracking-widest">Administrative Details</h3>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2 text-[10px]">
-                        <div className="flex justify-between border-b border-gray-200 pb-1">
-                          <span className="text-gray-500">Clinic Name:</span>
-                          <span className="font-semibold text-gray-700">{viewModal.clinicName || (typeof window !== 'undefined' ? localStorage.getItem('clinicName') : 'Clinic')}</span>
-                        </div>
                         <div className="flex justify-between border-b border-gray-200 pb-1">
                           <span className="text-gray-500">Patient Name:</span>
                           <span className="font-semibold text-gray-700">{viewModal.patientFirstName} {viewModal.patientLastName}</span>

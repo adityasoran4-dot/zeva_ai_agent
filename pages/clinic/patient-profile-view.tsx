@@ -2755,19 +2755,34 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
   };
 
   const handleNewClaimServiceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    // Get all selected options
-    const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
-    const selectedServices = newClaimServices
-      .filter((s: any) => selectedOptions.includes(s._id))
-      .map((s: any) => ({ serviceId: s._id, serviceName: s.name }));
-    
-    setNewClaimData((prev: any) => ({
-      ...prev,
-      services: selectedServices,
-      // Keep backward compatibility with single service fields
-      serviceId: selectedServices.length > 0 ? selectedServices[selectedServices.length - 1].serviceId : "",
-      serviceName: selectedServices.length > 0 ? selectedServices[selectedServices.length - 1].serviceName : "",
-    }));
+    const serviceId = e.target.value;
+    if (!serviceId) return;
+
+    const service = newClaimServices.find((s: any) => s._id === serviceId);
+    if (!service) return;
+
+    setNewClaimData((prev: any) => {
+      // Check if service is already selected
+      const isAlreadySelected = prev.services.some((s: any) => s.serviceId === serviceId);
+      
+      let updatedServices;
+      if (isAlreadySelected) {
+        // If already selected, maybe the user wants to remove it? 
+        // Or we just keep it. Usually in single-select UI that adds to list, 
+        // selecting again doesn't do anything or removes it.
+        // Let's make it add only if not present.
+        updatedServices = prev.services;
+      } else {
+        updatedServices = [...prev.services, { serviceId: service._id, serviceName: service.name }];
+      }
+
+      return {
+        ...prev,
+        services: updatedServices,
+        serviceId: serviceId,
+        serviceName: service.name,
+      };
+    });
   };
 
   const handleNewClaimDoctorChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -5815,60 +5830,35 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                       </div>
 
                       {/* Section B: Claim Source */}
-                      <div className="mb-3 p-3 bg-green-50 rounded-lg border border-green-200">
+                      <div className="mb-2 p-3 bg-green-50 rounded-lg border border-green-200">
                         <div className="text-xs font-semibold text-green-800 mb-2">Claim Source</div>
-                        <div className="flex flex-wrap gap-2 items-end">
-                          <div className="flex-1 min-w-[140px]">
-                            <label className="block text-xs mb-0.5 font-medium text-gray-700">Department</label>
-                            <select name="departmentId" value={newClaimData.departmentId} onChange={handleNewClaimDepartmentChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-green-500 text-gray-900">
-                              <option value="">Select Department</option>
-                              {newClaimDepartments.map((d: any) => (
-                                <option key={d._id} value={d._id}>{d.name}</option>
-                              ))}
-                            </select>
-                          </div>
-                          <div className="flex-1 min-w-[180px]">
-                            <label className="block text-xs mb-0.5 font-medium text-gray-700">
-                              Services {newClaimData.services.length > 0 && (
-                                <span className="text-blue-600 font-semibold ml-1">
-                                  ({newClaimData.services.length} selected)
-                                </span>
-                              )}
-                            </label>
-                            <div className="relative">
-                              <select 
-                                multiple
-                                value={newClaimData.services.map((s: any) => s.serviceId)} 
-                                onChange={handleNewClaimServiceChange} 
-                                className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-green-500 text-gray-900 min-h-[80px] bg-white"
-                              >
-                                {newClaimServices
-                                  .filter((s: any) => !newClaimData.departmentId || String(s.departmentId) === String(newClaimData.departmentId))
-                                  .map((s: any) => (
-                                    <option 
-                                      key={s._id} 
-                                      value={s._id}
-                                      className="py-1"
-                                    >
-                                      {s.name}
-                                    </option>
-                                  ))}
+                        <div className="flex flex-wrap gap-3 items-stretch">
+                          <div className="flex-1 min-w-[140px] flex flex-col">
+                            <label className="block text-xs mb-1 font-semibold text-gray-700">Department</label>
+                            <div className="mt-auto">
+                              <select name="departmentId" value={newClaimData.departmentId} onChange={handleNewClaimDepartmentChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-green-500 text-gray-900 bg-white shadow-sm h-full min-h-[32px]">
+                                <option value="">Select Department</option>
+                                {newClaimDepartments.map((d: any) => (
+                                  <option key={d._id} value={d._id}>{d.name}</option>
+                                ))}
                               </select>
                             </div>
-                            <p className="text-[9px] text-gray-500 mt-1">
-                              💡 Hold <kbd className="px-1 py-0.5 bg-gray-100 border border-gray-300 rounded text-[8px] font-mono">Ctrl</kbd> (Windows) or <kbd className="px-1 py-0.5 bg-gray-100 border border-gray-300 rounded text-[8px] font-mono">Cmd</kbd> (Mac) to select multiple
-                            </p>
-                            {newClaimData.services.length > 0 && (
-                              <div className="mt-1.5 flex flex-wrap gap-1">
+                          </div>
+                          
+                          <div className="flex-1 min-w-[200px] flex flex-col">
+                            <label className="block text-xs mb-1 font-semibold text-gray-700">Services</label>
+                            <div className="mt-auto relative w-full flex items-center p-0.5 border border-gray-300 rounded-lg bg-white shadow-sm focus-within:ring-2 focus-within:ring-green-500 transition-all min-h-[38px] box-border">
+                              <div className="flex flex-wrap items-center gap-1 flex-1 px-1 py-0.5">
                                 {newClaimData.services.map((svc: any, idx: number) => (
                                   <span 
                                     key={idx} 
-                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-medium bg-green-100 text-green-800 border border-green-200"
+                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-green-50 text-green-700 border border-green-200 text-[9px] font-bold whitespace-nowrap"
                                   >
                                     {svc.serviceName}
                                     <button
                                       type="button"
-                                      onClick={() => {
+                                      onClick={(e) => {
+                                        e.stopPropagation();
                                         const updatedServices = newClaimData.services.filter((_: any, i: number) => i !== idx);
                                         setNewClaimData((prev: any) => ({
                                           ...prev,
@@ -5877,188 +5867,199 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                           serviceName: updatedServices.length > 0 ? updatedServices[updatedServices.length - 1].serviceName : "",
                                         }));
                                       }}
-                                      className="hover:bg-green-200 rounded-full p-0.5 transition-colors"
+                                      className="hover:text-red-500 transition-colors"
                                     >
-                                      <X className="w-2.5 h-2.5" />
+                                      <X className="w-2 h-2" />
                                     </button>
                                   </span>
                                 ))}
+                                <select 
+                                  value="" 
+                                  onChange={handleNewClaimServiceChange} 
+                                  className="min-w-[100px] bg-transparent border-none outline-none text-[10px] text-gray-900 cursor-pointer h-full py-0.5 flex-1 appearance-none"
+                                >
+                                  <option value="" disabled>{newClaimData.services.length > 0 ? "Add More Services..." : "Select Services"}</option>
+                                  {newClaimServices
+                                    .filter((s: any) => !newClaimData.departmentId || String(s.departmentId) === String(newClaimData.departmentId))
+                                    .map((s: any) => (
+                                      <option key={s._id} value={s._id}>
+                                        {s.name}
+                                      </option>
+                                    ))}
+                                </select>
                               </div>
-                            )}
+                            </div>
                           </div>
-                          <div className="flex-1 min-w-[140px]">
-                            <label className="block text-xs mb-0.5 font-medium text-gray-700">Doctor <span className="text-red-500">*</span></label>
-                            <select name="doctorId" value={newClaimData.doctorId} onChange={handleNewClaimDoctorChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-green-500 text-gray-900">
-                              <option value="">Select Doctor</option>
-                              {newClaimDoctors.map((d: any) => (
-                                <option key={d._id} value={d._id}>{d.name}</option>
-                              ))}
-                            </select>
+
+                          <div className="flex-1 min-w-[140px] flex flex-col">
+                            <label className="block text-xs mb-1 font-semibold text-gray-700">Doctor <span className="text-red-500">*</span></label>
+                            <div className="mt-auto">
+                              <select name="doctorId" value={newClaimData.doctorId} onChange={handleNewClaimDoctorChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-green-500 text-gray-900 bg-white shadow-sm h-full min-h-[32px]">
+                                <option value="">Select Doctor</option>
+                                {newClaimDoctors.map((d: any) => (
+                                  <option key={d._id} value={d._id}>{d.name}</option>
+                                ))}
+                              </select>
+                            </div>
                           </div>
-                          <div className="flex-1 min-w-[120px]">
-                            <label className="block text-xs mb-0.5 font-medium text-gray-700">Claim Amount <span className="text-red-500">*</span></label>
-                            <input type="number" name="claimAmount" value={newClaimData.claimAmount} onChange={handleNewClaimChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-green-500 text-gray-900" placeholder="0" min="0" step="0.01" />
+                          
+                          <div className="flex-1 min-w-[120px] flex flex-col">
+                            <label className="block text-xs mb-1 font-semibold text-gray-700">Amount <span className="text-red-500">*</span></label>
+                            <div className="mt-auto">
+                              <input type="number" name="claimAmount" value={newClaimData.claimAmount} onChange={handleNewClaimChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-green-500 text-gray-900 bg-white shadow-sm h-full min-h-[32px] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" placeholder="0" min="0" step="0.01" />
+                            </div>
                           </div>
-                          <div className="flex-1 min-w-[120px]">
-                            <label className="block text-xs mb-0.5 font-medium text-gray-700">Claim Type <span className="text-red-500">*</span></label>
-                            <select name="claimType" value={newClaimData.claimType} onChange={handleNewClaimChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-green-500 text-gray-900">
-                              <option value="Paid">Paid</option>
-                              <option value="Advance">Advance</option>
-                            </select>
+                          
+                          <div className="flex-1 min-w-[120px] flex flex-col">
+                            <label className="block text-xs mb-1 font-semibold text-gray-700">Type <span className="text-red-500">*</span></label>
+                            <div className="mt-auto">
+                              <select name="claimType" value={newClaimData.claimType} onChange={handleNewClaimChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-green-500 text-gray-900 bg-white shadow-sm h-full min-h-[32px]">
+                                <option value="Paid">Paid</option>
+                                <option value="Advance">Advance</option>
+                              </select>
+                            </div>
                           </div>
                         </div>
                       </div>
 
                       {/* Section C: Claim Details */}
-                      <div className="mb-3 p-3 bg-purple-50 rounded-lg border border-purple-200">
+                      <div className="mb-2 p-3 bg-purple-50 rounded-lg border border-purple-200">
                         <div className="text-xs font-semibold text-purple-800 mb-2">Claim Details</div>
-                        <div className="flex flex-wrap gap-2 items-end">
-                          <div className="flex-1 min-w-[120px]">
-                            <label className="block text-xs mb-0.5 font-medium text-gray-700">Co-Pay %</label>
-                            <input type="number" name="coPayPercent" value={newClaimData.coPayPercent} onChange={handleNewClaimChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-purple-500 text-gray-900" placeholder="0-100" min="0" max="100" />
-                          </div>
-                          <div className="flex-1 min-w-[140px]">
-                            <label className="block text-xs mb-0.5 font-medium text-gray-700">Co-Pay Type</label>
-                            <select name="coPayType" value={newClaimData.coPayType} onChange={handleNewClaimChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-purple-500 text-gray-900">
-                              <option value="Patient Pays">Patient Pays</option>
-                              <option value="Deduct from Claim">Deduct from Claim</option>
-                              <option value="Clinic Adjusts">Clinic Adjusts</option>
-                            </select>
-                          </div>
-                          <div className="flex-1 min-w-[140px]">
-                            <label className="block text-xs mb-0.5 font-medium text-gray-700">Notes</label>
-                            <input type="text" name="notes" value={newClaimData.notes} onChange={handleNewClaimChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-purple-500 text-gray-900" placeholder="Additional notes" />
-                          </div>
-                          <div className="flex-1 min-w-[140px]">
-                            <label className="block text-xs mb-0.5 font-medium text-gray-700">Documents</label>
-                            <div className="relative group">
-                              <input 
-                                id="claim-documents-upload"
-                                type="file" 
-                                multiple
-                                accept="image/*,.pdf" 
-                                onChange={handleNewClaimDocumentsUpload} 
-                                className="hidden" 
-                                disabled={newClaimUploadingFiles} 
-                              />
-                              <label 
-                                htmlFor="claim-documents-upload"
-                                className={`w-full flex items-center gap-2 px-2 py-1.5 text-[9px] border border-gray-300 rounded-md cursor-pointer transition-all ${newClaimData.documentFiles.length > 0 ? 'bg-purple-50 border-purple-400 ring-1 ring-purple-400 shadow-sm' : 'bg-white hover:border-purple-400'}`}
-                              >
-                                <div className="flex-shrink-0 w-4 h-4 rounded bg-gray-50 border border-gray-200 flex items-center justify-center overflow-hidden">
-                                  {newClaimData.documentFiles.length > 0 ? (
-                                    <Paperclip className="w-2.5 h-2.5 text-purple-600" />
-                                  ) : (
-                                    <FileImage className="w-2.5 h-2.5 text-gray-400" />
-                                  )}
-                                </div>
-                                <span className={`truncate flex-1 ${newClaimData.documentFiles.length > 0 ? 'text-purple-700 font-semibold' : 'text-gray-400'}`}>
-                                  {newClaimData.documentFiles.length > 0 ? `${newClaimData.documentFiles.length} file(s) selected` : 'No file chosen'}
-                                </span>
-                                {newClaimData.documentFiles.length > 0 && (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      setNewClaimData((prev: any) => ({ ...prev, documentFiles: [] }));
-                                    }}
-                                    className="p-0.5 hover:bg-purple-100 rounded-full text-purple-600 transition-colors"
-                                  >
-                                    <X className="w-3 h-3" />
-                                  </button>
-                                )}
-                                {newClaimUploadingFiles && <Loader2 className="w-2.5 h-2.5 animate-spin text-purple-600" />}
-                              </label>
+                        <div className="flex flex-wrap gap-3 items-stretch">
+                          <div className="flex-1 min-w-[100px] flex flex-col">
+                            <label className="block text-xs mb-1 font-semibold text-gray-700">Co-Pay %</label>
+                            <div className="mt-auto">
+                              <input type="number" name="coPayPercent" value={newClaimData.coPayPercent} onChange={handleNewClaimChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-purple-500 text-gray-900 bg-white shadow-sm min-h-[32px] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" placeholder="0-100" min="0" max="100" />
                             </div>
-                            {newClaimData.documentFiles.length > 0 && (
-                              <div className="mt-1 flex flex-wrap gap-1">
-                                {newClaimData.documentFiles.map((f: string, i: number) => (
-                                  <div key={i} className="flex items-center gap-1 px-2 py-1 bg-purple-100 border border-purple-200 rounded text-[9px] font-medium text-purple-700">
-                                    <button
-                                      type="button"
-                                      onClick={() => setDocViewerUrl(f)}
-                                      className="hover:underline flex items-center gap-1"
-                                    >
-                                      <Paperclip className="w-2.5 h-2.5" /> Doc {i + 1}
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        setNewClaimData((prev: any) => ({
-                                          ...prev,
-                                          documentFiles: prev.documentFiles.filter((_: any, index: number) => index !== i)
-                                        }));
-                                      }}
-                                      className="ml-1 p-0.5 hover:bg-purple-200 rounded-full text-purple-600 transition-colors"
-                                    >
-                                      <X className="w-2 h-2" />
-                                    </button>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
                           </div>
-                        </div>
+                          <div className="flex-1 min-w-[140px] flex flex-col">
+                            <label className="block text-xs mb-1 font-semibold text-gray-700">Co-Pay Type</label>
+                            <div className="mt-auto">
+                              <select name="coPayType" value={newClaimData.coPayType} onChange={handleNewClaimChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-purple-500 text-gray-900 bg-white shadow-sm min-h-[32px]">
+                                <option value="Patient Pays">Patient Pays</option>
+                                <option value="Deduct from Claim">Deduct from Claim</option>
+                                <option value="Clinic Adjusts">Clinic Adjusts</option>
+                              </select>
+                            </div>
+                          </div>
+                          <div className="flex-1 min-w-[160px] flex flex-col">
+                            <label className="block text-xs mb-1 font-semibold text-gray-700">Notes</label>
+                            <div className="mt-auto">
+                              <input type="text" name="notes" value={newClaimData.notes} onChange={handleNewClaimChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-purple-500 text-gray-900 bg-white shadow-sm min-h-[32px]" placeholder="Notes..." />
+                            </div>
+                          </div>
+                          <div className="flex-1 min-w-[160px] flex flex-col">
+                            <label className="block text-xs mb-1 font-semibold text-gray-700">Documents</label>
+                            <div className="mt-auto">
+                              <div className="relative group">
+                                <input 
+                                  id="claim-documents-upload"
+                                  type="file" 
+                                  multiple
+                                  accept="image/*,.pdf" 
+                                  onChange={handleNewClaimDocumentsUpload} 
+                                  className="hidden" 
+                                  disabled={newClaimUploadingFiles} 
+                                />
+                                <label 
+                                  htmlFor="claim-documents-upload"
+                                  className={`w-full flex items-center gap-2 px-2 py-1.5 text-[10px] border border-gray-300 rounded-md cursor-pointer transition-all bg-white shadow-sm hover:border-purple-400 min-h-[32px]`}
+                                >
+                                  <Paperclip className="w-3 h-3 text-gray-400" />
+                                  <span className="truncate flex-1 text-gray-500">
+                                     {newClaimData.documentFiles.length > 0 ? `${newClaimData.documentFiles.length} files` : 'Upload...'}
+                                   </span>
+                                   {newClaimUploadingFiles && <Loader2 className="w-3 h-3 animate-spin text-purple-600" />}
+                                 </label>
+                               </div>
+                             </div>
+                             {newClaimData.documentFiles.length > 0 && (
+                               <div className="mt-1 flex flex-wrap gap-1">
+                                 {newClaimData.documentFiles.map((f: string, i: number) => (
+                                   <div key={i} className="flex items-center gap-1 px-1.5 py-0.5 bg-purple-50 border border-purple-100 rounded text-[8px] font-bold text-purple-700 shadow-sm">
+                                     <button type="button" onClick={() => setDocViewerUrl(f)} className="hover:underline">Doc {i + 1}</button>
+                                     <button
+                                       type="button"
+                                       onClick={() => setNewClaimData((prev: any) => ({ ...prev, documentFiles: prev.documentFiles.filter((_: any, idx: number) => idx !== i) }))}
+                                       className="ml-1 hover:text-red-500"
+                                     >
+                                       <X className="w-2 h-2" />
+                                     </button>
+                                   </div>
+                                 ))}
+                               </div>
+                             )}
+                           </div>
+                         </div>
 
                         {/* Advance-specific fields */}
                         {newClaimData.claimType === 'Advance' && (
-                          <div className="flex flex-wrap gap-2 items-end mt-2 pt-2 border-t border-purple-200">
-                            <div className="flex-1 min-w-[140px]">
-                              <label className="block text-xs mb-0.5 font-medium text-gray-700">Advance Status</label>
-                              <select name="advanceStatus" value={newClaimData.advanceStatus} onChange={handleNewClaimChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-purple-500 text-gray-900">
-                                <option value="Full Pay">Full Pay</option>
-                                <option value="Partial Pay">Partial Pay</option>
-                              </select>
+                          <div className="flex flex-wrap gap-3 items-stretch mt-2 pt-2 border-t border-purple-200">
+                            <div className="flex-1 min-w-[140px] flex flex-col">
+                              <label className="block text-xs mb-1 font-semibold text-gray-700">Advance Status</label>
+                              <div className="mt-auto">
+                                <select name="advanceStatus" value={newClaimData.advanceStatus} onChange={handleNewClaimChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-purple-500 text-gray-900 bg-white shadow-sm min-h-[32px]">
+                                  <option value="Full Pay">Full Pay</option>
+                                  <option value="Partial Pay">Partial Pay</option>
+                                </select>
+                              </div>
                             </div>
-                            <div className="flex-1 min-w-[140px]">
-                              <label className="block text-xs mb-0.5 font-medium text-gray-700">Advance Amount (Enter)</label>
-                              <input
-                                type="number"
-                                name="advanceAmount"
-                                value={newClaimData.advanceAmount}
-                                onChange={handleNewClaimChange}
-                                className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-purple-500 text-gray-900 font-semibold"
-                                placeholder="Enter advance amount"
-                                min="0"
-                                step="0.01"
-                              />
+                            <div className="flex-1 min-w-[140px] flex flex-col">
+                              <label className="block text-xs mb-1 font-semibold text-gray-700">Advance Amount</label>
+                              <div className="mt-auto">
+                                <input
+                                  type="number"
+                                  name="advanceAmount"
+                                  value={newClaimData.advanceAmount}
+                                  onChange={handleNewClaimChange}
+                                  className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-purple-500 text-gray-900 font-semibold bg-white shadow-sm min-h-[32px] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  placeholder="0.00"
+                                  min="0"
+                                  step="0.01"
+                                />
+                              </div>
                             </div>
-                            <div className="flex-1 min-w-[120px]">
-                              <label className="block text-xs mb-0.5 font-medium text-gray-700">Status</label>
-                              <div className="px-2 py-1 text-xs bg-yellow-50 border border-yellow-300 rounded-md text-yellow-800 font-semibold">Under Review</div>
+                            <div className="flex-1 min-w-[120px] flex flex-col">
+                              <label className="block text-xs mb-1 font-semibold text-gray-700">Status</label>
+                              <div className="mt-auto">
+                                <div className="px-2 py-1 text-xs bg-yellow-50 border border-yellow-300 rounded-md text-yellow-800 font-semibold min-h-[32px] flex items-center">Under Review</div>
+                              </div>
                             </div>
                           </div>
                         )}
 
                         {/* Paid claim type - show advance status and amount */}
                         {newClaimData.claimType === 'Paid' && (
-                          <div className="flex flex-wrap gap-2 items-end mt-2 pt-2 border-t border-purple-200">
-                            <div className="flex-1 min-w-[140px]">
-                              <label className="block text-xs mb-0.5 font-medium text-gray-700">Paid Status</label>
-                              <select name="advanceStatus" value={newClaimData.advanceStatus} onChange={handleNewClaimChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-purple-500 text-gray-900">
-                                <option value="Full Pay">Full Pay</option>
-                                <option value="Partial Pay">Partial Pay</option>
-                              </select>
+                          <div className="flex flex-wrap gap-3 items-stretch mt-2 pt-2 border-t border-purple-200">
+                            <div className="flex-1 min-w-[140px] flex flex-col">
+                              <label className="block text-xs mb-1 font-semibold text-gray-700">Paid Status</label>
+                              <div className="mt-auto">
+                                <select name="advanceStatus" value={newClaimData.advanceStatus} onChange={handleNewClaimChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-purple-500 text-gray-900 bg-white shadow-sm min-h-[32px]">
+                                  <option value="Full Pay">Full Pay</option>
+                                  <option value="Partial Pay">Partial Pay</option>
+                                </select>
+                              </div>
                             </div>
-                            <div className="flex-1 min-w-[140px]">
-                              <label className="block text-xs mb-0.5 font-medium text-gray-700">Paid Amount (Enter)</label>
-                              <input
-                                type="number"
-                                name="advanceAmount"
-                                value={newClaimData.advanceAmount}
-                                onChange={handleNewClaimChange}
-                                className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-purple-500 text-gray-900 font-semibold"
-                                placeholder="Enter advance amount"
-                                min="0"
-                                step="0.01"
-                              />
+                            <div className="flex-1 min-w-[140px] flex flex-col">
+                              <label className="block text-xs mb-1 font-semibold text-gray-700">Paid Amount</label>
+                              <div className="mt-auto">
+                                <input
+                                  type="number"
+                                  name="advanceAmount"
+                                  value={newClaimData.advanceAmount}
+                                  onChange={handleNewClaimChange}
+                                  className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-purple-500 text-gray-900 font-semibold bg-white shadow-sm min-h-[32px] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  placeholder="0.00"
+                                  min="0"
+                                  step="0.01"
+                                />
+                              </div>
                             </div>
-                            <div className="flex-1 min-w-[120px]">
-                              <label className="block text-xs mb-0.5 font-medium text-gray-700">Status</label>
-                              <div className="px-2 py-1 text-xs bg-yellow-50 border border-yellow-300 rounded-md text-yellow-800 font-semibold">Under Review</div>
+                            <div className="flex-1 min-w-[120px] flex flex-col">
+                              <label className="block text-xs mb-1 font-semibold text-gray-700">Status</label>
+                              <div className="mt-auto">
+                                <div className="px-2 py-1 text-xs bg-yellow-50 border border-yellow-300 rounded-md text-yellow-800 font-semibold min-h-[32px] flex items-center">Under Review</div>
+                              </div>
                             </div>
                           </div>
                         )}
@@ -6139,6 +6140,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Services</th>
                                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Doctor</th>
                                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Amount</th>
+                                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Paid Amount</th>
                                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Pending Claim</th>
                                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Co-Pay</th>
                                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
@@ -6169,9 +6171,16 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                       )}
                                     </td>
                                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">{claim.doctorName || '-'}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-gray-900">{claim.claimAmount?.toLocaleString()}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-orange-700">{claim.pendingClaim > 0 ? claim.pendingClaim.toLocaleString() : '-'}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">{claim.coPayPercent}% ({claim.coPayType})</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-gray-900">
+                                      {getCurrencySymbol(currency)} {claim.claimAmount?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-green-700">
+                                      {claim.advanceAmount ? `${getCurrencySymbol(currency)} ${claim.advanceAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-orange-700">
+                                      {claim.pendingClaim > 0 ? `${getCurrencySymbol(currency)} ${claim.pendingClaim.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 font-medium">{claim.coPayPercent}%</td>
                                     <td className="px-4 py-3 whitespace-nowrap">
                                       <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
                                         claim.status === 'Under Review' ? 'bg-yellow-100 text-yellow-800 border-yellow-300' :
@@ -6303,24 +6312,24 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                             <Activity className="w-4 h-4" />
                             Claim Source & Type
                           </h3>
-                          <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-5 gap-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-6 gap-4">
                             <div>
                               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Department</p>
                               <p className="text-sm font-semibold text-green-900">{claimViewModal.departmentName || '-'}</p>
                             </div>
-                            <div>
+                            <div className="md:col-span-2">
                               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Services</p>
-                              {claimViewModal.services && claimViewModal.services.length > 0 ? (
-                                <div className="flex flex-wrap gap-1">
-                                  {claimViewModal.services.map((svc: any, idx: number) => (
-                                    <span key={idx} className="inline-flex px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                              <div className="flex flex-wrap gap-1.5">
+                                {claimViewModal.services && claimViewModal.services.length > 0 ? (
+                                  claimViewModal.services.map((svc: any, idx: number) => (
+                                    <span key={idx} className="inline-flex items-center px-1.5 py-0.5 rounded bg-green-50 text-green-700 border border-green-200 text-[9px] font-bold whitespace-nowrap shadow-sm">
                                       {svc.serviceName || 'Service'}
                                     </span>
-                                  ))}
-                                </div>
-                              ) : (
-                                <p className="text-sm font-semibold text-green-900">-</p>
-                              )}
+                                  ))
+                                ) : (
+                                  <p className="text-sm font-semibold text-green-900">-</p>
+                                )}
+                              </div>
                             </div>
                             <div>
                               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Doctor</p>
@@ -6328,7 +6337,9 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                             </div>
                             <div>
                               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Claim Amount</p>
-                              <p className="text-sm font-bold text-green-900">{claimViewModal.claimAmount?.toLocaleString()}</p>
+                              <p className="text-sm font-bold text-green-900">
+                                {getCurrencySymbol(currency)} {claimViewModal.claimAmount?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </p>
                             </div>
                             <div>
                               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Claim Type</p>
@@ -6348,7 +6359,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                             <div>
                               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Co-Pay</p>
-                              <p className="text-sm font-semibold text-purple-900">{claimViewModal.coPayPercent}% ({claimViewModal.coPayType})</p>
+                              <p className="text-sm font-semibold text-purple-900">{claimViewModal.coPayPercent}%</p>
                             </div>
                             <div>
                               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Status</p>
@@ -6362,7 +6373,9 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                             {claimViewModal.pendingClaim > 0 && (
                               <div>
                                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Pending Claim</p>
-                                <p className="text-sm font-bold text-orange-700">{claimViewModal.pendingClaim?.toLocaleString()}</p>
+                                <p className="text-sm font-bold text-orange-700">
+                                  {getCurrencySymbol(currency)} {claimViewModal.pendingClaim?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </p>
                               </div>
                             )}
                             {(claimViewModal.claimType === 'Advance' || claimViewModal.claimType === 'Paid') && (
@@ -6372,8 +6385,10 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                   <p className="text-sm font-semibold text-purple-900">{claimViewModal.advanceStatus || '-'}</p>
                                 </div>
                                 <div>
-                                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">{claimViewModal.claimType} Amount</p>
-                                  <p className="text-sm font-bold text-purple-900">{claimViewModal.advanceAmount?.toLocaleString() || '-'}</p>
+                                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Paid Amount</p>
+                                  <p className="text-sm font-bold text-purple-900">
+                                    {claimViewModal.advanceAmount ? `${getCurrencySymbol(currency)} ${claimViewModal.advanceAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
+                                  </p>
                                 </div>
                               </>
                             )}
@@ -6407,9 +6422,43 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                             </div>
                           </div>
                         </div>
+                        {/* Section D: Administrative Details */}
+                        <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+                          <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Administrative Details</h3>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-3 text-[10px]">
+                            <div className="flex justify-between border-b border-gray-200 pb-1">
+                              <span className="text-gray-500">Patient Name:</span>
+                              <span className="font-semibold text-gray-700">{claimViewModal.patientFirstName} {claimViewModal.patientLastName}</span>
+                            </div>
+                            <div className="flex justify-between border-b border-gray-200 pb-1">
+                              <span className="text-gray-500">Doctor Name:</span>
+                              <span className="font-semibold text-gray-700">{claimViewModal.doctorName || "-"}</span>
+                            </div>
+                            <div className="flex justify-between border-b border-gray-200 pb-1">
+                              <span className="text-gray-500">Insurance Provider:</span>
+                              <span className="font-semibold text-gray-700">{claimViewModal.insuranceProvider}</span>
+                            </div>
+                            <div className="flex justify-between border-b border-gray-200 pb-1">
+                              <span className="text-gray-500">Policy Number:</span>
+                              <span className="font-semibold text-gray-700">{claimViewModal.policyNumber}</span>
+                            </div>
+                            <div className="flex justify-between border-b border-gray-200 pb-1">
+                              <span className="text-gray-500">Claim Type:</span>
+                              <span className="font-semibold text-gray-700">{claimViewModal.claimType}</span>
+                            </div>
+                            <div className="flex justify-between border-b border-gray-200 pb-1">
+                              <span className="text-gray-500">Created At:</span>
+                              <span className="text-gray-700">{new Date(claimViewModal.createdAt).toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between border-b border-gray-200 pb-1">
+                              <span className="text-gray-500">Last Updated:</span>
+                              <span className="text-gray-700">{new Date(claimViewModal.updatedAt).toLocaleString()}</span>
+                            </div>
+                          </div>
+                        </div>
+
                         <div className="text-xs text-gray-500 pt-2 border-t border-gray-100">
-                          Created: {new Date(claimViewModal.createdAt).toLocaleString()}
-                          {claimViewModal.reviewedAt && <> | Reviewed: {new Date(claimViewModal.reviewedAt).toLocaleString()}</>}
+                          ID: {claimViewModal._id}
                         </div>
                       </div>
                     </div>
@@ -6607,7 +6656,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                 {/* Claim Edit Modal */}
                 {claimEditModal && (
                   <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto">
                       <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
                         <h2 className="text-lg font-bold text-gray-900">Edit Claim</h2>
                         <button onClick={() => setClaimEditModal(null)} className="p-2 hover:bg-gray-100 rounded-lg">
@@ -6618,7 +6667,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                         {/* Insurance Details */}
                         <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
                           <h3 className="text-sm font-semibold text-blue-800 mb-3">Insurance Details</h3>
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
                             <div>
                               <label className="block text-xs font-medium text-gray-700 mb-1">Insurance Provider <span className="text-red-500">*</span></label>
                               <input type="text" value={claimEditData.insuranceProvider || ''} onChange={(e) => setClaimEditData((prev: any) => ({ ...prev, insuranceProvider: e.target.value }))} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
@@ -6633,33 +6682,71 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                             </div>
                             <div>
                               <label className="block text-xs font-medium text-gray-700 mb-1">Insurance Card </label>
-                              <input type="file" accept="image/*,.pdf" onChange={(e) => handleClaimEditFileUpload(e, 'insuranceCard')} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" disabled={claimEditUploadingFiles} />
-                              {claimEditData.insuranceCardFile && (
-                                <div className="mt-2">
-                                  <button
-                                    onClick={() => setDocViewerUrl(claimEditData.insuranceCardFile)}
-                                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-50 border border-blue-200 rounded-lg text-[10px] font-medium text-blue-700 hover:bg-blue-100 transition-colors"
+                              <div className="relative group">
+                                <input 
+                                  id="edit-insurance-card-upload"
+                                  type="file" 
+                                  accept="image/*,.pdf" 
+                                  onChange={(e) => handleClaimEditFileUpload(e, 'insuranceCard')} 
+                                  className="hidden" 
+                                  disabled={claimEditUploadingFiles} 
+                                />
+                                <div className={`w-full flex items-center gap-2 px-3 py-2 text-[10px] border border-gray-300 rounded-lg transition-all ${claimEditData.insuranceCardFile ? 'bg-blue-50 border-blue-400 ring-1 ring-blue-400 shadow-sm' : 'bg-white hover:border-blue-400'} min-h-[38px]`}>
+                                  <label 
+                                    htmlFor="edit-insurance-card-upload"
+                                    className="flex-1 flex items-center gap-2 cursor-pointer truncate"
                                   >
-                                    <Shield className="w-3 h-3" />
-                                    View Insurance Card
-                                  </button>
+                                    <Shield className={`w-3.5 h-3.5 flex-shrink-0 ${claimEditData.insuranceCardFile ? 'text-blue-600' : 'text-gray-400'}`} />
+                                    <span className={`truncate ${claimEditData.insuranceCardFile ? 'text-blue-700 font-semibold' : 'text-gray-400'}`}>
+                                       {claimEditData.insuranceCardFile ? (claimEditData.insuranceCardFile.split('/').pop()?.split('-').pop() || 'Card Attached') : 'No file chosen'}
+                                     </span>
+                                  </label>
+                                  {claimEditData.insuranceCardFile && (
+                                    <button
+                                      onClick={() => setDocViewerUrl(claimEditData.insuranceCardFile)}
+                                      className="flex-shrink-0 p-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
+                                      title="View Card"
+                                    >
+                                      <Eye className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                  {claimEditUploadingFiles && <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600 flex-shrink-0" />}
                                 </div>
-                              )}
+                               </div>
                             </div>
                             <div>
                               <label className="block text-xs font-medium text-gray-700 mb-1">Table of Benefits</label>
-                              <input type="file" accept="image/*,.pdf" onChange={(e) => handleClaimEditFileUpload(e, 'tableOfBenefits')} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" disabled={claimEditUploadingFiles} />
-                              {claimEditData.tableOfBenefitsFile && (
-                                <div className="mt-2">
-                                  <button
-                                    onClick={() => setDocViewerUrl(claimEditData.tableOfBenefitsFile)}
-                                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-50 border border-blue-200 rounded-lg text-[10px] font-medium text-blue-700 hover:bg-blue-100 transition-colors"
+                              <div className="relative group">
+                                <input 
+                                  id="edit-benefits-upload"
+                                  type="file" 
+                                  accept="image/*,.pdf" 
+                                  onChange={(e) => handleClaimEditFileUpload(e, 'tableOfBenefits')} 
+                                  className="hidden" 
+                                  disabled={claimEditUploadingFiles} 
+                                />
+                                <div className={`w-full flex items-center gap-2 px-3 py-2 text-[10px] border border-gray-300 rounded-lg transition-all ${claimEditData.tableOfBenefitsFile ? 'bg-blue-50 border-blue-400 ring-1 ring-blue-400 shadow-sm' : 'bg-white hover:border-blue-400'} min-h-[38px]`}>
+                                  <label 
+                                    htmlFor="edit-benefits-upload"
+                                    className="flex-1 flex items-center gap-2 cursor-pointer truncate"
                                   >
-                                    <FileText className="w-3 h-3" />
-                                    View Table of Benefits
-                                  </button>
+                                    <FileText className={`w-3.5 h-3.5 flex-shrink-0 ${claimEditData.tableOfBenefitsFile ? 'text-blue-600' : 'text-gray-400'}`} />
+                                    <span className={`truncate ${claimEditData.tableOfBenefitsFile ? 'text-blue-700 font-semibold' : 'text-gray-400'}`}>
+                                       {claimEditData.tableOfBenefitsFile ? (claimEditData.tableOfBenefitsFile.split('/').pop()?.split('-').pop() || 'Benefits Attached') : 'No file chosen'}
+                                     </span>
+                                  </label>
+                                  {claimEditData.tableOfBenefitsFile && (
+                                    <button
+                                      onClick={() => setDocViewerUrl(claimEditData.tableOfBenefitsFile)}
+                                      className="flex-shrink-0 p-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
+                                      title="View Benefits"
+                                    >
+                                      <Eye className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                  {claimEditUploadingFiles && <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600 flex-shrink-0" />}
                                 </div>
-                              )}
+                               </div>
                             </div>
                           </div>
                         </div>
@@ -6667,8 +6754,8 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                         {/* Claim Source & Type */}
                         <div className="bg-green-50 rounded-lg p-4 border border-green-200">
                           <h3 className="text-sm font-semibold text-green-800 mb-3">Claim Source & Type</h3>
-                          <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-5 gap-3">
-                            <div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 items-start">
+                            <div className="flex flex-col">
                               <label className="block text-xs font-medium text-gray-700 mb-1">
                                 Department
                               </label>
@@ -6682,54 +6769,31 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                   serviceName: '',
                                   services: [] // Clear services when department changes
                                 }));
-                              }} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                              }} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 h-[38px]">
                                 <option value="">Select Department</option>
                                 {claimDepartments.map((d: any) => <option key={d._id} value={d._id}>{d.name}</option>)}
                               </select>
                             </div>
-                            <div>
+                            <div className="flex flex-col">
                               <label className="block text-xs font-medium text-gray-700 mb-1">
                                 Services {claimEditData.services && claimEditData.services.length > 0 && (
                                   <span className="text-blue-600 font-semibold ml-1">
-                                    ({claimEditData.services.length} selected)
+                                    ({claimEditData.services.length})
                                   </span>
                                 )}
                               </label>
-                              <select 
-                                multiple
-                                value={(claimEditData.services || []).map((s: any) => s.serviceId)} 
-                                onChange={(e) => {
-                                  const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
-                                  const selectedServices = claimServices
-                                    .filter((s: any) => selectedOptions.includes(s._id))
-                                    .map((s: any) => ({ serviceId: s._id, serviceName: s.name }));
-                                  
-                                  setClaimEditData((prev: any) => ({
-                                    ...prev,
-                                    services: selectedServices,
-                                    serviceId: selectedServices.length > 0 ? selectedServices[selectedServices.length - 1].serviceId : "",
-                                    serviceName: selectedServices.length > 0 ? selectedServices[selectedServices.length - 1].serviceName : "",
-                                  }));
-                                }} 
-                                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 min-h-[80px]"
-                              >
-                                {claimServices
-                                  .filter((s: any) => !claimEditData.departmentId || String(s.departmentId) === String(claimEditData.departmentId))
-                                  .map((s: any) => (
-                                    <option key={s._id} value={s._id}>{s.name}</option>
-                                  ))}
-                              </select>
-                              {claimEditData.services && claimEditData.services.length > 0 && (
-                                <div className="mt-1.5 flex flex-wrap gap-1">
-                                  {claimEditData.services.map((svc: any, idx: number) => (
+                              <div className="relative w-full flex items-center p-0.5 border border-gray-300 rounded-lg bg-white shadow-sm focus-within:ring-2 focus-within:ring-green-500 transition-all min-h-[38px] box-border">
+                                <div className="flex flex-wrap items-center gap-1 flex-1 px-1 py-0.5">
+                                  {(claimEditData.services || []).map((svc: any, idx: number) => (
                                     <span 
                                       key={idx} 
-                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-medium bg-green-100 text-green-800 border border-green-200"
+                                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-green-50 text-green-700 border border-green-200 text-[9px] font-bold whitespace-nowrap"
                                     >
                                       {svc.serviceName}
                                       <button
                                         type="button"
-                                        onClick={() => {
+                                        onClick={(e) => {
+                                          e.stopPropagation();
                                           const updatedServices = claimEditData.services.filter((_: any, i: number) => i !== idx);
                                           setClaimEditData((prev: any) => ({
                                             ...prev,
@@ -6738,26 +6802,56 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                             serviceName: updatedServices.length > 0 ? updatedServices[updatedServices.length - 1].serviceName : "",
                                           }));
                                         }}
-                                        className="hover:bg-green-200 rounded-full p-0.5 transition-colors"
+                                        className="hover:text-red-500 transition-colors"
                                       >
-                                        <X className="w-2.5 h-2.5" />
+                                        <X className="w-2 h-2" />
                                       </button>
                                     </span>
                                   ))}
+                                  <select 
+                                    value="" 
+                                    onChange={(e) => {
+                                      const selectedId = e.target.value;
+                                      if (!selectedId) return;
+                                      const svc = claimServices.find((s: any) => s._id === selectedId);
+                                      if (svc) {
+                                        const alreadySelected = (claimEditData.services || []).some((s: any) => s.serviceId === selectedId);
+                                        if (!alreadySelected) {
+                                          const updatedServices = [...(claimEditData.services || []), { serviceId: svc._id, serviceName: svc.name }];
+                                          setClaimEditData((prev: any) => ({
+                                            ...prev,
+                                            services: updatedServices,
+                                            serviceId: svc._id,
+                                            serviceName: svc.name
+                                          }));
+                                        }
+                                      }
+                                    }} 
+                                    className="min-w-[100px] bg-transparent border-none outline-none text-[10px] text-gray-900 cursor-pointer h-full py-0.5 flex-1 appearance-none"
+                                  >
+                                    <option value="" disabled>{(claimEditData.services || []).length > 0 ? "Add More Services..." : "Select Services"}</option>
+                                    {claimServices
+                                      .filter((s: any) => !claimEditData.departmentId || String(s.departmentId) === String(claimEditData.departmentId))
+                                      .map((s: any) => (
+                                        <option key={s._id} value={s._id} className="py-2 px-3">
+                                          {s.name}
+                                        </option>
+                                      ))}
+                                  </select>
                                 </div>
-                              )}
+                              </div>
                             </div>
-                            <div>
+                            <div className="flex flex-col">
                               <label className="block text-xs font-medium text-gray-700 mb-1">Doctor <span className="text-red-500">*</span></label>
                               <select value={claimEditData.doctorId || ''} onChange={(e) => {
                                 const doc = claimDoctors.find((d: any) => d._id === e.target.value);
                                 setClaimEditData((prev: any) => ({ ...prev, doctorId: e.target.value, doctorName: doc?.name || '' }));
-                              }} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                              }} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 h-[38px]">
                                 <option value="">Select Doctor</option>
                                 {claimDoctors.map((d: any) => <option key={d._id} value={d._id}>{d.name}</option>)}
                               </select>
                             </div>
-                            <div>
+                            <div className="flex flex-col">
                               <label className="block text-xs font-medium text-gray-700 mb-1">Claim Amount <span className="text-red-500">*</span></label>
                               <input type="number" value={claimEditData.claimAmount ?? ''} onChange={(e) => {
                                 const amt = parseFloat(e.target.value) || 0;
@@ -6766,11 +6860,11 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                   claimAmount: amt,
                                   advanceAmount: prev.claimType === 'Advance' ? (prev.advanceStatus === 'Full Pay' ? amt : amt * 0.5) : 0,
                                 }));
-                              }} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500" min="0" step="0.01" />
+                              }} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 h-[38px] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" min="0" step="0.01" />
                             </div>
-                            <div>
+                            <div className="flex flex-col">
                               <label className="block text-xs font-medium text-gray-700 mb-1">Claim Type <span className="text-red-500">*</span></label>
-                              <select value={claimEditData.claimType || 'Paid'} onChange={(e) => setClaimEditData((prev: any) => ({ ...prev, claimType: e.target.value, advanceStatus: e.target.value === 'Advance' ? 'Full Pay' : null, advanceAmount: 0 }))} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                              <select value={claimEditData.claimType || 'Paid'} onChange={(e) => setClaimEditData((prev: any) => ({ ...prev, claimType: e.target.value, advanceStatus: e.target.value === 'Advance' ? 'Full Pay' : null, advanceAmount: 0 }))} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 h-[38px]">
                                 <option value="Paid">Paid</option>
                                 <option value="Advance">Advance</option>
                               </select>
@@ -6781,48 +6875,67 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                         {/* Claim Details */}
                         <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
                           <h3 className="text-sm font-semibold text-purple-800 mb-3">Claim Details</h3>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                            <div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 items-start">
+                            <div className="flex flex-col">
                               <label className="block text-xs font-medium text-gray-700 mb-1">Co-Pay %</label>
-                              <input type="number" value={claimEditData.coPayPercent ?? ''} onChange={(e) => setClaimEditData((prev: any) => ({ ...prev, coPayPercent: e.target.value }))} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500" min="0" max="100" />
+                              <input type="number" value={claimEditData.coPayPercent ?? ''} onChange={(e) => setClaimEditData((prev: any) => ({ ...prev, coPayPercent: e.target.value }))} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 h-[38px] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" min="0" max="100" />
                             </div>
-                            <div>
+                            <div className="flex flex-col">
                               <label className="block text-xs font-medium text-gray-700 mb-1">Co-Pay Type</label>
-                              <select value={claimEditData.coPayType || 'Patient Pays'} onChange={(e) => setClaimEditData((prev: any) => ({ ...prev, coPayType: e.target.value }))} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                              <select value={claimEditData.coPayType || 'Patient Pays'} onChange={(e) => setClaimEditData((prev: any) => ({ ...prev, coPayType: e.target.value }))} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 h-[38px]">
                                 <option value="Patient Pays">Patient Pays</option>
                                 <option value="Deduct from Claim">Deduct from Claim</option>
                                 <option value="Clinic Adjusts">Clinic Adjusts</option>
                               </select>
                             </div>
-                            <div className="md:col-span-2">
+                            <div className="md:col-span-1 lg:col-span-1 flex flex-col">
                               <label className="block text-xs font-medium text-gray-700 mb-1">Notes</label>
-                              <input type="text" value={claimEditData.notes || ''} onChange={(e) => setClaimEditData((prev: any) => ({ ...prev, notes: e.target.value }))} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500" />
+                              <input type="text" value={claimEditData.notes || ''} onChange={(e) => setClaimEditData((prev: any) => ({ ...prev, notes: e.target.value }))} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 h-[38px]" />
                             </div>
-                            <div className="md:col-span-2">
+                            <div className="md:col-span-1 lg:col-span-1 flex flex-col">
                               <label className="block text-xs font-medium text-gray-700 mb-1">Support Documents</label>
-                              <input type="file" multiple accept="image/*,.pdf" onChange={handleClaimEditDocumentsUpload} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100" disabled={claimEditUploadingFiles} />
-                              {claimEditData.documentFiles?.length > 0 && (
-                                <div className="mt-2 space-y-2">
-                                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Attached Documents ({claimEditData.documentFiles.length})</p>
-                                  <div className="flex flex-wrap gap-2">
-                                    {claimEditData.documentFiles.map((f: string, i: number) => (
-                                      <button
-                                        key={i}
-                                        onClick={() => setDocViewerUrl(f)}
-                                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-purple-50 border border-purple-200 rounded-lg text-[10px] font-medium text-purple-700 hover:bg-purple-100 transition-colors"
-                                      >
-                                        <Paperclip className="w-3 h-3" />
-                                        Doc {i + 1}
-                                      </button>
-                                    ))}
-                                  </div>
+                              <div className="relative group">
+                                <input 
+                                  id="edit-support-docs-upload"
+                                  type="file" 
+                                  multiple 
+                                  accept="image/*,.pdf" 
+                                  onChange={handleClaimEditDocumentsUpload} 
+                                  className="hidden" 
+                                  disabled={claimEditUploadingFiles} 
+                                />
+                                <div className={`w-full flex items-center gap-2 px-3 py-2 text-[10px] border border-gray-300 rounded-lg transition-all ${claimEditData.documentFiles?.length > 0 ? 'bg-purple-50 border-purple-400 ring-1 ring-purple-400 shadow-sm' : 'bg-white hover:border-purple-400'} min-h-[38px]`}>
+                                  <label 
+                                    htmlFor="edit-support-docs-upload"
+                                    className="flex-1 flex items-center gap-2 cursor-pointer truncate"
+                                  >
+                                    <Paperclip className={`w-3.5 h-3.5 flex-shrink-0 ${claimEditData.documentFiles?.length > 0 ? 'text-purple-600' : 'text-gray-400'}`} />
+                                    <span className={`truncate ${claimEditData.documentFiles?.length > 0 ? 'text-purple-700 font-semibold' : 'text-gray-400'}`}>
+                                       {claimEditData.documentFiles?.length > 0 ? `${claimEditData.documentFiles.length} files attached` : 'No files chosen'}
+                                     </span>
+                                  </label>
+                                  {claimEditData.documentFiles?.length > 0 && (
+                                    <div className="flex items-center gap-1 flex-shrink-0">
+                                      {claimEditData.documentFiles.map((f: string, i: number) => (
+                                        <button
+                                          key={i}
+                                          onClick={() => setDocViewerUrl(f)}
+                                          className="p-1 bg-purple-100 text-purple-700 rounded hover:bg-purple-200 transition-colors"
+                                          title={`View Doc ${i + 1}`}
+                                        >
+                                          <Eye className="w-3 h-3" />
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
+                                  {claimEditUploadingFiles && <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-600 flex-shrink-0" />}
                                 </div>
-                              )}
+                               </div>
                             </div>
                             {(claimEditData.claimType === 'Advance' || claimEditData.claimType === 'Paid') && (
-                              <>
-                                <div>
-                                  <label className="block text-xs font-medium text-gray-700 mb-1">{claimEditData.claimType} Status</label>
+                              <div className="grid grid-cols-2 gap-2 lg:col-span-1">
+                                <div className="flex flex-col">
+                                  <label className="block text-[10px] font-medium text-gray-700 mb-1 truncate">{claimEditData.claimType} Status</label>
                                   <select value={claimEditData.advanceStatus || 'Full Pay'} onChange={(e) => {
                                     const amt = parseFloat(claimEditData.claimAmount) || 0;
                                     setClaimEditData((prev: any) => ({
@@ -6830,16 +6943,16 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                       advanceStatus: e.target.value,
                                       advanceAmount: e.target.value === 'Full Pay' ? amt : amt * 0.5,
                                     }));
-                                  }} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
-                                    <option value="Full Pay">Full Pay</option>
-                                    <option value="Partial Pay">Partial Pay</option>
+                                  }} className="w-full px-2 py-2 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 h-[38px]">
+                                    <option value="Full Pay">Full</option>
+                                    <option value="Partial Pay">Partial</option>
                                   </select>
                                 </div>
-                                <div>
-                                  <label className="block text-xs font-medium text-gray-700 mb-1">{claimEditData.claimType} Amount (Enter)</label>
-                                  <input type="number" value={claimEditData.advanceAmount ?? ''} onChange={(e) => setClaimEditData((prev: any) => ({ ...prev, advanceAmount: parseFloat(e.target.value) || 0 }))} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 font-semibold" placeholder="Enter amount" min="0" step="0.01" />
+                                <div className="flex flex-col">
+                                  <label className="block text-[10px] font-medium text-gray-700 mb-1 truncate">Amount</label>
+                                  <input type="number" value={claimEditData.advanceAmount ?? ''} onChange={(e) => setClaimEditData((prev: any) => ({ ...prev, advanceAmount: parseFloat(e.target.value) || 0 }))} className="w-full px-2 py-2 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 font-semibold h-[38px] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" placeholder="0" min="0" step="0.01" />
                                 </div>
-                              </>
+                              </div>
                             )}
                           </div>
                         </div>

@@ -790,8 +790,7 @@ function AllClaimsPage() {
                     )}
                     {claim.status === "Rejected" && (
                       <button
-                        onClick={() => handleApprove(claim._id)}
-                        disabled={actionLoading}
+                        onClick={() => openApprovalModal(claim)}
                         className="flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded-md hover:bg-green-700 transition-colors disabled:opacity-50"
                         title="Approve"
                       >
@@ -835,7 +834,7 @@ function AllClaimsPage() {
         {/* View Detail Modal */}
         {viewModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto">
               {/* Rejection Notice Banner */}
               {viewModal.rejectedFromPassClaims === true && viewModal.reviewNotes && (
                 <div className="bg-red-50 border-b border-red-200 px-6 py-3">
@@ -1232,28 +1231,43 @@ function AllClaimsPage() {
                       <p className="text-xs text-gray-500">Department</p>
                       <p className="text-sm font-semibold text-gray-900">{viewModal.departmentName || "-"}</p>
                     </div>
-                    <div className="bg-gray-50 rounded-lg p-3">
-                      <p className="text-xs text-gray-500">Service</p>
-                      <p className="text-sm font-semibold text-gray-900">{viewModal.serviceName || "-"}</p>
+                    <div className="bg-gray-50 rounded-lg p-3 col-span-2 sm:col-span-1">
+                      <p className="text-xs text-gray-500 mb-1">Services</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {viewModal.services && viewModal.services.length > 0 ? (
+                          viewModal.services.map((svc, idx) => (
+                            <span 
+                              key={idx} 
+                              className="inline-flex items-center px-1.5 py-0.5 rounded bg-teal-50 text-teal-700 border border-teal-200 text-[9px] font-bold whitespace-nowrap shadow-sm"
+                            >
+                              {svc.serviceName}
+                            </span>
+                          ))
+                        ) : (
+                          <p className="text-sm font-semibold text-gray-900">{viewModal.serviceName || "-"}</p>
+                        )}
+                      </div>
                     </div>
                     <div className="bg-gray-50 rounded-lg p-3">
                       <p className="text-xs text-gray-500">Co-Pay %</p>
                       <p className="text-sm font-semibold text-gray-900">{viewModal.coPayPercent}%</p>
                     </div>
-                    <div className="bg-gray-50 rounded-lg p-3">
-                      <p className="text-xs text-gray-500">Co-Pay Type</p>
-                      <p className="text-sm font-semibold text-gray-900">{viewModal.coPayType}</p>
-                    </div>
-                    {viewModal.claimType === "Advance" && (
+                    {(viewModal.claimType === "Advance" || viewModal.claimType === "Paid") && (
                       <>
                         <div className="bg-gray-50 rounded-lg p-3">
-                          <p className="text-xs text-gray-500">Advance Status</p>
+                          <p className="text-xs text-gray-500">{viewModal.claimType} Status</p>
                           <p className="text-sm font-semibold text-gray-900">{viewModal.advanceStatus || "-"}</p>
                         </div>
                         <div className="bg-gray-50 rounded-lg p-3">
-                          <p className="text-xs text-gray-500">Advance Amount</p>
-                          <p className="text-sm font-semibold text-gray-900">{viewModal.advanceAmount?.toLocaleString()}</p>
+                          <p className="text-xs text-gray-500">Paid Amount</p>
+                          <p className="text-sm font-semibold text-gray-900">₹{viewModal.advanceAmount?.toLocaleString() || "0"}</p>
                         </div>
+                        {viewModal.pendingClaim > 0 && (
+                          <div className="bg-gray-50 rounded-lg p-3">
+                            <p className="text-xs text-gray-500">Pending Claim</p>
+                            <p className="text-sm font-semibold text-orange-600">₹{viewModal.pendingClaim?.toLocaleString()}</p>
+                          </div>
+                        )}
                       </>
                     )}
                     <div className="bg-gray-50 rounded-lg p-3">
@@ -1321,10 +1335,6 @@ function AllClaimsPage() {
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mt-4">
                   <h3 className="text-[10px] font-bold text-gray-400 uppercase mb-3 tracking-widest">Administrative Details</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2 text-[10px]">
-                    <div className="flex justify-between border-b border-gray-200 pb-1">
-                      <span className="text-gray-500">Clinic Name:</span>
-                      <span className="font-semibold text-gray-700">{viewModal.clinicName || (typeof window !== 'undefined' ? localStorage.getItem('clinicName') : 'Clinic')}</span>
-                    </div>
                     <div className="flex justify-between border-b border-gray-200 pb-1">
                       <span className="text-gray-500">Patient Name:</span>
                       <span className="font-semibold text-gray-700">{viewModal.patientFirstName} {viewModal.patientLastName}</span>
