@@ -302,6 +302,8 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
   const [balances, setBalances] = useState<{
     advanceBalance: number;
     pendingBalance: number;
+    claimAmount: number;
+    pendingClaim: number;
     pastAdvanceBalance: number;
     pastAdvance50PercentBalance: number;
     pastAdvance54PercentBalance: number;
@@ -309,6 +311,8 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
   }>({
     advanceBalance: 0,
     pendingBalance: 0,
+    claimAmount: 0,
+    pendingClaim: 0,
     pastAdvanceBalance: 0,
     pastAdvance50PercentBalance: 0,
     pastAdvance54PercentBalance: 0,
@@ -318,6 +322,8 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
   const [applyPastAdvance50Percent] = useState(false);
   const [applyPastAdvance54Percent] = useState(false);
   const [applyPastAdvance159Flat, setApplyPastAdvance159Flat] = useState(false);
+  const [applyClaimAmount, setApplyClaimAmount] = useState(false);
+  const [applyPendingClaim, setApplyPendingClaim] = useState(false);
   
   // Cashback state
   const [availableCashback, setAvailableCashback] = useState<any>(null); // { amount, expiryDate, daysRemaining }
@@ -379,6 +385,8 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
     pastAdvanceUsed54Percent: "0.00",
     pastAdvanceUsed159Flat: "0.00",
     pendingUsed: "0.00",
+    claimAmountUsed: "0.00",
+    pendingClaimUsed: "0.00",
   });
 
   const treatmentDropdownRef = useRef<HTMLDivElement>(null);
@@ -438,11 +446,15 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
       setBalances({
         advanceBalance: 0,
         pendingBalance: 0,
+        claimAmount: 0,
+        pendingClaim: 0,
         pastAdvanceBalance: 0,
         pastAdvance50PercentBalance: 0,
         pastAdvance54PercentBalance: 0,
         pastAdvance159FlatBalance: 0,
       });
+      setApplyClaimAmount(false);
+      setApplyPendingClaim(false);
       setApplyAdvance(false);
       setApplyPastAdvance159Flat(false);
       setUseMultiplePayments(false);
@@ -505,6 +517,8 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
         pastAdvanceUsed54Percent: "0.00",
         pastAdvanceUsed159Flat: "0.00",
         pendingUsed: "0.00",
+        claimAmountUsed: "0.00",
+        pendingClaimUsed: "0.00",
       });
 
       generateInvoiceNumber();
@@ -802,6 +816,8 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
           setBalances({
             advanceBalance: res.data.balances.advanceBalance || 0,
             pendingBalance: res.data.balances.pendingBalance || 0,
+            claimAmount: res.data.balances.claimAmount || 0,
+            pendingClaim: res.data.balances.pendingClaim || 0,
             pastAdvanceBalance: res.data.balances.pastAdvanceBalance || 0,
             pastAdvance50PercentBalance:
               res.data.balances.pastAdvance50PercentBalance || 0,
@@ -814,6 +830,8 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
           setBalances({
             advanceBalance: 0,
             pendingBalance: 0,
+            claimAmount: 0,
+            pendingClaim: 0,
             pastAdvanceBalance: 0,
             pastAdvance50PercentBalance: 0,
             pastAdvance54PercentBalance: 0,
@@ -824,6 +842,8 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
         setBalances({
           advanceBalance: 0,
           pendingBalance: 0,
+          claimAmount: 0,
+          pendingClaim: 0,
           pastAdvanceBalance: 0,
           pastAdvance50PercentBalance: 0,
           pastAdvance54PercentBalance: 0,
@@ -2620,13 +2640,15 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
     const discountedTotal = parseFloat(formData.discountedAmount || "0") || 0;
    
     // Always ensure amount has a value - either with previous pending or just the discounted total
+    // Include pending balance AND pending claim in the total
     const invoiceTotal = Number(
-      (discountedTotal + (balances.pendingBalance || 0)).toFixed(2),
+      (discountedTotal + (balances.pendingBalance || 0) + (balances.pendingClaim || 0)).toFixed(2),
     );
    
     console.log("Adding previous pending:", {
       discountedTotal,
       previousPending: balances.pendingBalance,
+      pendingClaim: balances.pendingClaim,
       invoiceTotal,
       currentAmount: formData.amount
     });
@@ -2638,7 +2660,7 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
         amount: invoiceTotal.toFixed(2),
       }));
     }
-  }, [balances.pendingBalance, formData.discountedAmount]);
+  }, [balances.pendingBalance, balances.pendingClaim, formData.discountedAmount]);
 
   // Auto-calc pending/advance considering applied advance balances
   useEffect(() => {
@@ -2654,7 +2676,15 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
     const finalAmountAfterCashback = Math.max(0, discountedAmount - cashbackDeduction);
     
     // Calculate how much previous pending is being rolled into this billing
-    const pendingBeingRolledIn = Math.max(0, originalAmountNum - discountedAmount);
+    // pendingUsed is for pending balance from billings only
+    const pendingUsed = balances.pendingBalance || 0;
+    // pendingClaimUsed is for pending claim from insurance claims only
+    const pendingClaimUsed = balances.pendingClaim || 0;
+    // Total pending being rolled in (for amountForCredits calculation)
+    const pendingBeingRolledIn = pendingUsed + pendingClaimUsed;
+    
+    // Amount for credits = discounted amount + all pending (balance + claim)
+    // This equals invoiceTotal which includes: discountedAmount + pendingBalance + pendingClaim
 
     // Amount available for applying credits = final amount after cashback + pending rolled in
     const amountForCredits = finalAmountAfterCashback + pendingBeingRolledIn;
@@ -2681,16 +2711,21 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
     const appliedPastAdvance159Flat = applyPastAdvance159Flat
       ? Math.min(balances.pastAdvance159FlatBalance || 0, amountForCredits - appliedAdvance - appliedPastAdvance50Percent - appliedPastAdvance54Percent)
       : 0;
-
     const totalPastAdvanceUsed =
       appliedPastAdvance50Percent +
       appliedPastAdvance54Percent +
       appliedPastAdvance159Flat;
+    const appliedClaimAmount = applyClaimAmount
+      ? Math.min(balances.claimAmount || 0, amountForCredits - appliedAdvance - totalPastAdvanceUsed)
+      : 0;
+    // Pending claim is automatically added to total, no separate deduction needed
+    // The amountForCredits already includes pending claim, so it affects net due automatically
+    const totalClaimUsed = appliedClaimAmount;
 
     // 2. Net Due (Remaining amount to be paid after credits)
     const netDue = Math.max(
       0,
-      amountForCredits - appliedAdvance - totalPastAdvanceUsed,
+      amountForCredits - appliedAdvance - totalPastAdvanceUsed - totalClaimUsed,
     );
 
     // 3. Determine how much is actually being paid today (Cash/Card etc)
@@ -2728,8 +2763,11 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
         pastAdvanceUsed50Percent: appliedPastAdvance50Percent.toFixed(2),
         pastAdvanceUsed54Percent: appliedPastAdvance54Percent.toFixed(2),
         pastAdvanceUsed159Flat: appliedPastAdvance159Flat.toFixed(2),
-        // Track previous pending being rolled into this billing
-        pendingUsed: pendingBeingRolledIn.toFixed(2),
+        // Track pending balance being rolled into this billing
+        pendingUsed: pendingUsed.toFixed(2),
+        claimAmountUsed: appliedClaimAmount.toFixed(2),
+        // Track pending claim being rolled into this billing
+        pendingClaimUsed: pendingClaimUsed.toFixed(2),
       };
 
       // Auto-set paid when advance is applied
@@ -2737,7 +2775,8 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
         applyAdvance ||
         applyPastAdvance50Percent ||
         applyPastAdvance54Percent ||
-        applyPastAdvance159Flat
+        applyPastAdvance159Flat ||
+        applyClaimAmount
       ) {
         const currentPaid = parseFloat(prev.paid) || 0;
         const currentAmount = parseFloat(prev.amount) || 0;
@@ -2766,6 +2805,8 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
         updates.pastAdvanceUsed50Percent !== prev.pastAdvanceUsed50Percent ||
         updates.pastAdvanceUsed54Percent !== prev.pastAdvanceUsed54Percent ||
         updates.pastAdvanceUsed159Flat !== prev.pastAdvanceUsed159Flat ||
+        updates.claimAmountUsed !== prev.claimAmountUsed ||
+        updates.pendingClaimUsed !== prev.pendingClaimUsed ||
         (updates.paid !== undefined && updates.paid !== prev.paid);
 
       if (!hasChanges) return prev;
@@ -2779,11 +2820,15 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
     applyPastAdvance50Percent,
     applyPastAdvance54Percent,
     applyPastAdvance159Flat,
+    applyClaimAmount,
+    applyPendingClaim,
     balances.advanceBalance,
     balances.pastAdvanceBalance,
     balances.pastAdvance50PercentBalance,
     balances.pastAdvance54PercentBalance,
     balances.pastAdvance159FlatBalance,
+    balances.claimAmount,
+    balances.pendingClaim,
     useMultiplePayments,
     multiplePayments,
   ]);
@@ -3471,6 +3516,8 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
         pastAdvanceUsed159Flat:
           parseFloat(formData.pastAdvanceUsed159Flat) || 0,
         pendingUsed: parseFloat(formData.pendingUsed || "0") || 0,
+        claimAmountUsed: parseFloat(formData.claimAmountUsed || "0") || 0,
+        pendingClaimUsed: parseFloat(formData.pendingClaimUsed || "0") || 0,
         pending: parseFloat(formData.pending || "0") || 0,
         advance: parseFloat(formData.advance) || 0,
         pastAdvance: parseFloat(formData.pastAdvance) || 0,
@@ -3619,6 +3666,10 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
                   balanceResponse.data.balances.advanceBalance || 0,
                 pendingBalance:
                   balanceResponse.data.balances.pendingBalance || 0,
+                claimAmount:
+                  balanceResponse.data.balances.claimAmount || 0,
+                pendingClaim:
+                  balanceResponse.data.balances.pendingClaim || 0,
                 pastAdvanceBalance:
                   balanceResponse.data.balances.pastAdvanceBalance || 0,
                 pastAdvance50PercentBalance:
@@ -4761,6 +4812,11 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
                             + Pending Amount Added
                           </div>
                         )}
+                        {balances.pendingClaim > 0 && (
+                          <div className="text-[9px] text-purple-600 mt-0.5 font-bold uppercase tracking-wider">
+                            + Pending Claim Added
+                          </div>
+                        )}
                         {(isDoctorDiscountApplied || isAgentDiscountApplied) && (
                           <div className="text-[9px] text-red-500 mt-0.5 font-medium italic">
                             Discounted from {getCurrencySymbol(currency)} {parseFloat(formData.originalAmount || "0").toFixed(2)}
@@ -4812,7 +4868,10 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
                                 ? Math.min(availableCashback.amount, discountedAmount) 
                                 : 0;
                               const finalAmountAfterCashback = Math.max(0, discountedAmount - cashbackDeduction);
-                              const pendingBeingRolledIn = Math.max(0, (parseFloat(formData.amount) || 0) - discountedAmount);
+                              // pendingUsed = pendingBalance, pendingClaimUsed = pendingClaim
+                              const pendingUsed = balances.pendingBalance || 0;
+                              const pendingClaimUsed = balances.pendingClaim || 0;
+                              const pendingBeingRolledIn = pendingUsed + pendingClaimUsed;
                               const amountForCredits = finalAmountAfterCashback + pendingBeingRolledIn;
                               
                               const appliedAdvance = applyAdvance 
@@ -4827,8 +4886,11 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
                               const appliedPast159 = applyPastAdvance159Flat 
                                 ? Math.min(balances.pastAdvance159FlatBalance, amountForCredits - appliedAdvance - appliedPast50 - appliedPast54) 
                                 : 0;
+                              const appliedClaimAmt = applyClaimAmount
+                                ? Math.min(balances.claimAmount || 0, amountForCredits - appliedAdvance - appliedPast50 - appliedPast54 - appliedPast159)
+                                : 0;
                               
-                              const netDue = Math.max(0, amountForCredits - appliedAdvance - appliedPast50 - appliedPast54 - appliedPast159);
+                              const netDue = Math.max(0, amountForCredits - appliedAdvance - appliedPast50 - appliedPast54 - appliedPast159 - appliedClaimAmt);
                               return netDue.toFixed(2);
                             })()
                           }
@@ -4938,6 +5000,25 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
                           </span>
                         </label>
 
+                        {/* Insurance Claim Amount */}
+                        {balances.claimAmount > 0 && (
+                          <label className="flex items-center justify-between cursor-pointer group">
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={applyClaimAmount}
+                                onChange={(e) => setApplyClaimAmount(e.target.checked)}
+                                className="w-3.5 h-3.5 text-green-600 rounded focus:ring-green-500 border-gray-300"
+                              />
+                              <span className="text-[10px] font-medium text-gray-700 group-hover:text-gray-900">Use Insurance Claim Amount</span>
+                            </div>
+                            <span className="text-[10px] font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
+                              {getCurrencySymbol(currency)} {balances.claimAmount.toFixed(2)}
+                            </span>
+                          </label>
+                        )}
+
+
                         {/* 159 Flat Past Advance (if available) */}
                         {balances.pastAdvance159FlatBalance > 0 && (
                           <label className="flex items-center justify-between cursor-pointer group">
@@ -4957,7 +5038,7 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
                         )}
 
                         {/* Summary of applied advances */}
-                        {(applyAdvance || applyPastAdvance50Percent || applyPastAdvance54Percent || applyPastAdvance159Flat) && (
+                        {(applyAdvance || applyPastAdvance50Percent || applyPastAdvance54Percent || applyPastAdvance159Flat || applyClaimAmount) && (
                           <div className="mt-2 pt-2 border-t border-teal-200">
                             <div className="flex items-center justify-between text-[10px]">
                               <span className="font-semibold text-gray-700">Total Applied:</span>
@@ -4966,7 +5047,8 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
                                   (applyAdvance ? Math.min(balances.advanceBalance, parseFloat(formData.amount) || 0) : 0) +
                                   (applyPastAdvance50Percent ? Math.min(balances.pastAdvance50PercentBalance, parseFloat(formData.amount) || 0) : 0) +
                                   (applyPastAdvance54Percent ? Math.min(balances.pastAdvance54PercentBalance, parseFloat(formData.amount) || 0) : 0) +
-                                  (applyPastAdvance159Flat ? Math.min(balances.pastAdvance159FlatBalance, parseFloat(formData.amount) || 0) : 0)
+                                  (applyPastAdvance159Flat ? Math.min(balances.pastAdvance159FlatBalance, parseFloat(formData.amount) || 0) : 0) +
+                                  (applyClaimAmount ? Math.min(balances.claimAmount, parseFloat(formData.amount) || 0) : 0)
                                 ).toFixed(2)}
                               </span>
                             </div>
@@ -5164,6 +5246,11 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
                           {parseFloat(formData.pendingUsed || "0") > 0 && (
                             <span className="px-1.5 py-0.5 text-[8px] font-bold bg-amber-100 text-amber-700 rounded border border-amber-200 uppercase">
                               + Pending Amount Added
+                            </span>
+                          )}
+                          {balances.pendingClaim > 0 && (
+                            <span className="px-1.5 py-0.5 text-[8px] font-bold bg-purple-100 text-purple-700 rounded border border-purple-200 uppercase">
+                              + Pending Claim Added
                             </span>
                           )}
                         </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import axios from 'axios';
 import {
@@ -577,13 +577,6 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
 
   // Insurance Claims state
   const [insuranceClaims, setInsuranceClaims] = useState<any[]>([]);
-  const isRiskyPatient = useMemo(() => {
-    return insuranceClaims.some((c: any) => 
-      c.pendingClaim && 
-      c.pendingClaim !== '-' && 
-      Number(c.pendingClaim) > 0
-    );
-  }, [insuranceClaims]);
   const [claimsLoading, setClaimsLoading] = useState(false);
   const [claimViewModal, setClaimViewModal] = useState<any>(null);
   const [claimEditModal, setClaimEditModal] = useState<any>(null);
@@ -643,6 +636,8 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
     pastAdvance159FlatBalance: Number(patientData?.initialBalance?.pastAdvance159FlatBalance || 0),
     pendingBalanceImages: [] as string[],
   });
+  // Patient is risky if they have pending claim from balance (authoritative source from patient-balance API)
+  const isRiskyPatient = balance.pendingClaim > 0;
   const [balanceLoading, setBalanceLoading] = useState(false);
   const [uploadLoading, setUploadLoading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -2891,12 +2886,10 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
   const submitNewClaim = async () => {
     if (!patientData?._id) return;
 
-    // Calculate total pending claim from all insurance claims
-    const totalPendingClaim = insuranceClaims.reduce((sum, claim) => sum + Number(claim.pendingClaim || 0), 0);
-
-    // Check if patient has pending claim
-    if (totalPendingClaim > 0) {
-      alert(`Cannot create new claim. This patient has a pending claim of ${formatAED(totalPendingClaim)}. Please clear the pending claim first.`);
+    // Check if patient has pending claim using balance.pendingClaim (from patient-balance API)
+    // This is the authoritative source as it accounts for billing payments
+    if (balance.pendingClaim > 0) {
+      alert(`Cannot create new claim. This patient has a pending claim of ${formatAED(balance.pendingClaim)}. Please clear the pending claim first.`);
       return;
     }
 
@@ -6170,7 +6163,10 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                     </td>
                                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">{claim.doctorName || '-'}</td>
                                     <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-gray-900">{claim.claimAmount?.toLocaleString()}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-orange-700">{claim.pendingClaim > 0 ? claim.pendingClaim.toLocaleString() : '-'}</td>
+                                    {/* Show pending claim only if balance.pendingClaim > 0 (meaning there's still pending claim to collect) */}
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-orange-700">
+                                      {balance.pendingClaim > 0 && claim.pendingClaim > 0 ? claim.pendingClaim.toLocaleString() : '-'}
+                                    </td>
                                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">{claim.coPayPercent}% ({claim.coPayType})</td>
                                     <td className="px-4 py-3 whitespace-nowrap">
                                       <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
@@ -6359,7 +6355,8 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                 'bg-blue-100 text-blue-800 border-blue-300'
                               }`}>{claimViewModal.status}</span>
                             </div>
-                            {claimViewModal.pendingClaim > 0 && (
+                            {/* Show pending claim in modal only if balance.pendingClaim > 0 */}
+                            {balance.pendingClaim > 0 && claimViewModal.pendingClaim > 0 && (
                               <div>
                                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Pending Claim</p>
                                 <p className="text-sm font-bold text-orange-700">{claimViewModal.pendingClaim?.toLocaleString()}</p>

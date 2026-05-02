@@ -174,7 +174,8 @@ export default async function handler(req, res) {
 
     // Aggregate insurance claim amounts - ONLY include "Released" claims
     const claimMatch = { patientId, status: "Released" };
-    if (clinicId) claimMatch.clinicId = clinicId;
+    // Don't filter by clinicId for now to see all claims
+    console.log(`[Patient Balance] Querying claims with:`, claimMatch);
     const claims = await InsuranceClaim.find(claimMatch)
       .select("claimAmount advanceAmount claimType status pendingClaim")
       .lean();
@@ -184,11 +185,21 @@ export default async function handler(req, res) {
     
     let totalClaimAmount = 0;
     for (const c of claims) {
+      console.log(`[Patient Balance] Processing claim ${c._id}:`, {
+        claimType: c.claimType,
+        claimAmount: c.claimAmount,
+        advanceAmount: c.advanceAmount,
+        status: c.status
+      });
       // For Advance type: use claimAmount, for Paid type: use advanceAmount
       if (c.claimType === "Advance") {
         totalClaimAmount += Number(c.claimAmount || 0);
+        console.log(`[Patient Balance] Added claimAmount for Advance type:`, c.claimAmount);
       } else if (c.claimType === "Paid") {
         totalClaimAmount += Number(c.advanceAmount || 0);
+        console.log(`[Patient Balance] Added advanceAmount for Paid type:`, c.advanceAmount);
+      } else {
+        console.log(`[Patient Balance] Unknown claimType:`, c.claimType);
       }
     }
     
