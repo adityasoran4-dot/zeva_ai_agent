@@ -76,7 +76,7 @@ const TransferSection = ({ patientId, patientData, onTransferComplete }: { patie
     const fetchData = async () => {
       try {
         const headers = getAuthHeaders() || {};
-        
+       
         // Fetch memberships
         const membershipsRes = await axios.get('/api/clinic/memberships', { headers });
         if (membershipsRes.data.success) {
@@ -91,7 +91,7 @@ const TransferSection = ({ patientId, patientData, onTransferComplete }: { patie
 
         // Fetch public packages - COMMENTED OUT: Only fetch patient packages now
         // if (patientData?._id) {
-        //   const publicPackagesRes = await axios.get('/api/clinic/public-package', { 
+        //   const publicPackagesRes = await axios.get('/api/clinic/public-package', {
         //     headers,
         //     params: {
         //       patientId: patientData._id,
@@ -118,7 +118,7 @@ const TransferSection = ({ patientId, patientData, onTransferComplete }: { patie
           const headers = getAuthHeaders() || {};
           const res = await axios.get(`/api/clinic/membership-usage/${patientId}?membershipId=${selectedMembershipId}`, { headers });
           console.log('Membership usage API response:', res.data);
-          
+         
           // Handle different response structures
           if (res.data.success) {
             const usageData = res.data.usage || res.data.data || res.data;
@@ -200,14 +200,14 @@ const TransferSection = ({ patientId, patientData, onTransferComplete }: { patie
     setTransferSubmitting(true);
     try {
       const headers = getAuthHeaders() || {};
-      
+     
       if (transferType === "membership") {
         // Check if there are remaining benefits to transfer (same as PatientUpdateForm)
         // Calculate remaining consultations from total and used
         const totalConsultations = membershipUsage?.totalFreeConsultations || 0;
         const usedConsultations = membershipUsage?.usedFreeConsultations || 0;
         const remainingConsultations = Math.max(0, totalConsultations - usedConsultations);
-        
+       
         if (!selectedMembershipId || !membershipUsage || remainingConsultations <= 0) {
           alert('No remaining membership benefits to transfer');
           setTransferSubmitting(false);
@@ -361,7 +361,7 @@ const TransferSection = ({ patientId, patientData, onTransferComplete }: { patie
                 const totalConsultations = membershipUsage.totalFreeConsultations || 0;
                 const usedConsultations = membershipUsage.usedFreeConsultations || 0;
                 const remainingConsultations = Math.max(0, totalConsultations - usedConsultations);
-                
+               
                 return (
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                     <div className="text-[11px]">
@@ -420,7 +420,7 @@ const TransferSection = ({ patientId, patientData, onTransferComplete }: { patie
                 const usedSess = packageUsage?.totalSessions || 0;
                 // Always calculate remaining from total and used to ensure consistency
                 const remainingSess = Math.max(0, totalSess - usedSess);
-                
+               
                 return (
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                     <div className="text-[11px]">
@@ -535,14 +535,14 @@ const PatientProfileDashboard = ({ patientData, onClose, onPatientUpdated }: { p
   const [loadingPackages, setLoadingPackages] = useState(false);
   const [billingHistory, setBillingHistory] = useState<any>(null);
   const [loadingBilling, setLoadingBilling] = useState(false);
-  
+ 
   // Cashback state
   const [validCashback, setValidCashback] = useState<any>(null);
   const [allAppointmentsData, setAllAppointmentsData] = useState<any[]>([]);
   const [loadingTreatmentAppointments, setLoadingTreatmentAppointments] = useState(false);
   const [mediaDocuments, setMediaDocuments] = useState<any[]>([]);
   const [loadingMedia, setLoadingMedia] = useState(false);
-  
+ 
   // Consent Form Status States
   const [consentStatuses, setConsentStatuses] = useState<any[]>([]);
   const [loadingConsentStatus, setLoadingConsentStatus] = useState(false);
@@ -550,19 +550,19 @@ const PatientProfileDashboard = ({ patientData, onClose, onPatientUpdated }: { p
   const [selectedConsentId, setSelectedConsentId] = useState("");
   const [sendingConsent, setSendingConsent] = useState(false);
   const [consentSent, setConsentSent] = useState(false);
-  
+ 
   // Package Link State
   const [sendingPackageLink, setSendingPackageLink] = useState(false);
 // Created Packages State (from UserPackage model)
 const [createdPackages, setCreatedPackages] = useState<any[]>([]);
 const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
-  
+ 
   // Progress Notes & Prescription States
   const [progressNotes, setProgressNotes] = useState<any[]>([]);
   const [prescriptions, setPrescriptions] = useState<any[]>([]);
   const [loadingProgressNotes, setLoadingProgressNotes] = useState(false);
   const [loadingPrescriptions, setLoadingPrescriptions] = useState(false);
-  
+ 
   // Stats state - fetched on mount
   const [statsData, setStatsData] = useState({
     totalVisits: 0,
@@ -616,7 +616,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
   const [newClaimDepartments, setNewClaimDepartments] = useState<any[]>([]);
   const [newClaimServices, setNewClaimServices] = useState<any[]>([]);
   const [newClaimDoctors, setNewClaimDoctors] = useState<any[]>([]);
-  
+ 
   // Financial snapshot state - initialized from patientData.initialBalance if available
   const [financialData, setFinancialData] = useState({
     totalSpent: 0,
@@ -658,7 +658,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
     const [pendingClaimPayAmount, setPendingClaimPayAmount] = useState("");
     const [pendingClaimPayMethod, setPendingClaimPayMethod] = useState("Cash");
   const [treatmentFilter, setTreatmentFilter] = useState<'all' | 'ongoing' | 'completed' | 'pending'>('all');
-  
+ 
   // Track invoice numbers that have been paid but billing history hasn't updated yet
   // Persisted in sessionStorage to survive page refreshes
   const [manuallyPaidInvoices, setManuallyPaidInvoices] = useState<Set<string>>(() => {
@@ -713,7 +713,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
     if (typeof window !== 'undefined' && patientData._id) {
       try {
         sessionStorage.setItem(
-          `manuallyPaidInvoices_${patientData._id}`, 
+          `manuallyPaidInvoices_${patientData._id}`,
           JSON.stringify(Array.from(manuallyPaidInvoices))
         );
         console.log('💾 Saved manuallyPaidInvoices to sessionStorage:', manuallyPaidInvoices.size, 'invoices');
@@ -769,20 +769,20 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
       setPkgError(`Total allocated prices (${totalAllocated.toFixed(2)}) must equal the package price (${packagePrice.toFixed(2)})`);
       return;
     }
-    
+   
     console.log('Package validation passed:', {
       name: pkgModalName,
       price: packagePrice,
       treatments: pkgSelectedTreatments,
       addToPatient
     });
-    
+   
     // ALWAYS open payment modal first (both for "Create Package" and "Create & Add to Patient")
     setPkgTotalAmount(packagePrice);
     setPkgPaidAmount(packagePrice);
     setPkgPaymentType("Full");
     setPkgPaymentMethod("Cash");
-    
+   
     // Ensure treatments have proper number types
     const normalizedTreatments = pkgSelectedTreatments.map(t => ({
       treatmentName: t.treatmentName,
@@ -790,7 +790,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
       sessions: parseInt(String(t.sessions)) || 1,
       allocatedPrice: parseFloat(String(t.allocatedPrice)) || 0,
     }));
-    
+   
     // Store the package data to be created after payment
     setPkgPendingToCreate({
       name: pkgModalName.trim(),
@@ -801,7 +801,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
       treatments: normalizedTreatments,
       addToPatient: addToPatient, // Flag to know if should add to patient after creation
     });
-    
+   
     setShowPackagePaymentModal(true);
   };
 
@@ -866,8 +866,8 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
         if (res.data.success && res.data.clinic?.currency) {
           setCurrency(res.data.clinic.currency);
         }
-      } catch (e) { 
-        console.error('Error fetching clinic currency:', e); 
+      } catch (e) {
+        console.error('Error fetching clinic currency:', e);
       }
     };
     fetchClinicCurrency();
@@ -941,7 +941,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
       setTimeout(() => setPmToast(null), 3000);
       return;
     }
-    
+   
     // Only add to the memberships array - do NOT set individual fields
     setEditFormData((prev: any) => ({
       ...prev,
@@ -963,7 +963,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
       setTimeout(() => setPmToast(null), 3000);
       return;
     }
-    
+   
     const selectedPkg = allAvailablePackages.find((pkg: any) => pkg._id === selectedPackageToAdd);
     if (selectedPkg) {
       setPkgTotalAmount(selectedPkg.totalPrice || 0);
@@ -979,7 +979,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
     if (pkgPendingToCreate) {
       try {
         const shouldAddToPatient = pkgPendingToCreate.addToPatient;
-        
+       
         // ALWAYS add to editFormData temporarily - will save on "Save Changes" click
         const newPkgData = {
           packageId: `temp_${Date.now()}`, // Temporary ID, will be replaced after save
@@ -996,27 +996,27 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
           paymentMethod: paymentMethod,
           addToPatient: shouldAddToPatient, // Keep flag to know behavior after save
         };
-        
+       
         setEditFormData((prev: any) => ({
           ...prev,
           packages: [
-            ...(prev.packages || []), 
+            ...(prev.packages || []),
             newPkgData
           ],
         }));
-        
+       
         // Reset create package form
-        setPkgModalName(""); 
-        setPkgModalPrice(""); 
+        setPkgModalName("");
+        setPkgModalPrice("");
         setPkgModalValidityInMonths("");
         setPkgModalStartDate(new Date().toISOString().split('T')[0]);
         setPkgModalEndDate("");
-        setPkgSelectedTreatments([]); 
+        setPkgSelectedTreatments([]);
         setPkgTreatmentSearch("");
-        
+       
         setPkgPendingToCreate(null);
         setShowPackagePaymentModal(false);
-        
+       
         // Show appropriate message based on flow
         if (shouldAddToPatient) {
           setPkgSuccess("Package added to patient! Click 'Save Changes' to save.");
@@ -1032,10 +1032,10 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
       }
       return;
     }
-    
+   
     // Case 2: Adding existing package to patient (original flow)
     if (!pkgPendingToAssign) return;
-    
+   
     // Dynamically calculate start and end dates based on current date
     const now = new Date();
     const startDate = formatPmDate(now);
@@ -1045,13 +1045,13 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
       endDateObj.setMonth(endDateObj.getMonth() + validity);
     }
     const endDate = validity > 0 ? formatPmDate(endDateObj) : null;
-    
+   
     setEditFormData((prev: any) => ({
       ...prev,
       packages: [
-        ...(prev.packages || []), 
-        { 
-          packageId: pkgPendingToAssign._id, 
+        ...(prev.packages || []),
+        {
+          packageId: pkgPendingToAssign._id,
           assignedDate: new Date().toISOString(),
           validityInMonths: validity,
           startDate: startDate,
@@ -1076,7 +1076,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
     setEditFormData((prev: any) => {
       const list = Array.isArray(prev.memberships) ? prev.memberships : [];
       const newList = list.filter((_: any, idx: number) => idx !== indexToRemove);
-      
+     
       // If this was the last membership, also clear the main membership fields
       if (newList.length === 0) {
         return {
@@ -1088,7 +1088,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
           membership: "No",
         };
       }
-      
+     
       return {
         ...prev,
         memberships: newList,
@@ -1101,7 +1101,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
     setEditFormData((prev: any) => {
       const list = Array.isArray(prev.packages) ? prev.packages : [];
       const newList = list.filter((_: any, idx: number) => idx !== indexToRemove);
-      
+     
       // If this was the last package, also clear the main package fields
       if (newList.length === 0) {
         return {
@@ -1111,7 +1111,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
           package: "No",
         };
       }
-      
+     
       return {
         ...prev,
         packages: newList,
@@ -1135,14 +1135,14 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
         setPmSaving(false);
         return;
       }
-        
+       
       // Step 1: Create any new packages first
       const packagesToSave = Array.isArray(editFormData.packages) ? [...editFormData.packages] : [];
       const newPackages = packagesToSave.filter((p: any) => p.isNewPackage);
-      
+     
       if (newPackages.length > 0) {
         console.log('Creating new packages:', newPackages);
-        
+       
         for (const newPkg of newPackages) {
           try {
             // Create the package
@@ -1154,10 +1154,10 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
               endDate: newPkg.endDate,
               treatments: newPkg.treatments,
             }, { headers });
-            
+           
             if (createRes.data?.success) {
               const realPackageId = createRes.data.package?._id || createRes.data.packageId;
-              
+             
               // Only assign to patient if addToPatient flag is true
               if (newPkg.addToPatient) {
                 await axios.post("/api/clinic/assign-package-to-patient", {
@@ -1172,7 +1172,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                   paymentMethod: newPkg.paymentMethod,
                 }, { headers });
               }
-              
+             
               // Update the package in the array with real ID and remove isNewPackage flag
               const pkgIndex = packagesToSave.findIndex((p: any) => p.packageId === newPkg.packageId);
               if (pkgIndex !== -1) {
@@ -1182,14 +1182,14 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                   isNewPackage: false,
                 };
               }
-              
+             
               console.log(`Package created: ${realPackageId}${newPkg.addToPatient ? ' and assigned to patient' : ''}`);
             }
           } catch (err: any) {
             console.error('Error creating package:', err);
-            setPmToast({ 
-              message: `Failed to create package "${newPkg.packageName}": ${err.response?.data?.message || err.message}`, 
-              type: 'error' 
+            setPmToast({
+              message: `Failed to create package "${newPkg.packageName}": ${err.response?.data?.message || err.message}`,
+              type: 'error'
             });
             setTimeout(() => setPmToast(null), 4000);
             setPmSaving(false);
@@ -1197,7 +1197,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
           }
         }
       }
-        
+       
       // Step 2: Prepare final packages array (with real IDs now)
       const hasPackagesArray = packagesToSave.length > 0;
       let finalPackages = packagesToSave.map((p: any) => {
@@ -1205,7 +1205,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
         const { isNewPackage, packageName, treatments, addToPatient, ...rest } = p;
         return rest;
       });
-        
+       
       // Auto-sync: If individual packageId exists but packages array is empty, create the array entry
       if (!hasPackagesArray && editFormData.packageId && !finalPackages.some((p: any) => p.packageId === editFormData.packageId)) {
         finalPackages = [{
@@ -1217,7 +1217,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
           paymentMethod: editFormData.packagePaymentMethod || '',
         }];
       }
-        
+       
       // Determine memberships
       const hasMembershipsArray = Array.isArray(editFormData.memberships) && editFormData.memberships.length > 0;
       let finalMemberships = Array.isArray(editFormData.memberships) ? editFormData.memberships : [];
@@ -1228,7 +1228,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
           endDate: editFormData.membershipEndDate || new Date(new Date().setMonth(new Date().getMonth() + 6)).toISOString(),
         }];
       }
-        
+       
       const payload = {
         updateType: 'details',
         membership: finalMemberships.length > 0 ? 'Yes' : (editFormData.membership || 'No'),
@@ -1254,26 +1254,26 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
         insuranceType: patientData.insuranceType,
         notes: patientData.notes,
       };
-        
+       
       console.log('🟢 Saving payload:', JSON.stringify(payload, null, 2));
-        
+       
       // Step 3: Save patient data
       const res = await axios.put(`/api/staff/get-patient-data/${patientData._id}`, payload, { headers });
       const result = res.data;
-        
+       
       console.log('📡 API Response:', result);
-        
+       
       if (res.status === 200 || res.status === 201) {
         setPmToast({ message: result.message || 'Patient updated successfully!', type: 'success' });
         setTimeout(() => setPmToast(null), 3000);
-          
+         
         // Fetch fresh patient data
         let freshData: any = null;
         try {
           const patientRes = await axios.get(`/api/staff/get-patient-data/${patientData._id}`, { headers });
           if (patientRes.data) {
             freshData = patientRes.data;
-            
+           
             // Update the main patient state via callback
             if (onPatientUpdated) {
               onPatientUpdated({
@@ -1288,7 +1288,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                 packages: Array.isArray(freshData?.packages) ? freshData.packages : [],
               });
             }
-            
+           
             // Update editFormData with fresh saved data
             setEditFormData({
               membership: freshData?.membership || 'No',
@@ -1304,13 +1304,13 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
         } catch (fetchError) {
           console.error('Error fetching fresh patient data:', fetchError);
         }
-          
+         
         // Refresh packages/memberships display
         fetchPackagesAndMemberships({
           memberships: Array.isArray(freshData?.memberships) ? freshData.memberships : (patientData?.memberships || []),
           packages: Array.isArray(freshData?.packages) ? freshData.packages : (patientData?.packages || []),
         });
-        
+       
         // Refresh available packages list
         try {
           const pRes = await axios.get('/api/clinic/packages', { headers });
@@ -1412,8 +1412,8 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
     });
 
     // From billing — add payment entries
-    const billings = Array.isArray(billingHistory) 
-      ? billingHistory.filter((b: any) => !b.isAdvanceOnly && b.treatment !== "Advance Payment" && b.treatment !== "Historical Advance Balance") 
+    const billings = Array.isArray(billingHistory)
+      ? billingHistory.filter((b: any) => !b.isAdvanceOnly && b.treatment !== "Advance Payment" && b.treatment !== "Historical Advance Balance")
       : [];
     billings.slice(0, 3).forEach((b: any) => {
       if (b.paid > 0) {
@@ -1513,11 +1513,11 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
     if (patientData?._id) {
       // 1. Fetch Overview & Dashboard Stats
       fetchOverviewData();
-      
+     
       // 2. Fetch Appointments & Billing (needed for Overview Timeline & Financials)
       fetchAppointments();
       fetchBillingHistory();
-      
+     
       // 3. Fetch Real Advance & Pending Balances
       setBalanceLoading(true);
       fetchPatientBalance(patientData._id).then((data: any) => {
@@ -1612,7 +1612,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
         `/api/clinic/all-appointments?page=1&limit=1000&fromDate=${oneYearAgo.toISOString().split('T')[0]}&toDate=${oneYearAhead.toISOString().split('T')[0]}`,
         { headers }
       );
-      
+     
       if (response.data.success) {
         const patientAppointments = response.data.appointments?.filter(
           (apt: any) => apt.patientId?.toString() === patientData._id?.toString()
@@ -1635,11 +1635,11 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
       if (!headers || !patientData?._id) return;
 
       // Fetch upcoming appointments from dedicated API
-      const response = await axios.get('/api/clinic/patient-upcoming-appointments', { 
+      const response = await axios.get('/api/clinic/patient-upcoming-appointments', {
         headers,
         params: { patientId: patientData._id }
       });
-      
+     
       if (response.data.success) {
         const upcomingAppts = response.data.appointments || [];
         setUpcomingAppointments(upcomingAppts);
@@ -1664,15 +1664,15 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
         axios.get('/api/clinic/memberships', { headers }),
         axios.get('/api/clinic/packages', { headers })
       ]);
-      
+     
       const allMemberships = mRes.data?.memberships || [];
       const allPackages = pRes.data?.packages || [];
-      
+     
       // Get patient's assigned package IDs and membership IDs
       // Use freshPatientData if provided (avoids stale closure after save)
       let patientPackageIds = (freshPatientData?.packages || patientData?.packages || []).map((p: any) => p.packageId);
       let patientMembershipIds = (freshPatientData?.memberships || patientData?.memberships || []).map((m: any) => m.membershipId);
-      
+     
       // Fetch package usage data for this patient
       let packageUsageData = [];
       let packageTransferredOutData: any[] = [];
@@ -1685,7 +1685,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
       } catch (err: any) {
         console.error('Error fetching package usage:', err.message);
       }
-      
+     
       // Fetch membership usage data for this patient
       let membershipUsageData: any = null;
       let membershipTransferredOutData: any[] = [];
@@ -1699,32 +1699,32 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
       } catch (err: any) {
         console.error('Error fetching membership usage:', err.message);
       }
-      
+     
       // Process packages with usage data - separate active, transferred-in, and transferred-out
       const transferredOutPackageIds = new Set(packageTransferredOutData.map(p => String(p.packageId)));
-      
+     
       // Filter patientPackageIds to exclude transferred-out packages
-      patientPackageIds = patientPackageIds.filter((pkgId: any) => 
+      patientPackageIds = patientPackageIds.filter((pkgId: any) =>
         !transferredOutPackageIds.has(String(pkgId))
       );
-      
-      const patientPackages = allPackages.filter((pkg: any) => 
+     
+      const patientPackages = allPackages.filter((pkg: any) =>
         patientPackageIds.includes(pkg._id)
       ).map((pkg: any) => {
         const calculatedTotalSessions = pkg.treatments?.reduce((sum: number, t: any) => sum + (parseInt(t.sessions) || 0), 0) || 0;
-        
+       
         // Find the patient's package assignment to get assigned date
         // Use freshPatientData for newest assignments if available
         const currentPackages = freshPatientData?.packages || patientData?.packages || [];
         const patientPackage = currentPackages.find((p: any) => p.packageId === pkg._id);
-        
+       
         // Find usage data for this package
         const usage = packageUsageData.find((u: any) => u.packageName === pkg.name);
-        
+       
         // Calculate used sessions from usage data
         let usedSessions = 0;
         let treatmentsWithUsage = pkg.treatments || [];
-        
+       
         if (usage) {
           usedSessions = usage.totalSessions || 0;
           // Enrich treatments with usage details
@@ -1738,7 +1738,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
             };
           });
         }
-        
+       
         return {
           ...pkg,
           validityInMonths: patientPackage?.validityInMonths || pkg.validityInMonths || 0,
@@ -1761,7 +1761,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
           remainingSessions: usage?.remainingSessions || null
         };
       });
-      
+     
       // Separate transferred-in packages from usage data
       const transferredInPkgs = packageUsageData
         .filter((u: any) => u.isTransferred && u.transferredFrom)
@@ -1777,7 +1777,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
           treatments: u.treatments || [],
           billingHistory: u.billingHistory || []
         }));
-      
+     
       // Process memberships with usage data - separate active, transferred-in, and transferred-out
       // Filter patientMembershipIds to exclude transferred-out memberships
       const transferredOutMembershipIds = new Set(
@@ -1785,17 +1785,17 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
           .filter((t: any) => t.type === 'out')
           .map((t: any) => String(t.membershipId))
       );
-      patientMembershipIds = patientMembershipIds.filter((membershipId: any) => 
+      patientMembershipIds = patientMembershipIds.filter((membershipId: any) =>
         !transferredOutMembershipIds.has(String(membershipId))
       );
-      
-      const patientMemberships = allMemberships.filter((membership: any) => 
+     
+      const patientMemberships = allMemberships.filter((membership: any) =>
         patientMembershipIds.includes(membership._id)
       ).map((membership: any) => {
         // Find the patient's membership assignment to get dates
         const currentMemberships = freshPatientData?.memberships || patientData?.memberships || [];
         const patientMembership = currentMemberships.find((m: any) => m.membershipId === membership._id);
-        
+       
         // Enrich with usage data
         const enrichedMembership = {
           ...membership,
@@ -1806,15 +1806,15 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
           paymentMethod: membershipUsageData?.paymentMethod || patientMembership?.paymentMethod || '',
           status: 'active'
         };
-        
+       
         // Add usage data if available
         if (membershipUsageData) {
           (enrichedMembership as any).usageData = membershipUsageData;
         }
-        
+       
         return enrichedMembership;
       });
-      
+     
       // Separate transferred-in memberships from usage data
       const transferredInMembs = membershipUsageData && membershipUsageData.isTransferred ? [{
         membershipName: membershipUsageData.membershipName,
@@ -1829,7 +1829,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
         isExpired: false,
         hasFreeConsultations: membershipUsageData.hasFreeConsultations || false
       }] : [];
-      
+     
       setPackages(patientPackages);
       // Fetch user packages (created via public form)
       try {
@@ -1838,10 +1838,10 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
           const approvedUserPackages = patientRegRes.data.patient.userPackages.filter(
             (pkg: any) => pkg.approvalStatus === 'approved'
           );
-          
+         
           // Initially set from patient record (partial data)
           setUserPackages(approvedUserPackages);
-          
+         
           const publicPkgRes = await axios.get('/api/clinic/public-package', {
             headers,
             params: {
@@ -1849,20 +1849,20 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
               clinicId: patientData.clinicId,
             },
           });
-          
+         
           if (publicPkgRes.data.success && publicPkgRes.data.existingPackages) {
             const fullUserPackages = approvedUserPackages.map((userPkg: any) => {
               const fullPkg = publicPkgRes.data.existingPackages.find(
                 (p: any) => p._id === userPkg.packageId
               );
-              
+             
               if (fullPkg) {
                 // Find usage data for this user package
                 const usage = packageUsageData.find((u: any) => u.packageName === fullPkg.packageName);
-                
+               
                 let usedSessions = 0;
                 let treatmentsWithUsage = fullPkg.treatments || [];
-                
+               
                 if (usage) {
                   usedSessions = usage.totalSessions || 0;
                   // Enrich treatments with usage details
@@ -1876,7 +1876,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                     };
                   });
                 }
-                
+               
                 return {
                   ...fullPkg,
                   validityInMonths: fullPkg.validityInMonths || 0,
@@ -1891,7 +1891,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                   treatments: treatmentsWithUsage
                 };
               }
-              
+             
               return userPkg;
             });
             setUserPackages(fullUserPackages);
@@ -1922,27 +1922,27 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
       if (!headers) return [];
 
       const response = await axios.get(`/api/clinic/billing-history/${patientData._id}`, { headers });
-      
+     
       if (response.data.success) {
         const billings = response.data.billings || [];
         setBillingHistory(billings);
         calculateFinancialSnapshot(billings);
-        
+       
         // Calculate valid cashback from billing history
         const today = new Date();
         today.setHours(0, 0, 0, 0); // Reset time to start of day
-        
+       
         console.log('[CashbackProfile] Checking cashback validity:', {
           totalBillings: billings.length,
           today: today.toISOString()
         });
-        
+       
         // Find all billings with valid cashback
         const cashbackBillings = billings.filter((billing: any) => {
           if (!billing.isCashbackApplied || !billing.cashbackAmount || billing.cashbackAmount <= 0) {
             return false;
           }
-          
+         
           // Check if cashback has not expired
           if (billing.cashbackEndDate) {
             const endDate = new Date(billing.cashbackEndDate);
@@ -1955,31 +1955,31 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
             });
             return isValid; // Not expired
           }
-          
+         
           return false;
         });
-        
+       
         console.log('[CashbackProfile] Valid cashback billings:', cashbackBillings.length);
-        
+       
         // Calculate total EARNED cashback (still valid, not expired)
         const totalCashbackEarned = cashbackBillings.reduce((sum: number, billing: any) => {
           return sum + (billing.cashbackAmount || 0);
         }, 0);
-        
+       
         // Calculate total USED cashback (from all billings)
         const totalCashbackUsed = billings.reduce((sum: number, billing: any) => {
           return sum + (billing.cashbackWalletUsed || 0);
         }, 0);
-        
+       
         // Calculate AVAILABLE cashback = Earned - Used
         const availableCashbackAmount = Math.max(0, totalCashbackEarned - totalCashbackUsed);
-        
+       
         console.log('[CashbackProfile] Cashback calculation:', {
           totalEarned: totalCashbackEarned,
           totalUsed: totalCashbackUsed,
           available: availableCashbackAmount
         });
-        
+       
         // Get the nearest expiry date (from earned cashback billings)
         let nearestExpiry = null;
         if (cashbackBillings.length > 0) {
@@ -1988,7 +1988,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
           });
           nearestExpiry = sortedByExpiry[0].cashbackEndDate;
         }
-        
+       
         if (availableCashbackAmount > 0 && nearestExpiry) {
           setValidCashback({
             amount: availableCashbackAmount,
@@ -1999,7 +1999,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
         } else {
           setValidCashback(null);
         }
-        
+       
         return billings;
       }
     } catch (error: any) {
@@ -2015,7 +2015,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
   // Fetch appointments data for Treatment section
   const fetchTreatmentsFromAppointments = async () => {
     if (!patientData?._id) return;
-    
+   
     setLoadingTreatmentAppointments(true);
     try {
       const headers = getAuthHeaders();
@@ -2030,7 +2030,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
         `/api/clinic/all-appointments?page=1&limit=1000&fromDate=${oneYearAgo.toISOString().split('T')[0]}&toDate=${oneYearAheadTx.toISOString().split('T')[0]}`,
         { headers }
       );
-      
+     
       if (response.data.success) {
         const patientAppointments = response.data.appointments?.filter(
           (apt: any) => apt.patientId?.toString() === patientData._id?.toString()
@@ -2095,7 +2095,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
       if (insuranceClaimsRes.data.success) {
         const claims = insuranceClaimsRes.data.data || [];
         // Filter claims based on statuses that indicate they are still in the pipeline
-        insuranceClaimsPending = claims.filter((c: any) => 
+        insuranceClaimsPending = claims.filter((c: any) =>
           ['Under Review', 'Approved'].includes(c.status)
         ).length;
       } else {
@@ -2107,7 +2107,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
         const patientAppointments = appointmentsRes.data.appointments?.filter(
           (apt: any) => apt.patientId === patientData._id
         ) || [];
-        
+       
         // Count total visits based on specific statuses
         // Statuses that count as visits: Arrived, Waiting, Consultation, Approved, Rescheduled, Completed, Discharge, invoice
         const visitStatuses = ['arrived', 'waiting', 'consultation', 'approved', 'rescheduled', 'completed', 'discharge', 'invoice'];
@@ -2115,7 +2115,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
           const status = (apt.status || '').toLowerCase();
           return visitStatuses.includes(status);
         }).length;
-        
+       
         patientAppointments.forEach((apt: any) => {
           const status = (apt.status || apt.appointmentStatus || '').toLowerCase();
           if (['cancelled', 'rejected', 'no show', 'no-show'].includes(status)) {
@@ -2144,15 +2144,15 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
       // Completed invoices from billing history - Use same logic as treatment section
       if (billingRes) {
         const billings: any[] = billingRes;
-        
+       
         // Filter out advance payments first
         const treatmentBillings = billings.filter((b: any) => {
-          const isAdvance = b.isAdvanceOnly || 
-                           b.treatment === "Advance Payment" || 
+          const isAdvance = b.isAdvanceOnly ||
+                           b.treatment === "Advance Payment" ||
                            b.treatment === "Historical Advance Balance";
           return !isAdvance;
         });
-        
+       
         // Apply the same completed/pending logic as treatment section
         completedInvoices = treatmentBillings.filter((billing: any) => {
           const amount = parseFloat(billing.amount) || 0;
@@ -2160,21 +2160,21 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
           const pending = parseFloat(billing.pending || 0) || 0;
           const pendingUsed = parseFloat(billing.pendingUsed || 0) || 0;
           const billingDate = billing.createdAt ? new Date(billing.createdAt).getTime() : 0;
-          
+         
           // Check if this invoice's pending was cleared by a newer invoice
           const hasNewerInvoiceWithPendingUsed = treatmentBillings.some((otherBilling: any) => {
             const otherDate = otherBilling.createdAt ? new Date(otherBilling.createdAt).getTime() : 0;
             const otherPendingUsed = parseFloat(otherBilling.pendingUsed || 0) || 0;
             return otherDate > billingDate && otherPendingUsed > 0;
           });
-          
+         
           const hasPendingAmount = pending > 0;
           const pendingClearedSeparately = pendingUsed > 0;
-          
+         
           // Same logic as treatment section
           const isFullyPaid = (!hasPendingAmount && (paid >= amount || pendingClearedSeparately)) ||
                              (hasPendingAmount && hasNewerInvoiceWithPendingUsed);
-          
+         
           return isFullyPaid;
         }).length;
       }
@@ -2318,7 +2318,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
         mobileNumber: patientData.mobileNumber || "",
         email: patientData.email || "",
       };
-      
+     
       const encodedPatientData = encodeURIComponent(JSON.stringify(patientDataObj));
       const consentUrl = `https://zeva360.com/consent-form/${selectedConsentId}?patient=${encodedPatientData}`;
 
@@ -2348,7 +2348,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
 
       if (data && data?.success) {
         setConsentSent(true);
-        
+       
         // Log the sent consent form
         try {
           const selectedForm = consentForms.find((f) => f._id === selectedConsentId);
@@ -2363,7 +2363,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
             },
             { headers }
           );
-          
+         
           // Refresh consent statuses
           setTimeout(() => {
             fetchConsentStatuses();
@@ -2478,12 +2478,12 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
 
       // Build params - need at least one valid ID
       const params: any = {};
-      
+     
       // Only add patientId if it's a valid string
       if (patientData._id && typeof patientData._id === 'string' && patientData._id.length > 0) {
         params.patientId = patientData._id;
       }
-      
+     
       // Only add clinicId if it's a valid string
       if (patientData.clinicId && typeof patientData.clinicId === 'string' && patientData.clinicId.length > 0) {
         params.clinicId = patientData.clinicId;
@@ -2750,19 +2750,34 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
   };
 
   const handleNewClaimServiceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    // Get all selected options
-    const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
-    const selectedServices = newClaimServices
-      .filter((s: any) => selectedOptions.includes(s._id))
-      .map((s: any) => ({ serviceId: s._id, serviceName: s.name }));
-    
-    setNewClaimData((prev: any) => ({
-      ...prev,
-      services: selectedServices,
-      // Keep backward compatibility with single service fields
-      serviceId: selectedServices.length > 0 ? selectedServices[selectedServices.length - 1].serviceId : "",
-      serviceName: selectedServices.length > 0 ? selectedServices[selectedServices.length - 1].serviceName : "",
-    }));
+    const serviceId = e.target.value;
+    if (!serviceId) return;
+
+    const service = newClaimServices.find((s: any) => s._id === serviceId);
+    if (!service) return;
+
+    setNewClaimData((prev: any) => {
+      // Check if service is already selected
+      const isAlreadySelected = prev.services.some((s: any) => s.serviceId === serviceId);
+     
+      let updatedServices;
+      if (isAlreadySelected) {
+        // If already selected, maybe the user wants to remove it?
+        // Or we just keep it. Usually in single-select UI that adds to list,
+        // selecting again doesn't do anything or removes it.
+        // Let's make it add only if not present.
+        updatedServices = prev.services;
+      } else {
+        updatedServices = [...prev.services, { serviceId: service._id, serviceName: service.name }];
+      }
+
+      return {
+        ...prev,
+        services: updatedServices,
+        serviceId: serviceId,
+        serviceName: service.name,
+      };
+    });
   };
 
   const handleNewClaimDoctorChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -2950,10 +2965,10 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
   // Commented out - not currently used in the UI
   /* const handleUploadBalance = async () => {
     if (!patientData?._id) return;
-    
+   
     setUploadLoading(true);
     setUploadError(null);
-    
+   
     try {
       const updatedBalance = await fetchPatientBalance(patientData._id);
       if (updatedBalance) {
@@ -2979,10 +2994,10 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
       // Step 1: Upload image to /api/upload
       const formData = new FormData();
       formData.append('file', file);
-      
+     
       const authHeaders = getAuthHeaders();
       if (!authHeaders) throw new Error('Not authenticated');
-      
+     
       const uploadResponse = await axios.post('/api/upload', formData, {
         headers: {
           ...authHeaders,
@@ -3026,12 +3041,12 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
 
   const filterAppointments = (appointmentsList: any[], filter: string) => {
     if (filter === 'all') return appointmentsList;
-    
+   
     // For 'upcoming' filter, use the already-fetched upcoming appointments
     if (filter === 'upcoming') {
       return upcomingAppointments;
     }
-    
+   
     return appointmentsList.filter((apt: any) => {
       const status = (apt.status || apt.appointmentStatus || '').toLowerCase();
       return status === filter.toLowerCase();
@@ -3066,7 +3081,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
     );
   };
 
-  const filteredAppointments = appointmentFilter === 'upcoming' 
+  const filteredAppointments = appointmentFilter === 'upcoming'
     ? filterAppointments(upcomingAppointments, appointmentFilter)
     : filterAppointments(appointments, appointmentFilter);
 
@@ -3091,7 +3106,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
 
       {/* Main Content */}
       <div className="w-full px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6">
-        
+       
         {/* Patient Profile Header Card */}
         <div className="bg-white rounded-xl shadow-md border border-gray-200 p-4 mb-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -3101,7 +3116,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
               <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-teal-400 to-cyan-500 flex items-center justify-center text-white text-xl font-bold shadow-lg flex-shrink-0">
                 {getInitials(patientData.firstName, patientData.lastName)}
               </div>
-              
+             
               {/* Patient Info */}
               <div className="flex-1 min-w-0">
                 <h2 className="text-base sm:text-xl font-bold text-gray-900 truncate">
@@ -3181,7 +3196,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                 className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-gradient-to-r from-teal-500 to-cyan-600 text-white rounded-lg hover:from-teal-600 hover:to-cyan-700 transition-all shadow-md font-medium text-xs whitespace-nowrap"
               >
                 {/* <DollarSign className="w-3.5 h-3.5" /> */}
-                {getCurrencySymbol(currency)} Add Payment 
+                {getCurrencySymbol(currency)} Add Payment
               </button>
             </div>
           </div>
@@ -3257,7 +3272,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                     </button>
                   ))}
                 </div>
-            
+           
                 {/* Appointments Table Card */}
                 <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                   {loadingAppointments ? (
@@ -3430,7 +3445,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                             onClick={() => setShowAddMembershipDropdown(true)}
                             className="px-3 py-1.5 bg-indigo-600 text-white text-[10px] font-medium rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-1"
                           >
-                            <Plus className="w-3 h-3" /> Add Membership 
+                            <Plus className="w-3 h-3" /> Add Membership
                           </button>
                         ) : (
                           <div className="border border-indigo-200 rounded-lg p-2 bg-indigo-50 mb-2">
@@ -3497,10 +3512,10 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                             .map((m: any, originalIdx: number) => ({ m, originalIdx }))
                             .filter(({ m }: any) => !txOutMembershipIds.has(String(m.membershipId)));
                           if (visibleMemberships.length === 0) return null;
-                          
+                         
                           // Check if more than 3 memberships to enable scroll
                           const shouldScroll = visibleMemberships.length > 3;
-                          
+                         
                           return (
                             <div className="border border-gray-200 rounded p-2 mt-2">
                               <div className="text-[10px] font-semibold text-gray-900 mb-1">Added Memberships</div>
@@ -3510,7 +3525,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                   const k = `${m.membershipId}|${m.startDate}|${m.endDate}`;
                                   const usage = pmMembershipUsageMap[k];
                                   const isExpired = m.endDate && new Date(m.endDate) < new Date();
-                                  
+                                 
                                   return (
                                     <div key={`${m.membershipId}-${originalIdx}`} className={`p-2 rounded-lg border ${isExpired ? 'border-red-200 bg-red-50/30' : 'border-indigo-100 bg-indigo-50/30'} hover:bg-indigo-50/50 transition-colors mb-2 last:mb-0 relative overflow-hidden`}>
                                       {isExpired && (
@@ -3549,7 +3564,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                           <X className="w-3.5 h-3.5" />
                                         </button>
                                       </div>
-                                      
+                                     
                                       {usage && !usage.isExpired && (usage.totalFreeConsultations || 0) > 0 && (() => {
                                         const total = usage.totalFreeConsultations || 0;
                                         const used = usage.usedFreeConsultations || 0;
@@ -3561,9 +3576,9 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                               <span className="font-bold">{used} / {total}</span>
                                             </div>
                                             <div className="w-full h-1.5 rounded-full bg-gray-200 overflow-hidden">
-                                              <div 
-                                                className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-500" 
-                                                style={{ width: `${pct}%` }} 
+                                              <div
+                                                className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-500"
+                                                style={{ width: `${pct}%` }}
                                               />
                                             </div>
                                           </div>
@@ -3941,10 +3956,10 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                             .map((p: any, originalIdx: number) => ({ p, originalIdx }))
                             .filter(({ p }: any) => !txOutPackageIds.has(String(p.packageId)));
                           if (visiblePackages.length === 0) return null;
-                          
+                         
                           // Check if more than 3 packages to enable scroll
                           const shouldScroll = visiblePackages.length > 3;
-                          
+                         
                           return (
                             <div className="border border-gray-200 rounded p-2 mt-2">
                               <div className="text-[10px] font-semibold text-gray-900 mb-1">Added Packages</div>
@@ -3957,7 +3972,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                   const isExpired = endDate && new Date(endDate) < new Date();
                                   const paymentStatus = p.paymentStatus || 'Unpaid';
                                   const paymentMethod = p.paymentMethod || 'N/A';
-                                  
+                                 
                                   return (
                                     <div key={`${p.packageId}-${originalIdx}`} className={`flex flex-col text-[10px] border-b ${isExpired ? 'border-red-100 bg-red-50/20' : 'border-purple-100 bg-purple-50/20'} pb-2 last:border-b-0 mb-2 last:mb-0 p-2 rounded-lg relative overflow-hidden`}>
                                       {isExpired && (
@@ -3990,7 +4005,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                           </span>
                                         )}
                                       </div>
-                                      
+                                     
                                       {/* Validity & Dates */}
                                       {(validity || startDate || endDate) && (
                                         <div className={`mt-1.5 grid grid-cols-2 gap-2 p-1.5 rounded border ${isExpired ? 'bg-red-50/50 border-red-100' : 'bg-white/60 border-purple-100'}`}>
@@ -4009,7 +4024,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                                   const newPackages = [...(prev.packages || [])];
                                                   if (newPackages[originalIdx]) {
                                                     const pkgToUpdate = { ...newPackages[originalIdx], startDate: newDate };
-                                                    
+                                                   
                                                     // Auto-calculate end date based on validity
                                                     const currentValidity = Number(pkgToUpdate.validityInMonths) || Number(pkg?.validityInMonths) || 0;
                                                     if (currentValidity > 0 && newDate) {
@@ -4017,7 +4032,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                                       d.setMonth(d.getMonth() + currentValidity);
                                                       pkgToUpdate.endDate = formatPmDate(d);
                                                     }
-                                                    
+                                                   
                                                     newPackages[originalIdx] = pkgToUpdate;
                                                   }
                                                   return { ...prev, packages: newPackages };
@@ -4046,7 +4061,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                           </div>
                                         </div>
                                       )}
-                                      
+                                     
                                       <div className="text-gray-500 text-[9px] mt-1">Treatments: {pkg?.treatments?.length || 0} included</div>
                                     </div>
                                   );
@@ -4061,12 +4076,12 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                     {/* Package Payment Modal */}
                     {showPackagePaymentModal && (pkgPendingToAssign || pkgPendingToCreate) && (
                       <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-                        <div 
-                          className="absolute inset-0 bg-gray-900/60 backdrop-blur-md" 
+                        <div
+                          className="absolute inset-0 bg-gray-900/60 backdrop-blur-md"
                           onClick={() => {
                             setShowPackagePaymentModal(false);
                             setPkgPendingToCreate(null); // Clear pending create on backdrop click
-                          }} 
+                          }}
                         />
                         <div className="relative bg-white rounded-3xl shadow-2xl max-w-lg w-full max-h-[95vh] overflow-hidden animate-in fade-in zoom-in duration-300 flex flex-col">
                           <div className="bg-gradient-to-r from-purple-600 to-indigo-700 px-6 py-4 flex items-center justify-between flex-shrink-0">
@@ -4079,11 +4094,11 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                 <p className="text-purple-100 text-[10px] font-medium opacity-80">{pkgPendingToCreate?.name || pkgPendingToAssign?.name}</p>
                               </div>
                             </div>
-                            <button 
+                            <button
                               onClick={() => {
                                 setShowPackagePaymentModal(false);
                                 setPkgPendingToCreate(null); // Clear pending create on cancel
-                              }} 
+                              }}
                               className="p-2 hover:bg-white/10 rounded-xl text-white/80 hover:text-white transition-all"
                             >
                               <X className="w-5 h-5" />
@@ -4151,8 +4166,8 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                     type="button"
                                     onClick={() => setPkgPaymentMethod(method.id)}
                                     className={`flex flex-col items-center justify-center gap-1 p-2 rounded-xl border-2 transition-all ${
-                                      pkgPaymentMethod === method.id 
-                                        ? 'border-emerald-500 bg-emerald-50 ring-1 ring-emerald-500/10' 
+                                      pkgPaymentMethod === method.id
+                                        ? 'border-emerald-500 bg-emerald-50 ring-1 ring-emerald-500/10'
                                         : 'border-gray-100 bg-white text-gray-400 hover:border-gray-200'
                                     }`}
                                   >
@@ -4176,7 +4191,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                               >
                                 Cancel
                               </button>
-                              
+                             
                               {/* Skip button for clinic role only */}
                               {typeof window !== "undefined" && getUserRole() === 'clinic' && (
                                 <button
@@ -4214,7 +4229,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                             </div>
                             <h3 className="text-lg font-bold text-gray-900">Confirm Save Changes</h3>
                           </div>
-                          
+                         
                           <div className="mb-6">
                             <p className="text-sm text-gray-700 mb-2">
                               Are you sure you want to save the following changes?
@@ -4291,7 +4306,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                       <Package className="w-5 h-5 text-teal-600" />
                       Packages
                     </h3>
-                    
+                   
                     {loadingPackages ? (
                       <div className="flex items-center justify-center py-12">
                         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600"></div>
@@ -4309,13 +4324,13 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                       const assignedDate = pkg.assignedDate || pkg.createdAt || pkg.startDate;
                       const isUserPackage = pkg.approvalStatus === 'approved';
                       const isExpired = pkg.endDate && new Date(pkg.endDate) < new Date();
-                      
+                     
                       // Session calculations - use actual data from API
                       const totalSessions = pkg.totalSessions || 0;
                       const usedSessions = typeof pkg.usedSessions === 'number' ? pkg.usedSessions : (totalSessions - (pkg.remainingSessions || 0));
                       const remainingSessions = typeof pkg.remainingSessions === 'number' ? pkg.remainingSessions : Math.max(0, totalSessions - usedSessions);
                       const progressPercent = totalSessions > 0 ? Math.min(100, Math.round((usedSessions / totalSessions) * 100)) : 0;
-                      
+                     
                       // Price calculation
                       const price = pkg.price || pkg.totalPrice || 0;
                       const formattedPrice = typeof price === 'number' ? `${getCurrencySymbol(currency)}${price.toFixed(2)}` : `${getCurrencySymbol(currency)}${price || 0}`;
@@ -4337,7 +4352,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                 <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${isExpired ? 'from-red-100 to-rose-100' : (isUserPackage ? 'from-indigo-100 to-purple-100' : 'from-teal-100 to-cyan-100')} flex items-center justify-center flex-shrink-0 shadow-sm`}>
                                   <Package className={`w-7 h-7 ${isExpired ? 'text-red-600' : (isUserPackage ? 'text-indigo-600' : 'text-teal-600')}`} />
                                 </div>
-                                
+                               
                                 {/* Package Info */}
                                 <div className="flex-1">
                                   <div className="flex items-center gap-2 mb-1">
@@ -4350,7 +4365,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                   </div>
                                   <div className="flex flex-wrap items-center gap-3 text-sm">
                                     <span className={`font-bold ${isExpired ? 'text-red-700' : 'text-gray-900'}`}>{formattedPrice}</span>
-                                    
+                                   
                                     {/* Payment Status & Method Tags */}
                                     {pkg.paymentStatus === 'Full' && (
                                       <span className="px-2 py-0.5 rounded-lg bg-green-100 text-green-700 font-black uppercase text-[9px] shadow-sm flex items-center gap-1">
@@ -4395,7 +4410,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                               </div>
                               {/* Progress Bar */}
                               <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
-                                <div 
+                                <div
                                   className={`h-full bg-gradient-to-r ${isExpired ? 'from-red-400 to-rose-400' : (isUserPackage ? 'from-indigo-500 to-purple-500' : 'from-teal-500 to-cyan-500')} rounded-full transition-all duration-500 ease-out`}
                                   style={{ width: `${progressPercent}%` }}
                                 ></div>
@@ -4450,13 +4465,13 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                 <div className="text-2xl font-bold text-blue-700">{totalSessions}</div>
                                 <div className="text-xs text-blue-600 mt-1 font-medium">Total Sessions</div>
                               </div>
-                              
+                             
                               {/* Used Sessions */}
                               <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
                                 <div className="text-2xl font-bold text-green-700">{usedSessions}</div>
                                 <div className="text-xs text-green-600 mt-1 font-medium">Used Sessions</div>
                               </div>
-                              
+                             
                               {/* Remaining Sessions */}
                               <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-center">
                                 <div className="text-2xl font-bold text-orange-700">{remainingSessions}</div>
@@ -4494,7 +4509,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                 </div>
                               </div>
                             )}
-                            
+                           
                             {/* Treatment Breakdown */}
                             {pkg.treatments && pkg.treatments.length > 0 && (
                               <div className="bg-white rounded-lg border border-gray-200 p-3">
@@ -4509,7 +4524,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                     const percent = max > 0 ? Math.min(100, Math.round((used / max) * 100)) : 0;
                                     const remaining = max - used;
                                     const isComplete = used >= max;
-                                    
+                                   
                                     return (
                                       <div key={tIdx} className="bg-gray-50 rounded-lg px-3 py-2.5">
                                         <div className="flex items-center justify-between mb-1.5">
@@ -4526,7 +4541,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                         </div>
                                         {/* Progress Bar */}
                                         <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden mb-1">
-                                          <div 
+                                          <div
                                             className={`h-full rounded-full transition-all duration-500 ${
                                               isComplete ? 'bg-gradient-to-r from-green-500 to-emerald-500' :
                                               used > 0 ? 'bg-gradient-to-r from-blue-500 to-cyan-500' :
@@ -4540,7 +4555,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                           {treatment.sessionPrice > 0 && <span>{getCurrencySymbol(currency)}{treatment.sessionPrice.toFixed(2)} / session</span>}
                                           <span>{percent}% complete</span>
                                         </div>
-                                        
+                                       
                                         {/* Billing Records Table - per treatment */}
                                         {treatment.usageDetails && treatment.usageDetails.length > 0 && (
                                           <div className="mt-3 pt-3 border-t border-gray-200">
@@ -4578,7 +4593,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                                       </td>
                                                       <td className="py-2.5 px-2.5 text-left">
                                                         <span className="text-[10px] text-gray-700 font-medium">
-                                                          {detail.multiplePayments && detail.multiplePayments.length > 0 
+                                                          {detail.multiplePayments && detail.multiplePayments.length > 0
                                                             ? detail.multiplePayments.map((mp: any) => mp.paymentMethod).join(" + ")
                                                             : (detail.paymentMethod || "–")}
                                                         </span>
@@ -4589,7 +4604,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                                           const isAgentDiscount = detail.isAgentDiscountApplied;
                                                           const membershipDiscountAmount = detail.membershipDiscountApplied || 0;
                                                           const isMembershipDiscount = membershipDiscountAmount > 0;
-                                                          
+                                                         
                                                           const originalAmount = detail.originalAmount || 0;
                                                           const finalAmount = detail.amount || 0;
                                                           const totalDiscountAmount = originalAmount > finalAmount ? (originalAmount - finalAmount) : 0;
@@ -4668,7 +4683,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                 </div>
                               </div>
                             )}
-                            
+                           
                             {/* Transfer Information */}
                             {pkg.isTransferred && (
                               <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-3 mt-3">
@@ -4744,7 +4759,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                     <Shield className="w-5 h-5 text-purple-600" />
                     Memberships
                   </h3>
-                              
+                             
                   {memberships.length === 0 ? (
                     <div className="text-center py-12 bg-gray-50 rounded-lg border border-gray-200">
                       <Shield className="w-12 h-12 text-gray-300 mx-auto mb-3" />
@@ -4759,7 +4774,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                         const endDate = membership.endDate;
                         const isExpired = endDate && new Date(endDate) < new Date();
                         const plan: any = allAvailableMemberships.find((m: any) => m._id === membershipId);
-              
+             
                         return (
                           <div key={membership._id || membershipId || index} className={`bg-white rounded-xl border ${isExpired ? 'border-red-200 shadow-sm' : 'border-gray-200 shadow-sm'} p-5 hover:shadow-md transition-all relative overflow-hidden`}>
                             {isExpired && (
@@ -4798,7 +4813,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                 </div>
                               </div>
                             </div>
-              
+             
                             {/* Membership Details */}
                             <div className={`mb-4 space-y-3 ${isExpired ? 'opacity-60 grayscale-[0.5]' : ''}`}>
                               {/* Membership Info Card */}
@@ -4815,7 +4830,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                       </span>
                                     </div>
                                   </div>
-                                  
+                                 
                                   <div>
                                     <div className="text-[10px] text-gray-600 mb-0.5">Priority Booking</div>
                                     <div className="flex items-center gap-1">
@@ -4833,35 +4848,35 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                       </div>
                                     </div>
                                   )}
-                                  
+                                 
                                   <div>
                                     <div className="text-[10px] text-gray-600 mb-0.5">Start Date</div>
                                     <div className={`text-xs font-semibold ${isExpired ? 'text-red-800' : 'text-gray-800'}`}>{new Date(membership.startDate).toLocaleDateString()}</div>
                                   </div>
-                                  
+                                 
                                   <div>
                                     <div className="text-[10px] text-gray-600 mb-0.5">End Date</div>
                                     <div className={`text-xs font-semibold ${isExpired ? 'text-red-700' : 'text-gray-800'}`}>{new Date(membership.endDate).toLocaleDateString()}</div>
                                   </div>
-                                  
+                                 
                                   <div>
                                     <div className="text-[10px] text-gray-600 mb-0.5">Price</div>
                                     <div className={`text-xs font-bold ${isExpired ? 'text-red-700' : 'text-purple-700'}`}>{getCurrencySymbol(currency)}{plan?.price?.toLocaleString() || 0}</div>
                                   </div>
-                                  
+                                 
                                   <div>
                                     <div className="text-[10px] text-gray-600 mb-0.5">Duration</div>
                                     <div className={`text-xs font-semibold ${isExpired ? 'text-red-800' : 'text-gray-800'}`}>{plan?.durationMonths} months</div>
                                   </div>
                                 </div>
-                                
+                               
                                 {isExpired && (
                                   <div className="mt-3 text-[10px] text-red-600 font-bold flex items-center gap-1 bg-white/50 p-2 rounded border border-red-200">
                                     <AlertCircle className="w-3.5 h-3.5" />
                                     MEMBERSHIP EXPIRED: BENEFITS & DISCOUNTS ARE NO LONGER APPLICABLE.
                                   </div>
                                 )}
-                                
+                               
                                 {(membership as any).usageData?.isTransferred && (
                                   <div className="mt-3 pt-3 border-t-2 border-purple-300 bg-gradient-to-r from-purple-100 to-blue-50 rounded-lg p-3">
                                     <div className="flex items-center gap-2 mb-2">
@@ -4887,7 +4902,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                   </div>
                                 )}
                               </div>
-                              
+                             
                               {/* Membership Benefits Section */}
                               {plan?.benefits && (
                                 <div className="bg-white rounded-lg border border-gray-200 p-3">
@@ -4914,7 +4929,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                         {(membership as any).usageData && (membership as any).usageData.totalFreeConsultations > 0 && (
                                           <>
                                             <div className="w-full h-3 bg-blue-200 rounded-full overflow-hidden mb-2">
-                                              <div 
+                                              <div
                                                 className="h-full bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full transition-all duration-500"
                                                 style={{ width: `${Math.min(100, (((membership as any).usageData.usedFreeConsultations || 0) / (membership as any).usageData.totalFreeConsultations) * 100)}%` }}
                                               />
@@ -4931,7 +4946,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                         )}
                                       </div>
                                     )}
-                                    
+                                   
                                     {/* Discount Percentage */}
                                     {plan.benefits.discountPercentage > 0 && (
                                       <div className="bg-green-50 border border-green-200 rounded-lg p-2.5">
@@ -4946,7 +4961,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                         </div>
                                       </div>
                                     )}
-                                    
+                                   
                                     {/* Priority Booking */}
                                     {plan.benefits.priorityBooking && (
                                       <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5">
@@ -4962,7 +4977,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                   </div>
                                 </div>
                               )}
-                              
+                             
                               {/* Transfer Information */}
                               {(membership as any).usageData?.isTransferred && (
                                 <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-xl p-4">
@@ -4997,7 +5012,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                   </div>
                                 </div>
                               )}
-                              
+                             
                               {/* Usage History */}
                               {(membership as any).usageData?.freeConsultationDetails && (membership as any).usageData.freeConsultationDetails.length > 0 && (
                                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
@@ -5027,11 +5042,11 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                 </div>
                               )}
                             </div>
-              
+             
                             {/* Footer with Action Button */}
                             <div className="flex items-center justify-between pt-4 border-t border-gray-100">
                              
-                              
+                             
                             </div>
                           </div>
                         );
@@ -5062,7 +5077,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                 <span className="px-2 py-0.5 rounded-full bg-green-200 text-green-800 text-[10px] font-bold">
                                   Transferred In
                                 </span>
-                                
+                               
                                 {/* Payment Status & Method Tags for Transferred Packages */}
                                 {pkg.paymentStatus === 'Full' && (
                                   <span className="px-2 py-0.5 rounded-lg bg-green-100 text-green-700 font-black uppercase text-[9px] shadow-sm flex items-center gap-1">
@@ -5341,8 +5356,8 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                     <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
                       <div className="text-[10px] text-blue-600 font-bold uppercase tracking-wider mb-1">Total Billed</div>
                       <div className="text-lg font-bold text-blue-800">
-                        {formatAED((billingHistory || []).filter((b: any) => 
-                          (!b.isAdvanceOnly && b.treatment !== "Advance Payment" && b.treatment !== "Historical Advance Balance") || 
+                        {formatAED((billingHistory || []).filter((b: any) =>
+                          (!b.isAdvanceOnly && b.treatment !== "Advance Payment" && b.treatment !== "Historical Advance Balance") ||
                           b.treatment === "Pending Balance Payment"
                         ).reduce((acc: number, b: any) => acc + (Number(b.amount) || 0), 0))}
                       </div>
@@ -5409,7 +5424,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                             Invoices
                           </h3>
                         </div>
-                        
+                       
                         <div className="overflow-x-auto">
                           <table className="min-w-full divide-y divide-gray-100 hidden sm:table">
                             <thead className="bg-gray-50">
@@ -5428,10 +5443,10 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                 .filter((b: any) => !b.isAdvanceOnly && b.treatment !== "Advance Payment" && b.treatment !== "Historical Advance Balance")
                                 .map((billing: any, index: number) => {
                                 // Determine payment method
-                                const paymentMethods = billing.multiplePayments && billing.multiplePayments.length > 0 
+                                const paymentMethods = billing.multiplePayments && billing.multiplePayments.length > 0
                                   ? billing.multiplePayments.map((mp: any) => mp.paymentMethod).join(" + ")
                                   : (billing.paymentMethod || "–");
-                                
+                               
                                 return (
                                   <tr key={billing._id || index} className="hover:bg-gray-50 transition-colors">
                                     <td className="px-5 py-4 whitespace-nowrap">
@@ -5471,7 +5486,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                         const isAgentDiscount = billing.isAgentDiscountApplied;
                                         const membershipDiscountAmount = billing.membershipDiscountApplied || 0;
                                         const isMembershipDiscount = membershipDiscountAmount > 0;
-                                        
+                                       
                                         const originalAmount = billing.originalAmount || 0;
                                         const finalAmount = billing.amount || 0;
                                         const totalDiscountAmount = originalAmount > finalAmount ? (originalAmount - finalAmount) : 0;
@@ -5535,7 +5550,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                             {(billingHistory || [])
                               .filter((b: any) => !b.isAdvanceOnly && b.treatment !== "Advance Payment" && b.treatment !== "Historical Advance Balance")
                               .map((billing: any, index: number) => {
-                                const paymentMethods = billing.multiplePayments && billing.multiplePayments.length > 0 
+                                const paymentMethods = billing.multiplePayments && billing.multiplePayments.length > 0
                                   ? billing.multiplePayments.map((mp: any) => mp.paymentMethod).join(" + ")
                                   : (billing.paymentMethod || "–");
                                 return (
@@ -5544,7 +5559,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                       const originalAmt = billing.originalAmount || billing.amount || 0;
                                       const totalDisc = originalAmt > billing.amount ? (originalAmt - billing.amount) : 0;
                                       const totalPct = originalAmt > 0 ? (totalDisc / originalAmt * 100) : 0;
-                                      
+                                     
                                       return (
                                         <>
                                           <div className="flex justify-between items-start mb-2">
@@ -5599,8 +5614,8 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center">
                                 <div className="text-[10px] sm:text-xs text-blue-600 mb-1">Total Billed</div>
                                 <div className="text-lg sm:text-xl md:text-2xl font-bold text-blue-800">
-                                  {formatAED((billingHistory || []).filter((b: any) => 
-                                    (!b.isAdvanceOnly && b.treatment !== "Advance Payment" && b.treatment !== "Historical Advance Balance") || 
+                                  {formatAED((billingHistory || []).filter((b: any) =>
+                                    (!b.isAdvanceOnly && b.treatment !== "Advance Payment" && b.treatment !== "Historical Advance Balance") ||
                                     b.treatment === "Pending Balance Payment"
                                   ).reduce((acc: number, b: any) => acc + (Number(b.amount) || 0), 0))}
                                 </div>
@@ -5609,8 +5624,8 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                               <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
                                 <div className="text-[10px] sm:text-xs text-green-600 mb-1">Total Paid</div>
                                 <div className="text-lg sm:text-xl md:text-2xl font-bold text-green-800">
-                                  {formatAED((billingHistory || []).filter((b: any) => 
-                                    (!b.isAdvanceOnly && b.treatment !== "Advance Payment" && b.treatment !== "Historical Advance Balance") || 
+                                  {formatAED((billingHistory || []).filter((b: any) =>
+                                    (!b.isAdvanceOnly && b.treatment !== "Advance Payment" && b.treatment !== "Historical Advance Balance") ||
                                     b.treatment === "Pending Balance Payment"
                                   ).reduce((acc: number, b: any) => acc + (Number(b.paid) || 0), 0))}
                                 </div>
@@ -5715,15 +5730,15 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                           <div className="flex-1 min-w-[140px]">
                             <label className="block text-xs mb-0.5 font-medium text-gray-700">Insurance Card </label>
                             <div className="relative group">
-                              <input 
+                              <input
                                 id="insurance-card-upload"
-                                type="file" 
-                                accept="image/*,.pdf" 
-                                onChange={(e) => handleNewClaimFileUpload(e, 'insuranceCard')} 
-                                className="hidden" 
-                                disabled={newClaimUploadingFiles} 
+                                type="file"
+                                accept="image/*,.pdf"
+                                onChange={(e) => handleNewClaimFileUpload(e, 'insuranceCard')}
+                                className="hidden"
+                                disabled={newClaimUploadingFiles}
                               />
-                              <label 
+                              <label
                                 htmlFor="insurance-card-upload"
                                 className={`w-full flex items-center gap-2 px-2 py-1.5 text-[9px] border border-gray-300 rounded-md cursor-pointer transition-all ${newClaimData.insuranceCardFile ? 'bg-blue-50 border-blue-400 ring-1 ring-blue-400 shadow-sm' : 'bg-white hover:border-blue-400'}`}
                               >
@@ -5761,15 +5776,15 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                           <div className="flex-1 min-w-[140px]">
                             <label className="block text-xs mb-0.5 font-medium text-gray-700">Table of Benefits</label>
                             <div className="relative group">
-                              <input 
+                              <input
                                 id="table-of-benefits-upload"
-                                type="file" 
-                                accept="image/*,.pdf" 
-                                onChange={(e) => handleNewClaimFileUpload(e, 'tableOfBenefits')} 
-                                className="hidden" 
-                                disabled={newClaimUploadingFiles} 
+                                type="file"
+                                accept="image/*,.pdf"
+                                onChange={(e) => handleNewClaimFileUpload(e, 'tableOfBenefits')}
+                                className="hidden"
+                                disabled={newClaimUploadingFiles}
                               />
-                              <label 
+                              <label
                                 htmlFor="table-of-benefits-upload"
                                 className={`w-full flex items-center gap-2 px-2 py-1.5 text-[9px] border border-gray-300 rounded-md cursor-pointer transition-all ${newClaimData.tableOfBenefitsFile ? 'bg-blue-50 border-blue-400 ring-1 ring-blue-400 shadow-sm' : 'bg-white hover:border-blue-400'}`}
                               >
@@ -5808,60 +5823,35 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                       </div>
 
                       {/* Section B: Claim Source */}
-                      <div className="mb-3 p-3 bg-green-50 rounded-lg border border-green-200">
+                      <div className="mb-2 p-3 bg-green-50 rounded-lg border border-green-200">
                         <div className="text-xs font-semibold text-green-800 mb-2">Claim Source</div>
-                        <div className="flex flex-wrap gap-2 items-end">
-                          <div className="flex-1 min-w-[140px]">
-                            <label className="block text-xs mb-0.5 font-medium text-gray-700">Department</label>
-                            <select name="departmentId" value={newClaimData.departmentId} onChange={handleNewClaimDepartmentChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-green-500 text-gray-900">
-                              <option value="">Select Department</option>
-                              {newClaimDepartments.map((d: any) => (
-                                <option key={d._id} value={d._id}>{d.name}</option>
-                              ))}
-                            </select>
-                          </div>
-                          <div className="flex-1 min-w-[180px]">
-                            <label className="block text-xs mb-0.5 font-medium text-gray-700">
-                              Services {newClaimData.services.length > 0 && (
-                                <span className="text-blue-600 font-semibold ml-1">
-                                  ({newClaimData.services.length} selected)
-                                </span>
-                              )}
-                            </label>
-                            <div className="relative">
-                              <select 
-                                multiple
-                                value={newClaimData.services.map((s: any) => s.serviceId)} 
-                                onChange={handleNewClaimServiceChange} 
-                                className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-green-500 text-gray-900 min-h-[80px] bg-white"
-                              >
-                                {newClaimServices
-                                  .filter((s: any) => !newClaimData.departmentId || String(s.departmentId) === String(newClaimData.departmentId))
-                                  .map((s: any) => (
-                                    <option 
-                                      key={s._id} 
-                                      value={s._id}
-                                      className="py-1"
-                                    >
-                                      {s.name}
-                                    </option>
-                                  ))}
+                        <div className="flex flex-wrap gap-3 items-stretch">
+                          <div className="flex-1 min-w-[140px] flex flex-col">
+                            <label className="block text-xs mb-1 font-semibold text-gray-700">Department</label>
+                            <div className="mt-auto">
+                              <select name="departmentId" value={newClaimData.departmentId} onChange={handleNewClaimDepartmentChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-green-500 text-gray-900 bg-white shadow-sm h-full min-h-[32px]">
+                                <option value="">Select Department</option>
+                                {newClaimDepartments.map((d: any) => (
+                                  <option key={d._id} value={d._id}>{d.name}</option>
+                                ))}
                               </select>
                             </div>
-                            <p className="text-[9px] text-gray-500 mt-1">
-                              💡 Hold <kbd className="px-1 py-0.5 bg-gray-100 border border-gray-300 rounded text-[8px] font-mono">Ctrl</kbd> (Windows) or <kbd className="px-1 py-0.5 bg-gray-100 border border-gray-300 rounded text-[8px] font-mono">Cmd</kbd> (Mac) to select multiple
-                            </p>
-                            {newClaimData.services.length > 0 && (
-                              <div className="mt-1.5 flex flex-wrap gap-1">
+                          </div>
+                         
+                          <div className="flex-1 min-w-[200px] flex flex-col">
+                            <label className="block text-xs mb-1 font-semibold text-gray-700">Services</label>
+                            <div className="mt-auto relative w-full flex items-center p-0.5 border border-gray-300 rounded-lg bg-white shadow-sm focus-within:ring-2 focus-within:ring-green-500 transition-all min-h-[38px] box-border">
+                              <div className="flex flex-wrap items-center gap-1 flex-1 px-1 py-0.5">
                                 {newClaimData.services.map((svc: any, idx: number) => (
-                                  <span 
-                                    key={idx} 
-                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-medium bg-green-100 text-green-800 border border-green-200"
+                                  <span
+                                    key={idx}
+                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-green-50 text-green-700 border border-green-200 text-[9px] font-bold whitespace-nowrap"
                                   >
                                     {svc.serviceName}
                                     <button
                                       type="button"
-                                      onClick={() => {
+                                      onClick={(e) => {
+                                        e.stopPropagation();
                                         const updatedServices = newClaimData.services.filter((_: any, i: number) => i !== idx);
                                         setNewClaimData((prev: any) => ({
                                           ...prev,
@@ -5870,188 +5860,199 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                           serviceName: updatedServices.length > 0 ? updatedServices[updatedServices.length - 1].serviceName : "",
                                         }));
                                       }}
-                                      className="hover:bg-green-200 rounded-full p-0.5 transition-colors"
+                                      className="hover:text-red-500 transition-colors"
                                     >
-                                      <X className="w-2.5 h-2.5" />
+                                      <X className="w-2 h-2" />
                                     </button>
                                   </span>
                                 ))}
+                                <select
+                                  value=""
+                                  onChange={handleNewClaimServiceChange}
+                                  className="min-w-[100px] bg-transparent border-none outline-none text-[10px] text-gray-900 cursor-pointer h-full py-0.5 flex-1 appearance-none"
+                                >
+                                  <option value="" disabled>{newClaimData.services.length > 0 ? "Add More Services..." : "Select Services"}</option>
+                                  {newClaimServices
+                                    .filter((s: any) => !newClaimData.departmentId || String(s.departmentId) === String(newClaimData.departmentId))
+                                    .map((s: any) => (
+                                      <option key={s._id} value={s._id}>
+                                        {s.name}
+                                      </option>
+                                    ))}
+                                </select>
                               </div>
-                            )}
+                            </div>
                           </div>
-                          <div className="flex-1 min-w-[140px]">
-                            <label className="block text-xs mb-0.5 font-medium text-gray-700">Doctor <span className="text-red-500">*</span></label>
-                            <select name="doctorId" value={newClaimData.doctorId} onChange={handleNewClaimDoctorChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-green-500 text-gray-900">
-                              <option value="">Select Doctor</option>
-                              {newClaimDoctors.map((d: any) => (
-                                <option key={d._id} value={d._id}>{d.name}</option>
-                              ))}
-                            </select>
+
+                          <div className="flex-1 min-w-[140px] flex flex-col">
+                            <label className="block text-xs mb-1 font-semibold text-gray-700">Doctor <span className="text-red-500">*</span></label>
+                            <div className="mt-auto">
+                              <select name="doctorId" value={newClaimData.doctorId} onChange={handleNewClaimDoctorChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-green-500 text-gray-900 bg-white shadow-sm h-full min-h-[32px]">
+                                <option value="">Select Doctor</option>
+                                {newClaimDoctors.map((d: any) => (
+                                  <option key={d._id} value={d._id}>{d.name}</option>
+                                ))}
+                              </select>
+                            </div>
                           </div>
-                          <div className="flex-1 min-w-[120px]">
-                            <label className="block text-xs mb-0.5 font-medium text-gray-700">Claim Amount <span className="text-red-500">*</span></label>
-                            <input type="number" name="claimAmount" value={newClaimData.claimAmount} onChange={handleNewClaimChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-green-500 text-gray-900" placeholder="0" min="0" step="0.01" />
+                         
+                          <div className="flex-1 min-w-[120px] flex flex-col">
+                            <label className="block text-xs mb-1 font-semibold text-gray-700">Amount <span className="text-red-500">*</span></label>
+                            <div className="mt-auto">
+                              <input type="number" name="claimAmount" value={newClaimData.claimAmount} onChange={handleNewClaimChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-green-500 text-gray-900 bg-white shadow-sm h-full min-h-[32px] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" placeholder="0" min="0" step="0.01" />
+                            </div>
                           </div>
-                          <div className="flex-1 min-w-[120px]">
-                            <label className="block text-xs mb-0.5 font-medium text-gray-700">Claim Type <span className="text-red-500">*</span></label>
-                            <select name="claimType" value={newClaimData.claimType} onChange={handleNewClaimChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-green-500 text-gray-900">
-                              <option value="Paid">Paid</option>
-                              <option value="Advance">Advance</option>
-                            </select>
+                         
+                          <div className="flex-1 min-w-[120px] flex flex-col">
+                            <label className="block text-xs mb-1 font-semibold text-gray-700">Type <span className="text-red-500">*</span></label>
+                            <div className="mt-auto">
+                              <select name="claimType" value={newClaimData.claimType} onChange={handleNewClaimChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-green-500 text-gray-900 bg-white shadow-sm h-full min-h-[32px]">
+                                <option value="Paid">Paid</option>
+                                <option value="Advance">Advance</option>
+                              </select>
+                            </div>
                           </div>
                         </div>
                       </div>
 
                       {/* Section C: Claim Details */}
-                      <div className="mb-3 p-3 bg-purple-50 rounded-lg border border-purple-200">
+                      <div className="mb-2 p-3 bg-purple-50 rounded-lg border border-purple-200">
                         <div className="text-xs font-semibold text-purple-800 mb-2">Claim Details</div>
-                        <div className="flex flex-wrap gap-2 items-end">
-                          <div className="flex-1 min-w-[120px]">
-                            <label className="block text-xs mb-0.5 font-medium text-gray-700">Co-Pay %</label>
-                            <input type="number" name="coPayPercent" value={newClaimData.coPayPercent} onChange={handleNewClaimChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-purple-500 text-gray-900" placeholder="0-100" min="0" max="100" />
-                          </div>
-                          <div className="flex-1 min-w-[140px]">
-                            <label className="block text-xs mb-0.5 font-medium text-gray-700">Co-Pay Type</label>
-                            <select name="coPayType" value={newClaimData.coPayType} onChange={handleNewClaimChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-purple-500 text-gray-900">
-                              <option value="Patient Pays">Patient Pays</option>
-                              <option value="Deduct from Claim">Deduct from Claim</option>
-                              <option value="Clinic Adjusts">Clinic Adjusts</option>
-                            </select>
-                          </div>
-                          <div className="flex-1 min-w-[140px]">
-                            <label className="block text-xs mb-0.5 font-medium text-gray-700">Notes</label>
-                            <input type="text" name="notes" value={newClaimData.notes} onChange={handleNewClaimChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-purple-500 text-gray-900" placeholder="Additional notes" />
-                          </div>
-                          <div className="flex-1 min-w-[140px]">
-                            <label className="block text-xs mb-0.5 font-medium text-gray-700">Documents</label>
-                            <div className="relative group">
-                              <input 
-                                id="claim-documents-upload"
-                                type="file" 
-                                multiple
-                                accept="image/*,.pdf" 
-                                onChange={handleNewClaimDocumentsUpload} 
-                                className="hidden" 
-                                disabled={newClaimUploadingFiles} 
-                              />
-                              <label 
-                                htmlFor="claim-documents-upload"
-                                className={`w-full flex items-center gap-2 px-2 py-1.5 text-[9px] border border-gray-300 rounded-md cursor-pointer transition-all ${newClaimData.documentFiles.length > 0 ? 'bg-purple-50 border-purple-400 ring-1 ring-purple-400 shadow-sm' : 'bg-white hover:border-purple-400'}`}
-                              >
-                                <div className="flex-shrink-0 w-4 h-4 rounded bg-gray-50 border border-gray-200 flex items-center justify-center overflow-hidden">
-                                  {newClaimData.documentFiles.length > 0 ? (
-                                    <Paperclip className="w-2.5 h-2.5 text-purple-600" />
-                                  ) : (
-                                    <FileImage className="w-2.5 h-2.5 text-gray-400" />
-                                  )}
-                                </div>
-                                <span className={`truncate flex-1 ${newClaimData.documentFiles.length > 0 ? 'text-purple-700 font-semibold' : 'text-gray-400'}`}>
-                                  {newClaimData.documentFiles.length > 0 ? `${newClaimData.documentFiles.length} file(s) selected` : 'No file chosen'}
-                                </span>
-                                {newClaimData.documentFiles.length > 0 && (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      setNewClaimData((prev: any) => ({ ...prev, documentFiles: [] }));
-                                    }}
-                                    className="p-0.5 hover:bg-purple-100 rounded-full text-purple-600 transition-colors"
-                                  >
-                                    <X className="w-3 h-3" />
-                                  </button>
-                                )}
-                                {newClaimUploadingFiles && <Loader2 className="w-2.5 h-2.5 animate-spin text-purple-600" />}
-                              </label>
+                        <div className="flex flex-wrap gap-3 items-stretch">
+                          <div className="flex-1 min-w-[100px] flex flex-col">
+                            <label className="block text-xs mb-1 font-semibold text-gray-700">Co-Pay %</label>
+                            <div className="mt-auto">
+                              <input type="number" name="coPayPercent" value={newClaimData.coPayPercent} onChange={handleNewClaimChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-purple-500 text-gray-900 bg-white shadow-sm min-h-[32px] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" placeholder="0-100" min="0" max="100" />
                             </div>
-                            {newClaimData.documentFiles.length > 0 && (
-                              <div className="mt-1 flex flex-wrap gap-1">
-                                {newClaimData.documentFiles.map((f: string, i: number) => (
-                                  <div key={i} className="flex items-center gap-1 px-2 py-1 bg-purple-100 border border-purple-200 rounded text-[9px] font-medium text-purple-700">
-                                    <button
-                                      type="button"
-                                      onClick={() => setDocViewerUrl(f)}
-                                      className="hover:underline flex items-center gap-1"
-                                    >
-                                      <Paperclip className="w-2.5 h-2.5" /> Doc {i + 1}
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        setNewClaimData((prev: any) => ({
-                                          ...prev,
-                                          documentFiles: prev.documentFiles.filter((_: any, index: number) => index !== i)
-                                        }));
-                                      }}
-                                      className="ml-1 p-0.5 hover:bg-purple-200 rounded-full text-purple-600 transition-colors"
-                                    >
-                                      <X className="w-2 h-2" />
-                                    </button>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
                           </div>
-                        </div>
+                          <div className="flex-1 min-w-[140px] flex flex-col">
+                            <label className="block text-xs mb-1 font-semibold text-gray-700">Co-Pay Type</label>
+                            <div className="mt-auto">
+                              <select name="coPayType" value={newClaimData.coPayType} onChange={handleNewClaimChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-purple-500 text-gray-900 bg-white shadow-sm min-h-[32px]">
+                                <option value="Patient Pays">Patient Pays</option>
+                                <option value="Deduct from Claim">Deduct from Claim</option>
+                                <option value="Clinic Adjusts">Clinic Adjusts</option>
+                              </select>
+                            </div>
+                          </div>
+                          <div className="flex-1 min-w-[160px] flex flex-col">
+                            <label className="block text-xs mb-1 font-semibold text-gray-700">Notes</label>
+                            <div className="mt-auto">
+                              <input type="text" name="notes" value={newClaimData.notes} onChange={handleNewClaimChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-purple-500 text-gray-900 bg-white shadow-sm min-h-[32px]" placeholder="Notes..." />
+                            </div>
+                          </div>
+                          <div className="flex-1 min-w-[160px] flex flex-col">
+                            <label className="block text-xs mb-1 font-semibold text-gray-700">Documents</label>
+                            <div className="mt-auto">
+                              <div className="relative group">
+                                <input
+                                  id="claim-documents-upload"
+                                  type="file"
+                                  multiple
+                                  accept="image/*,.pdf"
+                                  onChange={handleNewClaimDocumentsUpload}
+                                  className="hidden"
+                                  disabled={newClaimUploadingFiles}
+                                />
+                                <label
+                                  htmlFor="claim-documents-upload"
+                                  className={`w-full flex items-center gap-2 px-2 py-1.5 text-[10px] border border-gray-300 rounded-md cursor-pointer transition-all bg-white shadow-sm hover:border-purple-400 min-h-[32px]`}
+                                >
+                                  <Paperclip className="w-3 h-3 text-gray-400" />
+                                  <span className="truncate flex-1 text-gray-500">
+                                     {newClaimData.documentFiles.length > 0 ? `${newClaimData.documentFiles.length} files` : 'Upload...'}
+                                   </span>
+                                   {newClaimUploadingFiles && <Loader2 className="w-3 h-3 animate-spin text-purple-600" />}
+                                 </label>
+                               </div>
+                             </div>
+                             {newClaimData.documentFiles.length > 0 && (
+                               <div className="mt-1 flex flex-wrap gap-1">
+                                 {newClaimData.documentFiles.map((f: string, i: number) => (
+                                   <div key={i} className="flex items-center gap-1 px-1.5 py-0.5 bg-purple-50 border border-purple-100 rounded text-[8px] font-bold text-purple-700 shadow-sm">
+                                     <button type="button" onClick={() => setDocViewerUrl(f)} className="hover:underline">Doc {i + 1}</button>
+                                     <button
+                                       type="button"
+                                       onClick={() => setNewClaimData((prev: any) => ({ ...prev, documentFiles: prev.documentFiles.filter((_: any, idx: number) => idx !== i) }))}
+                                       className="ml-1 hover:text-red-500"
+                                     >
+                                       <X className="w-2 h-2" />
+                                     </button>
+                                   </div>
+                                 ))}
+                               </div>
+                             )}
+                           </div>
+                         </div>
 
                         {/* Advance-specific fields */}
                         {newClaimData.claimType === 'Advance' && (
-                          <div className="flex flex-wrap gap-2 items-end mt-2 pt-2 border-t border-purple-200">
-                            <div className="flex-1 min-w-[140px]">
-                              <label className="block text-xs mb-0.5 font-medium text-gray-700">Advance Status</label>
-                              <select name="advanceStatus" value={newClaimData.advanceStatus} onChange={handleNewClaimChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-purple-500 text-gray-900">
-                                <option value="Full Pay">Full Pay</option>
-                                <option value="Partial Pay">Partial Pay</option>
-                              </select>
+                          <div className="flex flex-wrap gap-3 items-stretch mt-2 pt-2 border-t border-purple-200">
+                            <div className="flex-1 min-w-[140px] flex flex-col">
+                              <label className="block text-xs mb-1 font-semibold text-gray-700">Advance Status</label>
+                              <div className="mt-auto">
+                                <select name="advanceStatus" value={newClaimData.advanceStatus} onChange={handleNewClaimChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-purple-500 text-gray-900 bg-white shadow-sm min-h-[32px]">
+                                  <option value="Full Pay">Full Pay</option>
+                                  <option value="Partial Pay">Partial Pay</option>
+                                </select>
+                              </div>
                             </div>
-                            <div className="flex-1 min-w-[140px]">
-                              <label className="block text-xs mb-0.5 font-medium text-gray-700">Advance Amount (Enter)</label>
-                              <input
-                                type="number"
-                                name="advanceAmount"
-                                value={newClaimData.advanceAmount}
-                                onChange={handleNewClaimChange}
-                                className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-purple-500 text-gray-900 font-semibold"
-                                placeholder="Enter advance amount"
-                                min="0"
-                                step="0.01"
-                              />
+                            <div className="flex-1 min-w-[140px] flex flex-col">
+                              <label className="block text-xs mb-1 font-semibold text-gray-700">Advance Amount</label>
+                              <div className="mt-auto">
+                                <input
+                                  type="number"
+                                  name="advanceAmount"
+                                  value={newClaimData.advanceAmount}
+                                  onChange={handleNewClaimChange}
+                                  className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-purple-500 text-gray-900 font-semibold bg-white shadow-sm min-h-[32px] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  placeholder="0.00"
+                                  min="0"
+                                  step="0.01"
+                                />
+                              </div>
                             </div>
-                            <div className="flex-1 min-w-[120px]">
-                              <label className="block text-xs mb-0.5 font-medium text-gray-700">Status</label>
-                              <div className="px-2 py-1 text-xs bg-yellow-50 border border-yellow-300 rounded-md text-yellow-800 font-semibold">Under Review</div>
+                            <div className="flex-1 min-w-[120px] flex flex-col">
+                              <label className="block text-xs mb-1 font-semibold text-gray-700">Status</label>
+                              <div className="mt-auto">
+                                <div className="px-2 py-1 text-xs bg-yellow-50 border border-yellow-300 rounded-md text-yellow-800 font-semibold min-h-[32px] flex items-center">Under Review</div>
+                              </div>
                             </div>
                           </div>
                         )}
 
                         {/* Paid claim type - show advance status and amount */}
                         {newClaimData.claimType === 'Paid' && (
-                          <div className="flex flex-wrap gap-2 items-end mt-2 pt-2 border-t border-purple-200">
-                            <div className="flex-1 min-w-[140px]">
-                              <label className="block text-xs mb-0.5 font-medium text-gray-700">Paid Status</label>
-                              <select name="advanceStatus" value={newClaimData.advanceStatus} onChange={handleNewClaimChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-purple-500 text-gray-900">
-                                <option value="Full Pay">Full Pay</option>
-                                <option value="Partial Pay">Partial Pay</option>
-                              </select>
+                          <div className="flex flex-wrap gap-3 items-stretch mt-2 pt-2 border-t border-purple-200">
+                            <div className="flex-1 min-w-[140px] flex flex-col">
+                              <label className="block text-xs mb-1 font-semibold text-gray-700">Paid Status</label>
+                              <div className="mt-auto">
+                                <select name="advanceStatus" value={newClaimData.advanceStatus} onChange={handleNewClaimChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-purple-500 text-gray-900 bg-white shadow-sm min-h-[32px]">
+                                  <option value="Full Pay">Full Pay</option>
+                                  <option value="Partial Pay">Partial Pay</option>
+                                </select>
+                              </div>
                             </div>
-                            <div className="flex-1 min-w-[140px]">
-                              <label className="block text-xs mb-0.5 font-medium text-gray-700">Paid Amount (Enter)</label>
-                              <input
-                                type="number"
-                                name="advanceAmount"
-                                value={newClaimData.advanceAmount}
-                                onChange={handleNewClaimChange}
-                                className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-purple-500 text-gray-900 font-semibold"
-                                placeholder="Enter advance amount"
-                                min="0"
-                                step="0.01"
-                              />
+                            <div className="flex-1 min-w-[140px] flex flex-col">
+                              <label className="block text-xs mb-1 font-semibold text-gray-700">Paid Amount</label>
+                              <div className="mt-auto">
+                                <input
+                                  type="number"
+                                  name="advanceAmount"
+                                  value={newClaimData.advanceAmount}
+                                  onChange={handleNewClaimChange}
+                                  className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-purple-500 text-gray-900 font-semibold bg-white shadow-sm min-h-[32px] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  placeholder="0.00"
+                                  min="0"
+                                  step="0.01"
+                                />
+                              </div>
                             </div>
-                            <div className="flex-1 min-w-[120px]">
-                              <label className="block text-xs mb-0.5 font-medium text-gray-700">Status</label>
-                              <div className="px-2 py-1 text-xs bg-yellow-50 border border-yellow-300 rounded-md text-yellow-800 font-semibold">Under Review</div>
+                            <div className="flex-1 min-w-[120px] flex flex-col">
+                              <label className="block text-xs mb-1 font-semibold text-gray-700">Status</label>
+                              <div className="mt-auto">
+                                <div className="px-2 py-1 text-xs bg-yellow-50 border border-yellow-300 rounded-md text-yellow-800 font-semibold min-h-[32px] flex items-center">Under Review</div>
+                              </div>
                             </div>
                           </div>
                         )}
@@ -6132,6 +6133,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Services</th>
                                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Doctor</th>
                                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Amount</th>
+                                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Paid Amount</th>
                                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Pending Claim</th>
                                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Co-Pay</th>
                                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
@@ -6162,12 +6164,17 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                       )}
                                     </td>
                                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">{claim.doctorName || '-'}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-gray-900">{claim.claimAmount?.toLocaleString()}</td>
-                                    {/* Show pending claim only if balance.pendingClaim > 0 (meaning there's still pending claim to collect) */}
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-orange-700">
-                                      {balance.pendingClaim > 0 && claim.pendingClaim > 0 ? claim.pendingClaim.toLocaleString() : '-'}
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-gray-900">
+                                      {getCurrencySymbol(currency)} {claim.claimAmount?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">{claim.coPayPercent}% ({claim.coPayType})</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-green-700">
+                                      {claim.advanceAmount ? `${getCurrencySymbol(currency)} ${claim.advanceAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-orange-700">
+                                      {/* Show pending claim only if balance.pendingClaim > 0 (meaning there's still pending claim to collect) */}
+                                      {balance.pendingClaim > 0 && claim.pendingClaim > 0 ? `${getCurrencySymbol(currency)} ${claim.pendingClaim.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 font-medium">{claim.coPayPercent}%</td>
                                     <td className="px-4 py-3 whitespace-nowrap">
                                       <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
                                         claim.status === 'Under Review' ? 'bg-yellow-100 text-yellow-800 border-yellow-300' :
@@ -6299,24 +6306,24 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                             <Activity className="w-4 h-4" />
                             Claim Source & Type
                           </h3>
-                          <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-5 gap-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-6 gap-4">
                             <div>
                               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Department</p>
                               <p className="text-sm font-semibold text-green-900">{claimViewModal.departmentName || '-'}</p>
                             </div>
-                            <div>
+                            <div className="md:col-span-2">
                               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Services</p>
-                              {claimViewModal.services && claimViewModal.services.length > 0 ? (
-                                <div className="flex flex-wrap gap-1">
-                                  {claimViewModal.services.map((svc: any, idx: number) => (
-                                    <span key={idx} className="inline-flex px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                              <div className="flex flex-wrap gap-1.5">
+                                {claimViewModal.services && claimViewModal.services.length > 0 ? (
+                                  claimViewModal.services.map((svc: any, idx: number) => (
+                                    <span key={idx} className="inline-flex items-center px-1.5 py-0.5 rounded bg-green-50 text-green-700 border border-green-200 text-[9px] font-bold whitespace-nowrap shadow-sm">
                                       {svc.serviceName || 'Service'}
                                     </span>
-                                  ))}
-                                </div>
-                              ) : (
-                                <p className="text-sm font-semibold text-green-900">-</p>
-                              )}
+                                  ))
+                                ) : (
+                                  <p className="text-sm font-semibold text-green-900">-</p>
+                                )}
+                              </div>
                             </div>
                             <div>
                               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Doctor</p>
@@ -6324,7 +6331,9 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                             </div>
                             <div>
                               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Claim Amount</p>
-                              <p className="text-sm font-bold text-green-900">{claimViewModal.claimAmount?.toLocaleString()}</p>
+                              <p className="text-sm font-bold text-green-900">
+                                {getCurrencySymbol(currency)} {claimViewModal.claimAmount?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </p>
                             </div>
                             <div>
                               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Claim Type</p>
@@ -6344,7 +6353,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                             <div>
                               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Co-Pay</p>
-                              <p className="text-sm font-semibold text-purple-900">{claimViewModal.coPayPercent}% ({claimViewModal.coPayType})</p>
+                              <p className="text-sm font-semibold text-purple-900">{claimViewModal.coPayPercent}%</p>
                             </div>
                             <div>
                               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Status</p>
@@ -6359,7 +6368,9 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                             {balance.pendingClaim > 0 && claimViewModal.pendingClaim > 0 && (
                               <div>
                                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Pending Claim</p>
-                                <p className="text-sm font-bold text-orange-700">{claimViewModal.pendingClaim?.toLocaleString()}</p>
+                                <p className="text-sm font-bold text-orange-700">
+                                  {getCurrencySymbol(currency)} {claimViewModal.pendingClaim?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </p>
                               </div>
                             )}
                             {(claimViewModal.claimType === 'Advance' || claimViewModal.claimType === 'Paid') && (
@@ -6369,8 +6380,10 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                   <p className="text-sm font-semibold text-purple-900">{claimViewModal.advanceStatus || '-'}</p>
                                 </div>
                                 <div>
-                                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">{claimViewModal.claimType} Amount</p>
-                                  <p className="text-sm font-bold text-purple-900">{claimViewModal.advanceAmount?.toLocaleString() || '-'}</p>
+                                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Paid Amount</p>
+                                  <p className="text-sm font-bold text-purple-900">
+                                    {claimViewModal.advanceAmount ? `${getCurrencySymbol(currency)} ${claimViewModal.advanceAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
+                                  </p>
                                 </div>
                               </>
                             )}
@@ -6404,9 +6417,43 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                             </div>
                           </div>
                         </div>
+                        {/* Section D: Administrative Details */}
+                        <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+                          <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Administrative Details</h3>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-3 text-[10px]">
+                            <div className="flex justify-between border-b border-gray-200 pb-1">
+                              <span className="text-gray-500">Patient Name:</span>
+                              <span className="font-semibold text-gray-700">{claimViewModal.patientFirstName} {claimViewModal.patientLastName}</span>
+                            </div>
+                            <div className="flex justify-between border-b border-gray-200 pb-1">
+                              <span className="text-gray-500">Doctor Name:</span>
+                              <span className="font-semibold text-gray-700">{claimViewModal.doctorName || "-"}</span>
+                            </div>
+                            <div className="flex justify-between border-b border-gray-200 pb-1">
+                              <span className="text-gray-500">Insurance Provider:</span>
+                              <span className="font-semibold text-gray-700">{claimViewModal.insuranceProvider}</span>
+                            </div>
+                            <div className="flex justify-between border-b border-gray-200 pb-1">
+                              <span className="text-gray-500">Policy Number:</span>
+                              <span className="font-semibold text-gray-700">{claimViewModal.policyNumber}</span>
+                            </div>
+                            <div className="flex justify-between border-b border-gray-200 pb-1">
+                              <span className="text-gray-500">Claim Type:</span>
+                              <span className="font-semibold text-gray-700">{claimViewModal.claimType}</span>
+                            </div>
+                            <div className="flex justify-between border-b border-gray-200 pb-1">
+                              <span className="text-gray-500">Created At:</span>
+                              <span className="text-gray-700">{new Date(claimViewModal.createdAt).toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between border-b border-gray-200 pb-1">
+                              <span className="text-gray-500">Last Updated:</span>
+                              <span className="text-gray-700">{new Date(claimViewModal.updatedAt).toLocaleString()}</span>
+                            </div>
+                          </div>
+                        </div>
+
                         <div className="text-xs text-gray-500 pt-2 border-t border-gray-100">
-                          Created: {new Date(claimViewModal.createdAt).toLocaleString()}
-                          {claimViewModal.reviewedAt && <> | Reviewed: {new Date(claimViewModal.reviewedAt).toLocaleString()}</>}
+                          ID: {claimViewModal._id}
                         </div>
                       </div>
                     </div>
@@ -6434,13 +6481,13 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                           <X className="w-5 h-5" />
                         </button>
                       </div>
-                      
+                     
                       <div className="p-6">
                         {/* Timeline Container */}
                         <div className="relative">
                           {/* Vertical Line */}
                           <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-gradient-to-b from-purple-300 via-blue-300 to-green-300"></div>
-                          
+                         
                           {/* Timeline Items */}
                           <div className="space-y-6">
                             {/* 1. Claim Created */}
@@ -6604,7 +6651,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                 {/* Claim Edit Modal */}
                 {claimEditModal && (
                   <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto">
                       <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
                         <h2 className="text-lg font-bold text-gray-900">Edit Claim</h2>
                         <button onClick={() => setClaimEditModal(null)} className="p-2 hover:bg-gray-100 rounded-lg">
@@ -6615,7 +6662,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                         {/* Insurance Details */}
                         <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
                           <h3 className="text-sm font-semibold text-blue-800 mb-3">Insurance Details</h3>
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
                             <div>
                               <label className="block text-xs font-medium text-gray-700 mb-1">Insurance Provider <span className="text-red-500">*</span></label>
                               <input type="text" value={claimEditData.insuranceProvider || ''} onChange={(e) => setClaimEditData((prev: any) => ({ ...prev, insuranceProvider: e.target.value }))} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
@@ -6630,33 +6677,71 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                             </div>
                             <div>
                               <label className="block text-xs font-medium text-gray-700 mb-1">Insurance Card </label>
-                              <input type="file" accept="image/*,.pdf" onChange={(e) => handleClaimEditFileUpload(e, 'insuranceCard')} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" disabled={claimEditUploadingFiles} />
-                              {claimEditData.insuranceCardFile && (
-                                <div className="mt-2">
-                                  <button
-                                    onClick={() => setDocViewerUrl(claimEditData.insuranceCardFile)}
-                                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-50 border border-blue-200 rounded-lg text-[10px] font-medium text-blue-700 hover:bg-blue-100 transition-colors"
+                              <div className="relative group">
+                                <input
+                                  id="edit-insurance-card-upload"
+                                  type="file"
+                                  accept="image/*,.pdf"
+                                  onChange={(e) => handleClaimEditFileUpload(e, 'insuranceCard')}
+                                  className="hidden"
+                                  disabled={claimEditUploadingFiles}
+                                />
+                                <div className={`w-full flex items-center gap-2 px-3 py-2 text-[10px] border border-gray-300 rounded-lg transition-all ${claimEditData.insuranceCardFile ? 'bg-blue-50 border-blue-400 ring-1 ring-blue-400 shadow-sm' : 'bg-white hover:border-blue-400'} min-h-[38px]`}>
+                                  <label
+                                    htmlFor="edit-insurance-card-upload"
+                                    className="flex-1 flex items-center gap-2 cursor-pointer truncate"
                                   >
-                                    <Shield className="w-3 h-3" />
-                                    View Insurance Card
-                                  </button>
+                                    <Shield className={`w-3.5 h-3.5 flex-shrink-0 ${claimEditData.insuranceCardFile ? 'text-blue-600' : 'text-gray-400'}`} />
+                                    <span className={`truncate ${claimEditData.insuranceCardFile ? 'text-blue-700 font-semibold' : 'text-gray-400'}`}>
+                                       {claimEditData.insuranceCardFile ? (claimEditData.insuranceCardFile.split('/').pop()?.split('-').pop() || 'Card Attached') : 'No file chosen'}
+                                     </span>
+                                  </label>
+                                  {claimEditData.insuranceCardFile && (
+                                    <button
+                                      onClick={() => setDocViewerUrl(claimEditData.insuranceCardFile)}
+                                      className="flex-shrink-0 p-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
+                                      title="View Card"
+                                    >
+                                      <Eye className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                  {claimEditUploadingFiles && <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600 flex-shrink-0" />}
                                 </div>
-                              )}
+                               </div>
                             </div>
                             <div>
                               <label className="block text-xs font-medium text-gray-700 mb-1">Table of Benefits</label>
-                              <input type="file" accept="image/*,.pdf" onChange={(e) => handleClaimEditFileUpload(e, 'tableOfBenefits')} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" disabled={claimEditUploadingFiles} />
-                              {claimEditData.tableOfBenefitsFile && (
-                                <div className="mt-2">
-                                  <button
-                                    onClick={() => setDocViewerUrl(claimEditData.tableOfBenefitsFile)}
-                                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-50 border border-blue-200 rounded-lg text-[10px] font-medium text-blue-700 hover:bg-blue-100 transition-colors"
+                              <div className="relative group">
+                                <input
+                                  id="edit-benefits-upload"
+                                  type="file"
+                                  accept="image/*,.pdf"
+                                  onChange={(e) => handleClaimEditFileUpload(e, 'tableOfBenefits')}
+                                  className="hidden"
+                                  disabled={claimEditUploadingFiles}
+                                />
+                                <div className={`w-full flex items-center gap-2 px-3 py-2 text-[10px] border border-gray-300 rounded-lg transition-all ${claimEditData.tableOfBenefitsFile ? 'bg-blue-50 border-blue-400 ring-1 ring-blue-400 shadow-sm' : 'bg-white hover:border-blue-400'} min-h-[38px]`}>
+                                  <label
+                                    htmlFor="edit-benefits-upload"
+                                    className="flex-1 flex items-center gap-2 cursor-pointer truncate"
                                   >
-                                    <FileText className="w-3 h-3" />
-                                    View Table of Benefits
-                                  </button>
+                                    <FileText className={`w-3.5 h-3.5 flex-shrink-0 ${claimEditData.tableOfBenefitsFile ? 'text-blue-600' : 'text-gray-400'}`} />
+                                    <span className={`truncate ${claimEditData.tableOfBenefitsFile ? 'text-blue-700 font-semibold' : 'text-gray-400'}`}>
+                                       {claimEditData.tableOfBenefitsFile ? (claimEditData.tableOfBenefitsFile.split('/').pop()?.split('-').pop() || 'Benefits Attached') : 'No file chosen'}
+                                     </span>
+                                  </label>
+                                  {claimEditData.tableOfBenefitsFile && (
+                                    <button
+                                      onClick={() => setDocViewerUrl(claimEditData.tableOfBenefitsFile)}
+                                      className="flex-shrink-0 p-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
+                                      title="View Benefits"
+                                    >
+                                      <Eye className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                  {claimEditUploadingFiles && <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600 flex-shrink-0" />}
                                 </div>
-                              )}
+                               </div>
                             </div>
                           </div>
                         </div>
@@ -6664,69 +6749,46 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                         {/* Claim Source & Type */}
                         <div className="bg-green-50 rounded-lg p-4 border border-green-200">
                           <h3 className="text-sm font-semibold text-green-800 mb-3">Claim Source & Type</h3>
-                          <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-5 gap-3">
-                            <div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 items-start">
+                            <div className="flex flex-col">
                               <label className="block text-xs font-medium text-gray-700 mb-1">
                                 Department
                               </label>
                               <select value={claimEditData.departmentId || ''} onChange={(e) => {
                                 const dept = claimDepartments.find((d: any) => d._id === e.target.value);
-                                setClaimEditData((prev: any) => ({ 
-                                  ...prev, 
-                                  departmentId: e.target.value, 
-                                  departmentName: dept?.name || '', 
-                                  serviceId: '', 
+                                setClaimEditData((prev: any) => ({
+                                  ...prev,
+                                  departmentId: e.target.value,
+                                  departmentName: dept?.name || '',
+                                  serviceId: '',
                                   serviceName: '',
                                   services: [] // Clear services when department changes
                                 }));
-                              }} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                              }} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 h-[38px]">
                                 <option value="">Select Department</option>
                                 {claimDepartments.map((d: any) => <option key={d._id} value={d._id}>{d.name}</option>)}
                               </select>
                             </div>
-                            <div>
+                            <div className="flex flex-col">
                               <label className="block text-xs font-medium text-gray-700 mb-1">
                                 Services {claimEditData.services && claimEditData.services.length > 0 && (
                                   <span className="text-blue-600 font-semibold ml-1">
-                                    ({claimEditData.services.length} selected)
+                                    ({claimEditData.services.length})
                                   </span>
                                 )}
                               </label>
-                              <select 
-                                multiple
-                                value={(claimEditData.services || []).map((s: any) => s.serviceId)} 
-                                onChange={(e) => {
-                                  const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
-                                  const selectedServices = claimServices
-                                    .filter((s: any) => selectedOptions.includes(s._id))
-                                    .map((s: any) => ({ serviceId: s._id, serviceName: s.name }));
-                                  
-                                  setClaimEditData((prev: any) => ({
-                                    ...prev,
-                                    services: selectedServices,
-                                    serviceId: selectedServices.length > 0 ? selectedServices[selectedServices.length - 1].serviceId : "",
-                                    serviceName: selectedServices.length > 0 ? selectedServices[selectedServices.length - 1].serviceName : "",
-                                  }));
-                                }} 
-                                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 min-h-[80px]"
-                              >
-                                {claimServices
-                                  .filter((s: any) => !claimEditData.departmentId || String(s.departmentId) === String(claimEditData.departmentId))
-                                  .map((s: any) => (
-                                    <option key={s._id} value={s._id}>{s.name}</option>
-                                  ))}
-                              </select>
-                              {claimEditData.services && claimEditData.services.length > 0 && (
-                                <div className="mt-1.5 flex flex-wrap gap-1">
-                                  {claimEditData.services.map((svc: any, idx: number) => (
-                                    <span 
-                                      key={idx} 
-                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-medium bg-green-100 text-green-800 border border-green-200"
+                              <div className="relative w-full flex items-center p-0.5 border border-gray-300 rounded-lg bg-white shadow-sm focus-within:ring-2 focus-within:ring-green-500 transition-all min-h-[38px] box-border">
+                                <div className="flex flex-wrap items-center gap-1 flex-1 px-1 py-0.5">
+                                  {(claimEditData.services || []).map((svc: any, idx: number) => (
+                                    <span
+                                      key={idx}
+                                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-green-50 text-green-700 border border-green-200 text-[9px] font-bold whitespace-nowrap"
                                     >
                                       {svc.serviceName}
                                       <button
                                         type="button"
-                                        onClick={() => {
+                                        onClick={(e) => {
+                                          e.stopPropagation();
                                           const updatedServices = claimEditData.services.filter((_: any, i: number) => i !== idx);
                                           setClaimEditData((prev: any) => ({
                                             ...prev,
@@ -6735,26 +6797,56 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                             serviceName: updatedServices.length > 0 ? updatedServices[updatedServices.length - 1].serviceName : "",
                                           }));
                                         }}
-                                        className="hover:bg-green-200 rounded-full p-0.5 transition-colors"
+                                        className="hover:text-red-500 transition-colors"
                                       >
-                                        <X className="w-2.5 h-2.5" />
+                                        <X className="w-2 h-2" />
                                       </button>
                                     </span>
                                   ))}
+                                  <select
+                                    value=""
+                                    onChange={(e) => {
+                                      const selectedId = e.target.value;
+                                      if (!selectedId) return;
+                                      const svc = claimServices.find((s: any) => s._id === selectedId);
+                                      if (svc) {
+                                        const alreadySelected = (claimEditData.services || []).some((s: any) => s.serviceId === selectedId);
+                                        if (!alreadySelected) {
+                                          const updatedServices = [...(claimEditData.services || []), { serviceId: svc._id, serviceName: svc.name }];
+                                          setClaimEditData((prev: any) => ({
+                                            ...prev,
+                                            services: updatedServices,
+                                            serviceId: svc._id,
+                                            serviceName: svc.name
+                                          }));
+                                        }
+                                      }
+                                    }}
+                                    className="min-w-[100px] bg-transparent border-none outline-none text-[10px] text-gray-900 cursor-pointer h-full py-0.5 flex-1 appearance-none"
+                                  >
+                                    <option value="" disabled>{(claimEditData.services || []).length > 0 ? "Add More Services..." : "Select Services"}</option>
+                                    {claimServices
+                                      .filter((s: any) => !claimEditData.departmentId || String(s.departmentId) === String(claimEditData.departmentId))
+                                      .map((s: any) => (
+                                        <option key={s._id} value={s._id} className="py-2 px-3">
+                                          {s.name}
+                                        </option>
+                                      ))}
+                                  </select>
                                 </div>
-                              )}
+                              </div>
                             </div>
-                            <div>
+                            <div className="flex flex-col">
                               <label className="block text-xs font-medium text-gray-700 mb-1">Doctor <span className="text-red-500">*</span></label>
                               <select value={claimEditData.doctorId || ''} onChange={(e) => {
                                 const doc = claimDoctors.find((d: any) => d._id === e.target.value);
                                 setClaimEditData((prev: any) => ({ ...prev, doctorId: e.target.value, doctorName: doc?.name || '' }));
-                              }} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                              }} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 h-[38px]">
                                 <option value="">Select Doctor</option>
                                 {claimDoctors.map((d: any) => <option key={d._id} value={d._id}>{d.name}</option>)}
                               </select>
                             </div>
-                            <div>
+                            <div className="flex flex-col">
                               <label className="block text-xs font-medium text-gray-700 mb-1">Claim Amount <span className="text-red-500">*</span></label>
                               <input type="number" value={claimEditData.claimAmount ?? ''} onChange={(e) => {
                                 const amt = parseFloat(e.target.value) || 0;
@@ -6763,11 +6855,11 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                   claimAmount: amt,
                                   advanceAmount: prev.claimType === 'Advance' ? (prev.advanceStatus === 'Full Pay' ? amt : amt * 0.5) : 0,
                                 }));
-                              }} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500" min="0" step="0.01" />
+                              }} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 h-[38px] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" min="0" step="0.01" />
                             </div>
-                            <div>
+                            <div className="flex flex-col">
                               <label className="block text-xs font-medium text-gray-700 mb-1">Claim Type <span className="text-red-500">*</span></label>
-                              <select value={claimEditData.claimType || 'Paid'} onChange={(e) => setClaimEditData((prev: any) => ({ ...prev, claimType: e.target.value, advanceStatus: e.target.value === 'Advance' ? 'Full Pay' : null, advanceAmount: 0 }))} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                              <select value={claimEditData.claimType || 'Paid'} onChange={(e) => setClaimEditData((prev: any) => ({ ...prev, claimType: e.target.value, advanceStatus: e.target.value === 'Advance' ? 'Full Pay' : null, advanceAmount: 0 }))} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 h-[38px]">
                                 <option value="Paid">Paid</option>
                                 <option value="Advance">Advance</option>
                               </select>
@@ -6778,48 +6870,67 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                         {/* Claim Details */}
                         <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
                           <h3 className="text-sm font-semibold text-purple-800 mb-3">Claim Details</h3>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                            <div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 items-start">
+                            <div className="flex flex-col">
                               <label className="block text-xs font-medium text-gray-700 mb-1">Co-Pay %</label>
-                              <input type="number" value={claimEditData.coPayPercent ?? ''} onChange={(e) => setClaimEditData((prev: any) => ({ ...prev, coPayPercent: e.target.value }))} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500" min="0" max="100" />
+                              <input type="number" value={claimEditData.coPayPercent ?? ''} onChange={(e) => setClaimEditData((prev: any) => ({ ...prev, coPayPercent: e.target.value }))} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 h-[38px] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" min="0" max="100" />
                             </div>
-                            <div>
+                            <div className="flex flex-col">
                               <label className="block text-xs font-medium text-gray-700 mb-1">Co-Pay Type</label>
-                              <select value={claimEditData.coPayType || 'Patient Pays'} onChange={(e) => setClaimEditData((prev: any) => ({ ...prev, coPayType: e.target.value }))} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                              <select value={claimEditData.coPayType || 'Patient Pays'} onChange={(e) => setClaimEditData((prev: any) => ({ ...prev, coPayType: e.target.value }))} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 h-[38px]">
                                 <option value="Patient Pays">Patient Pays</option>
                                 <option value="Deduct from Claim">Deduct from Claim</option>
                                 <option value="Clinic Adjusts">Clinic Adjusts</option>
                               </select>
                             </div>
-                            <div className="md:col-span-2">
+                            <div className="md:col-span-1 lg:col-span-1 flex flex-col">
                               <label className="block text-xs font-medium text-gray-700 mb-1">Notes</label>
-                              <input type="text" value={claimEditData.notes || ''} onChange={(e) => setClaimEditData((prev: any) => ({ ...prev, notes: e.target.value }))} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500" />
+                              <input type="text" value={claimEditData.notes || ''} onChange={(e) => setClaimEditData((prev: any) => ({ ...prev, notes: e.target.value }))} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 h-[38px]" />
                             </div>
-                            <div className="md:col-span-2">
+                            <div className="md:col-span-1 lg:col-span-1 flex flex-col">
                               <label className="block text-xs font-medium text-gray-700 mb-1">Support Documents</label>
-                              <input type="file" multiple accept="image/*,.pdf" onChange={handleClaimEditDocumentsUpload} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100" disabled={claimEditUploadingFiles} />
-                              {claimEditData.documentFiles?.length > 0 && (
-                                <div className="mt-2 space-y-2">
-                                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Attached Documents ({claimEditData.documentFiles.length})</p>
-                                  <div className="flex flex-wrap gap-2">
-                                    {claimEditData.documentFiles.map((f: string, i: number) => (
-                                      <button
-                                        key={i}
-                                        onClick={() => setDocViewerUrl(f)}
-                                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-purple-50 border border-purple-200 rounded-lg text-[10px] font-medium text-purple-700 hover:bg-purple-100 transition-colors"
-                                      >
-                                        <Paperclip className="w-3 h-3" />
-                                        Doc {i + 1}
-                                      </button>
-                                    ))}
-                                  </div>
+                              <div className="relative group">
+                                <input
+                                  id="edit-support-docs-upload"
+                                  type="file"
+                                  multiple
+                                  accept="image/*,.pdf"
+                                  onChange={handleClaimEditDocumentsUpload}
+                                  className="hidden"
+                                  disabled={claimEditUploadingFiles}
+                                />
+                                <div className={`w-full flex items-center gap-2 px-3 py-2 text-[10px] border border-gray-300 rounded-lg transition-all ${claimEditData.documentFiles?.length > 0 ? 'bg-purple-50 border-purple-400 ring-1 ring-purple-400 shadow-sm' : 'bg-white hover:border-purple-400'} min-h-[38px]`}>
+                                  <label
+                                    htmlFor="edit-support-docs-upload"
+                                    className="flex-1 flex items-center gap-2 cursor-pointer truncate"
+                                  >
+                                    <Paperclip className={`w-3.5 h-3.5 flex-shrink-0 ${claimEditData.documentFiles?.length > 0 ? 'text-purple-600' : 'text-gray-400'}`} />
+                                    <span className={`truncate ${claimEditData.documentFiles?.length > 0 ? 'text-purple-700 font-semibold' : 'text-gray-400'}`}>
+                                       {claimEditData.documentFiles?.length > 0 ? `${claimEditData.documentFiles.length} files attached` : 'No files chosen'}
+                                     </span>
+                                  </label>
+                                  {claimEditData.documentFiles?.length > 0 && (
+                                    <div className="flex items-center gap-1 flex-shrink-0">
+                                      {claimEditData.documentFiles.map((f: string, i: number) => (
+                                        <button
+                                          key={i}
+                                          onClick={() => setDocViewerUrl(f)}
+                                          className="p-1 bg-purple-100 text-purple-700 rounded hover:bg-purple-200 transition-colors"
+                                          title={`View Doc ${i + 1}`}
+                                        >
+                                          <Eye className="w-3 h-3" />
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
+                                  {claimEditUploadingFiles && <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-600 flex-shrink-0" />}
                                 </div>
-                              )}
+                               </div>
                             </div>
                             {(claimEditData.claimType === 'Advance' || claimEditData.claimType === 'Paid') && (
-                              <>
-                                <div>
-                                  <label className="block text-xs font-medium text-gray-700 mb-1">{claimEditData.claimType} Status</label>
+                              <div className="grid grid-cols-2 gap-2 lg:col-span-1">
+                                <div className="flex flex-col">
+                                  <label className="block text-[10px] font-medium text-gray-700 mb-1 truncate">{claimEditData.claimType} Status</label>
                                   <select value={claimEditData.advanceStatus || 'Full Pay'} onChange={(e) => {
                                     const amt = parseFloat(claimEditData.claimAmount) || 0;
                                     setClaimEditData((prev: any) => ({
@@ -6827,16 +6938,16 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                       advanceStatus: e.target.value,
                                       advanceAmount: e.target.value === 'Full Pay' ? amt : amt * 0.5,
                                     }));
-                                  }} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
-                                    <option value="Full Pay">Full Pay</option>
-                                    <option value="Partial Pay">Partial Pay</option>
+                                  }} className="w-full px-2 py-2 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 h-[38px]">
+                                    <option value="Full Pay">Full</option>
+                                    <option value="Partial Pay">Partial</option>
                                   </select>
                                 </div>
-                                <div>
-                                  <label className="block text-xs font-medium text-gray-700 mb-1">{claimEditData.claimType} Amount (Enter)</label>
-                                  <input type="number" value={claimEditData.advanceAmount ?? ''} onChange={(e) => setClaimEditData((prev: any) => ({ ...prev, advanceAmount: parseFloat(e.target.value) || 0 }))} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 font-semibold" placeholder="Enter amount" min="0" step="0.01" />
+                                <div className="flex flex-col">
+                                  <label className="block text-[10px] font-medium text-gray-700 mb-1 truncate">Amount</label>
+                                  <input type="number" value={claimEditData.advanceAmount ?? ''} onChange={(e) => setClaimEditData((prev: any) => ({ ...prev, advanceAmount: parseFloat(e.target.value) || 0 }))} className="w-full px-2 py-2 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 font-semibold h-[38px] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" placeholder="0" min="0" step="0.01" />
                                 </div>
-                              </>
+                              </div>
                             )}
                           </div>
                         </div>
@@ -6892,7 +7003,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                       <Camera className="w-4 h-4" />
                       Payment Proofs
                     </span>
-                    
+                   
                   </button>
                 </div>
 
@@ -7107,40 +7218,40 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                 // Debug: Log data sources
                 console.log('Billing History:', billingHistory);
                 console.log('Appointments Data:', allAppointmentsData);
-                
+               
                 // Build treatment items from appointments (for Ongoing and All sections)
                 const appointmentTreatments = (allAppointmentsData || [])
                   .filter((apt: any) => {
                     // Filter out appointments without valid treatment names
                     const treatmentName = apt.treatmentName || apt.serviceName || '';
-                    const hasValidTreatmentName = treatmentName && 
-                                                  treatmentName.trim() !== '' && 
+                    const hasValidTreatmentName = treatmentName &&
+                                                  treatmentName.trim() !== '' &&
                                                   treatmentName.toLowerCase() !== 'appointment';
                     return hasValidTreatmentName;
                   })
                   .map((apt: any) => {
                     const status = (apt.status || apt.appointmentStatus || '').toLowerCase();
                     const isCompleted = status === 'completed' || status === 'discharge';
-                    
+                   
                     // Get treatment name
                     const treatmentName = apt.treatmentName || apt.serviceName || '';
-                    
+                   
                     // Get doctor name
                     const doctorName = apt.doctorName || '';
-                    
+                   
                     // Get date
-                    const date = apt.appointmentDate 
+                    const date = apt.appointmentDate
                       ? new Date(apt.appointmentDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                      : (apt.createdAt 
+                      : (apt.createdAt
                         ? new Date(apt.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
                         : 'N/A');
-                    
+                   
                     // Get time
                     const time = apt.fromTime || '';
-                    
+                   
                     // Get invoice number if available
                     const invoiceNumber = apt.invoiceNumber || apt.invoiceNo || apt._id?.slice(-8).toUpperCase() || '';
-                    
+                   
                     return {
                       source: 'appointment',
                       data: apt,
@@ -7159,10 +7270,10 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                 const billingTreatments = (billingHistory || [])
                   .filter((b: any) => {
                     // Filter out advance payments and balance adjustments
-                    const isAdvance = b.isAdvanceOnly || 
-                                     b.treatment === "Advance Payment" || 
+                    const isAdvance = b.isAdvanceOnly ||
+                                     b.treatment === "Advance Payment" ||
                                      b.treatment === "Historical Advance Balance";
-                    
+                   
                     // Include all billing records except advance payments
                     // Show even if treatment/package name is empty (will display as '-')
                     return !isAdvance;
@@ -7173,14 +7284,14 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                     const paid = parseFloat(billing.paid || billing.paidAmount || 0) || 0;
                     const pending = parseFloat(billing.pending || 0) || 0;
                     const pendingUsed = parseFloat(billing.pendingUsed || 0) || 0;
-                    
+                   
                     // Get invoice number early (needed for manuallyPaidInvoices check)
                     const invoiceNumber = billing.invoiceNumber || billing.invoiceNo || billing._id?.slice(-8).toUpperCase() || '';
                     const billingDate = billing.createdAt ? new Date(billing.createdAt).getTime() : 0;
-                    
+                   
                     // Calculate pending amount based on original amount
                     const pendingAmount = originalAmount - paid;
-                    
+                   
                     // Check if this invoice's pending was cleared by a newer invoice
                     // Look for any newer invoice that has pendingUsed > 0
                     const hasNewerInvoiceWithPendingUsed = (billingHistory || []).some((otherBilling: any) => {
@@ -7189,10 +7300,10 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                       // Check if this is a newer invoice (created after current billing) with pendingUsed > 0
                       return otherDate > billingDate && otherPendingUsed > 0;
                     });
-                    
+                   
                     // Check if pending was cleared separately (pendingUsed > 0 means THIS invoice cleared previous pending)
                     const pendingClearedSeparately = pendingUsed > 0;
-                    
+                   
                     // Check if fully paid:
                     // PRIMARY CHECK: Use the pending field from backend
                     // - If pending > 0 AND no newer invoice cleared it → NOT fully paid (show in pending section)
@@ -7203,7 +7314,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                     const isFullyPaid = (!hasPendingAmount && (paid >= amount || pendingClearedSeparately)) ||
                                        (hasPendingAmount && hasNewerInvoiceWithPendingUsed) || // Pending was cleared by newer invoice
                                        manuallyPaidInvoices.has(invoiceNumber);
-                    
+                   
                     // Debug logging for invoice status calculation
                     console.log('📊 Invoice Status Calculation:', {
                       invoiceNumber,
@@ -7224,21 +7335,21 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                               pendingClearedSeparately ? 'pendingClearedSeparately' :
                               paid >= amount ? 'paid_equals_or_exceeds_amount' : 'NOT_FULLY_PAID'
                     });
-                    
+                   
                     // Status based on actual payment status
                     const treatmentStatus = isFullyPaid ? 'completed' : 'pending';
-                    
+                   
                     // Get treatment/package name from billing record
-                    const treatmentName = (billing.treatment && billing.treatment.trim() !== '' ? billing.treatment : 
+                    const treatmentName = (billing.treatment && billing.treatment.trim() !== '' ? billing.treatment :
                                           (billing.package && billing.package.trim() !== '' ? billing.package : '-'));
-                    
+                   
                     // Get doctor name if available
-                    const doctorName = billing.doctorName || 
+                    const doctorName = billing.doctorName ||
                                       (billing.doctorId && typeof billing.doctorId === 'object' ? billing.doctorId.name : null) ||
                                       '';
-                    
+                   
                     // Get date from billing record
-                    const date = billing.createdAt 
+                    const date = billing.createdAt
                       ? new Date(billing.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
                       : 'N/A';
 
@@ -7263,7 +7374,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
 
                 // Filter based on treatmentFilter
                 let filtered: any[] = [];
-                
+               
                 if (treatmentFilter === 'completed') {
                   // Completed section: Use billing history (fully paid treatments with ZERO pending amount)
                   filtered = billingTreatments.filter((t: any) => {
@@ -7279,8 +7390,8 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                   // Ongoing section: Use appointments (non-completed status) - FILTER OUT empty treatment names
                   filtered = appointmentTreatments.filter((t: any) => {
                     // Filter out appointments without treatment names (like generic "Appointment" entries)
-                    const hasValidTreatmentName = t.treatmentName && 
-                                                  t.treatmentName.trim() !== '' && 
+                    const hasValidTreatmentName = t.treatmentName &&
+                                                  t.treatmentName.trim() !== '' &&
                                                   t.treatmentName.toLowerCase() !== 'appointment';
                     return t.treatmentStatus === 'ongoing' && hasValidTreatmentName;
                   });
@@ -7290,23 +7401,23 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                   const completedTreatments = billingTreatments.filter((t: any) => {
                     return t.treatmentStatus === 'completed';
                   });
-                  
+                 
                   // Get pending treatments (billing with pending status)
                   const pendingTreatments = billingTreatments.filter((t: any) => {
                     return t.treatmentStatus === 'pending';
                   });
-                  
+                 
                   // Get ongoing treatments (appointments with valid treatment names)
                   const ongoingTreatments = appointmentTreatments.filter((t: any) => {
-                    const hasValidTreatmentName = t.treatmentName && 
-                                                  t.treatmentName.trim() !== '' && 
+                    const hasValidTreatmentName = t.treatmentName &&
+                                                  t.treatmentName.trim() !== '' &&
                                                   t.treatmentName.toLowerCase() !== 'appointment';
                     return t.treatmentStatus === 'ongoing' && hasValidTreatmentName;
                   });
-                  
+                 
                   // Combine ONLY valid records from all three sections
                   filtered = [...completedTreatments, ...pendingTreatments, ...ongoingTreatments];
-                  
+                 
                   // Remove duplicates by checking if treatment names and IDs match
                   const seen = new Set();
                   filtered = filtered.filter((item: any) => {
@@ -7366,7 +7477,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                           const pendingAmount = item.pendingAmount || (item.amount - item.paid);
                           const isFromBilling = item.source === 'billing';
                           const hasPendingAmount = pendingAmount > 0;
-                          
+                         
                           return (
                             <div
                               key={item.data._id || index}
@@ -7483,7 +7594,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                         <p className="text-xs text-gray-500">Send a digital consent form to sign</p>
                       </div>
                     </div>
-                    
+                   
                     <div className="flex items-center gap-3 w-full sm:w-auto">
                       <select
                         value={selectedConsentId}
@@ -7498,7 +7609,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                           </option>
                         ))}
                       </select>
-                      
+                     
                       <button
                         onClick={handleSendConsentMsgOnWhatsapp}
                         disabled={!selectedConsentId || sendingConsent || consentSent}
@@ -7891,7 +8002,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                       <div className="flex flex-wrap gap-3">
                         {/* Pending */}
                         <div className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200">
-                        
+                       
                           <span className="text-xs font-bold text-amber-700">Pending: {formatAED(balance.pendingBalance)}</span>
                         </div>
                         {/* Advance */}
@@ -7938,7 +8049,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
             ) : (
               /* Default Overview Tab - Compact Professional Dashboard */
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                              
+                             
                 {/* Left Column - Activity Timeline (Compact) - Reduced Width */}
                 <div className="lg:col-span-1">
                   <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-3 h-full">
@@ -7946,7 +8057,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                       <Activity className="w-4 h-4 text-teal-600 flex-shrink-0" />
                       <span className="truncate">Activity Timeline</span>
                     </h3>
-                                    
+                                   
                     <div className={`space-y-2 ${timelineItems.length > 4 ? 'max-h-[280px] overflow-y-auto custom-scrollbar pr-2' : ''}`}>
                       {timelineItems.map((item, index) => (
                         <div key={index} className="relative flex gap-2 pb-3 last:pb-0">
@@ -7954,12 +8065,12 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                           {index < timelineItems.length - 1 && (
                             <div className="absolute left-2.5 top-6 bottom-0 w-px bg-gray-200" />
                           )}
-                                              
+                                             
                           {/* Icon - Smaller */}
                           <div className={`relative w-5 h-5 rounded-full {getCurrencySymbol(item.currency)}${item.color} flex items-center justify-center flex-shrink-0 shadow-sm z-10`}>
                             <item.icon className="w-2.5 h-2.5 text-white flex-shrink-0" />
                           </div>
-                                              
+                                             
                           {/* Content - More Compact */}
                           <div className="flex-1 min-w-0 bg-gray-50 rounded-md p-2 border border-gray-100">
                             <h4 className="font-medium text-gray-900 text-sm truncate">{item.title}</h4>
@@ -7971,17 +8082,17 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                     </div>
                   </div>
                 </div>
-              
+             
                 {/* Right Column - Stacked Cards (Compact) - Increased Width */}
                 <div className="lg:col-span-1 space-y-3">
-                                
+                               
                   {/* Financial Snapshot - Compact Row Layout */}
                   <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-3">
                     <h3 className="text-sm font-semibold text-gray-900 mb-2.5 flex items-center gap-2">
                       {/* <DollarSign className="w-4 h-4 text-green-600 flex-shrink-0" /> */}
                       Financial Snapshot
                     </h3>
-                                        
+                                       
                     <div className="space-y-2">
                       {/* Total Spent */}
                       <div className="flex items-center justify-between p-2 bg-green-50 border border-green-100 rounded-md">
@@ -8028,7 +8139,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                         </svg>
                         Bundle Offers & Free Sessions
                       </h3>
-                      
+                     
                       <div className="space-y-2">
                         {(() => {
                           // Extract unique bundle offers from billing history
@@ -8084,7 +8195,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                       </div>
                     </div>
                   )}
-                                          
+                                         
                       {/* Pending Payment */}
                       <div className="flex items-center justify-between p-2 bg-red-50 border border-red-100 rounded-md">
                         <div className="flex items-center gap-2">
@@ -8106,7 +8217,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                               <Camera className="w-3 h-3" />
                               Upload
                             </button>
-                            
+                           
                             <button
                               onClick={() => setShowPayPendingModal(true)}
                               className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-[10px] font-bold rounded shadow-sm transition-all active:scale-95 flex items-center gap-1"
@@ -8121,7 +8232,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                           </div>
                         )}
                       </div>
-                                          
+                                         
                       {/* Advance Balance */}
                       <div className="flex items-center justify-between p-2 bg-teal-50 border border-teal-100 rounded-md">
                         <div className="flex items-center gap-2">
@@ -8153,14 +8264,14 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                       )}
                     </div>
                   </div>
-              
+             
                   {/* Alerts - Compact Card Style */}
                   {/* <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-3">
                     <h3 className="text-sm font-semibold text-gray-900 mb-2.5 flex items-center gap-2">
                       <AlertCircle className="w-4 h-4 text-yellow-600 flex-shrink-0" />
                       Alerts
                     </h3>
-                                        
+                                       
                     <div className="space-y-1.5">
                       {alerts.map((alert, index) => (
                         <div key={index} className={`p-2 rounded-md border-l-2 ${
@@ -8189,14 +8300,14 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                       ))}
                     </div>
                   </div> */}
-              
+             
                   {/* Patient Behavior - Compact with Right-Aligned Values */}
                   <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-3">
                     <h3 className="text-sm font-semibold text-gray-900 mb-2.5 flex items-center gap-2">
                       <TrendingUp className="w-4 h-4 text-blue-600 flex-shrink-0" />
                       Patient Behavior
                     </h3>
-                                        
+                                       
                     <div className="space-y-2">
                       {behaviorMetrics.map((metric: any, index: number) => (
                         <div key={index}>
@@ -8218,7 +8329,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                       ))}
                     </div>
                   </div>
-              
+             
                 </div>
               </div>
             )}
@@ -8226,11 +8337,11 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
 
         {/* Before/After Modal */}
         {showBeforeAfterModal && (
-          <div 
+          <div
             className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
             onClick={() => setShowBeforeAfterModal(false)}
           >
-            <div 
+            <div
               className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             >
@@ -8244,7 +8355,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                   <X className="w-6 h-6 text-gray-600" />
                 </button>
               </div>
-              
+             
               {/* Modal Content - Images */}
               <div className="p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -8258,7 +8369,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                       </div>
                     </div>
                   </div>
-                  
+                 
                   {/* After Image */}
                   <div>
                     <h3 className="text-lg font-semibold text-gray-700 mb-3 text-center">After</h3>
@@ -8271,7 +8382,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                   </div>
                 </div>
               </div>
-              
+             
               {/* Modal Footer - Close Button */}
               <div className="p-6 border-t border-gray-200">
                 <button
@@ -8341,32 +8452,32 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
           onSuccess={async (_paymentData: any) => {
             // Store the previous pending balance before update
             const prevBalance = balance.pendingBalance;
-            
+           
             const updated = await fetchPatientBalance(patientData._id);
             if (updated) {
               const newPendingBalance = Number(updated.pendingBalance || 0);
               setBalance(updated as typeof balance);
-              
+             
               // If pending balance decreased, it means payment was successful
               if (newPendingBalance < prevBalance) {
                 // CRITICAL: Refresh billing history FIRST to get the latest data
                 const refreshedBillings = await fetchBillingHistory();
-                
+               
                 // Use the refreshed billing history (or fallback to current state)
                 const billingsToCheck = refreshedBillings || billingHistory || [];
-                
+               
                 // Get all invoice numbers from billing history that have pending amount
                 const pendingInvoices = billingsToCheck
                   .filter((b: any) => {
                     const amount = parseFloat(b.amount) || 0;
                     const paid = parseFloat(b.paid || b.paidAmount || 0) || 0;
-                    const isAdvance = b.isAdvanceOnly || 
-                                     b.treatment === "Advance Payment" || 
+                    const isAdvance = b.isAdvanceOnly ||
+                                     b.treatment === "Advance Payment" ||
                                      b.treatment === "Historical Advance Balance";
                     return !isAdvance && (amount - paid) > 0;
                   })
                   .map((b: any) => b.invoiceNumber || b.invoiceNo || b._id?.slice(-8).toUpperCase() || '');
-                
+               
                 // Add these invoices to manually paid set
                 if (pendingInvoices.length > 0) {
                   setManuallyPaidInvoices(prev => {
@@ -8502,7 +8613,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Select Image
                   </label>
-                  
+                 
                   {/* Image Preview or Upload Box */}
                   {previewUrl ? (
                     <div className="relative rounded-xl overflow-hidden border-2 border-purple-300 bg-gray-50">
@@ -8536,7 +8647,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                       </div>
                     </div>
                   ) : (
-                    <div 
+                    <div
                       className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-purple-500 transition-colors cursor-pointer"
                       onClick={() => document.getElementById('payment-image-input')?.click()}
                     >
@@ -8545,7 +8656,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                       <p className="text-xs text-gray-500 mt-1">PNG, JPG up to 5MB</p>
                     </div>
                   )}
-                  
+                 
                   <input
                     id="payment-image-input"
                     type="file"
@@ -8602,7 +8713,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                     <button
                       onClick={async () => {
                         if (!selectedFile) return;
-                        
+                       
                         setUploadLoading(true);
                         setUploadError(null);
 
@@ -8807,8 +8918,8 @@ function PatientProfileView() {
   }
 
   return (
-    <PatientProfileDashboard 
-      patientData={patient} 
+    <PatientProfileDashboard
+      patientData={patient}
       onClose={handleClose}
       onPatientUpdated={(updatedData) => {
         setPatient(updatedData);

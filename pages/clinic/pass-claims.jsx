@@ -3,7 +3,7 @@ import { useEffect, useState, useMemo } from "react";
 import axios from "axios";
 import withClinicAuth from "../../components/withClinicAuth";
 import ClinicLayout from "../../components/ClinicLayout";
-import { Search, CheckCircle, XCircle, Eye, FileText, AlertCircle, Shield, X, Activity, Clock, User, Calendar } from "lucide-react";
+import { Search, CheckCircle, XCircle, Eye, FileText, AlertCircle, Shield, X, Activity, Clock, User, Calendar, Paperclip } from "lucide-react";
 
 const TOKEN_PRIORITY = ["clinicToken", "doctorToken", "agentToken", "staffToken", "userToken", "adminToken"];
 
@@ -41,6 +41,7 @@ function PassClaimsPage() {
   const [rejectionNote, setRejectionNote] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
+  const [previewFile, setPreviewFile] = useState(null);
 
   useEffect(() => {
     fetchClaims();
@@ -360,6 +361,22 @@ function PassClaimsPage() {
                           <p className="text-xs font-semibold text-gray-900 truncate">{claim.departmentName || "N/A"}</p>
                         </div>
                       </div>
+
+                      {/* Services */}
+                      <div className="bg-gray-50 rounded-lg p-2.5 border border-gray-100">
+                        <p className="text-[10px] text-gray-500 uppercase font-bold tracking-tight mb-1">Services</p>
+                        <div className="flex flex-wrap gap-1">
+                          {claim.services && claim.services.length > 0 ? (
+                            claim.services.map((svc, idx) => (
+                              <span key={idx} className="inline-flex px-1 py-0.5 rounded-full text-[8px] font-bold bg-teal-100 text-teal-800 border border-teal-200">
+                                {svc.serviceName}
+                              </span>
+                            ))
+                          ) : (
+                            <p className="text-xs font-semibold text-gray-900 truncate">{claim.serviceName || "N/A"}</p>
+                          )}
+                        </div>
+                      </div>
                     </div>
 
                     {/* Rejection Reason (if rejected) */}
@@ -523,7 +540,7 @@ function PassClaimsPage() {
       {/* View Modal */}
       {viewModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-gray-200">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-y-auto border border-gray-200">
             <div className={`px-6 py-4 border-b sticky top-0 bg-white z-10 flex items-center justify-between ${getStatusBadge(viewModal.status)}`}>
               <div className="flex items-center gap-3">
                 <h2 className="text-lg font-bold">
@@ -797,85 +814,350 @@ function PassClaimsPage() {
                   )}
                 </div>
               ) : (
-                <>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
-                  <h3 className="text-[10px] font-bold text-gray-400 uppercase mb-3 tracking-widest">Patient Information</h3>
-                  <div className="space-y-3">
-                    <div>
-                      <p className="text-[10px] font-bold text-gray-500 uppercase">Name</p>
-                      <p className="text-sm font-bold text-gray-900">{viewModal.patientFirstName} {viewModal.patientLastName}</p>
+                  <>
+                    {/* Patient & Insurance Info */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="bg-white border border-gray-200 rounded-lg p-4">
+                        <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                          <User className="w-4 h-4 text-blue-500" /> Patient Information
+                        </h3>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between border-b border-gray-50 pb-1">
+                            <span className="text-gray-500">First Name:</span>
+                            <span className="font-medium text-gray-900">{viewModal.patientFirstName || "-"}</span>
+                          </div>
+                          <div className="flex justify-between border-b border-gray-50 pb-1">
+                            <span className="text-gray-500">Last Name:</span>
+                            <span className="font-medium text-gray-900">{viewModal.patientLastName || "-"}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-500">Mobile:</span>
+                            <span className="font-medium text-gray-900">{viewModal.patientMobileNumber || "-"}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="bg-white border border-gray-200 rounded-lg p-4">
+                        <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                          <Shield className="w-4 h-4 text-green-500" /> Insurance Details
+                        </h3>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between border-b border-gray-50 pb-1">
+                            <span className="text-gray-500">Provider:</span>
+                            <span className="font-medium text-gray-900">{viewModal.insuranceProvider || "-"}</span>
+                          </div>
+                          <div className="flex justify-between border-b border-gray-50 pb-1">
+                            <span className="text-gray-500">Policy #:</span>
+                            <span className="font-medium text-gray-900">{viewModal.policyNumber || "-"}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-500">Expiry Date:</span>
+                            <span className="font-medium text-gray-900">{viewModal.expiryDate ? new Date(viewModal.expiryDate).toLocaleDateString() : "-"}</span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-[10px] font-bold text-gray-500 uppercase">Mobile</p>
-                      <p className="text-sm font-bold text-gray-900">{viewModal.patientMobileNumber || "N/A"}</p>
+
+                    {/* Uploaded Insurance Files */}
+                    {(viewModal.insuranceCardFile || viewModal.tableOfBenefitsFile) && (
+                      <div className="bg-white border border-gray-200 rounded-lg p-4">
+                        <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                          <Paperclip className="w-4 h-4 text-purple-500" /> Insurance Files
+                        </h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {viewModal.insuranceCardFile && (
+                            <div className="space-y-2">
+                              <p className="text-xs font-medium text-gray-500">Insurance Card</p>
+                              <div className="relative rounded-lg overflow-hidden border border-gray-200 bg-gray-50 h-32 group">
+                                {viewModal.insuranceCardFile.toLowerCase().endsWith('.pdf') ? (
+                                  <div className="flex items-center justify-center h-full">
+                                    <FileText className="w-8 h-8 text-gray-400" />
+                                  </div>
+                                ) : (
+                                  <img src={viewModal.insuranceCardFile} alt="Card" className="w-full h-full object-contain" />
+                                )}
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                  <button 
+                                    onClick={() => setPreviewFile({ url: viewModal.insuranceCardFile, name: "Insurance Card", field: "insuranceCardFile" })}
+                                    className="px-3 py-1.5 bg-white text-gray-900 text-xs font-bold rounded-lg shadow-lg hover:scale-105 transition-transform"
+                                  >
+                                    View Full
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                          {viewModal.tableOfBenefitsFile && (
+                            <div className="space-y-2">
+                              <p className="text-xs font-medium text-gray-500">Table of Benefits</p>
+                              <div className="relative rounded-lg overflow-hidden border border-gray-200 bg-gray-50 h-32 group">
+                                {viewModal.tableOfBenefitsFile.toLowerCase().endsWith('.pdf') ? (
+                                  <div className="flex items-center justify-center h-full">
+                                    <FileText className="w-8 h-8 text-gray-400" />
+                                  </div>
+                                ) : (
+                                  <img src={viewModal.tableOfBenefitsFile} alt="Benefits" className="w-full h-full object-contain" />
+                                )}
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                  <button 
+                                    onClick={() => setPreviewFile({ url: viewModal.tableOfBenefitsFile, name: "Table of Benefits", field: "tableOfBenefitsFile" })}
+                                    className="px-3 py-1.5 bg-white text-gray-900 text-xs font-bold rounded-lg shadow-lg hover:scale-105 transition-transform"
+                                  >
+                                    View Full
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Claim Details */}
+                    <div className="bg-white border border-gray-200 rounded-lg p-4">
+                      <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                        <Activity className="w-4 h-4 text-orange-500" /> Claim Details
+                      </h3>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        <div className="bg-gray-50 rounded-lg p-3">
+                          <p className="text-xs text-gray-500">Claim Type</p>
+                          <p className="text-sm font-semibold text-gray-900">{viewModal.claimType}</p>
+                        </div>
+                        <div className="bg-gray-50 rounded-lg p-3">
+                          <p className="text-xs text-gray-500">Claim Amount</p>
+                          <p className="text-sm font-semibold text-teal-600 font-bold">₹{viewModal.claimAmount?.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+                        </div>
+                        <div className="bg-gray-50 rounded-lg p-3">
+                          <p className="text-xs text-gray-500">Doctor</p>
+                          <p className="text-sm font-semibold text-gray-900">{viewModal.doctorName || "-"}</p>
+                        </div>
+                        <div className="bg-gray-50 rounded-lg p-3">
+                          <p className="text-xs text-gray-500">Department</p>
+                          <p className="text-sm font-semibold text-gray-900">{viewModal.departmentName || "-"}</p>
+                        </div>
+                        <div className="bg-gray-50 rounded-lg p-3 col-span-2 sm:col-span-1">
+                          <p className="text-xs text-gray-500 mb-1">Services</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {viewModal.services && viewModal.services.length > 0 ? (
+                              viewModal.services.map((svc, idx) => (
+                              <span 
+                                key={idx} 
+                                className="inline-flex items-center px-1.5 py-0.5 rounded bg-teal-50 text-teal-700 border border-teal-200 text-[9px] font-bold whitespace-nowrap shadow-sm"
+                              >
+                                {svc.serviceName}
+                              </span>
+                            ))
+                            ) : (
+                              <p className="text-sm font-semibold text-gray-900">{viewModal.serviceName || "-"}</p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="bg-gray-50 rounded-lg p-3">
+                          <p className="text-xs text-gray-500">Co-Pay %</p>
+                          <p className="text-sm font-semibold text-gray-900">{viewModal.coPayPercent}%</p>
+                        </div>
+                        {(viewModal.claimType === "Advance" || viewModal.claimType === "Paid") && (
+                          <>
+                            <div className="bg-gray-50 rounded-lg p-3">
+                              <p className="text-xs text-gray-500">{viewModal.claimType} Status</p>
+                              <p className="text-sm font-semibold text-gray-900">{viewModal.advanceStatus || "-"}</p>
+                            </div>
+                            <div className="bg-gray-50 rounded-lg p-3">
+                              <p className="text-xs text-gray-500">Paid Amount</p>
+                              <p className="text-sm font-semibold text-gray-900">₹{viewModal.advanceAmount?.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+                            </div>
+                          </>
+                        )}
+                        {viewModal.pendingClaim > 0 && (
+                          <div className="bg-gray-50 rounded-lg p-3">
+                            <p className="text-xs text-gray-500">Pending Claim</p>
+                            <p className="text-sm font-semibold text-orange-600 font-bold">₹{viewModal.pendingClaim?.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+                          </div>
+                        )}
+                        <div className="bg-gray-50 rounded-lg p-3">
+                          <p className="text-xs text-gray-500">Status</p>
+                          <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-wider ${getStatusBadge(viewModal.status)}`}>
+                            {viewModal.status}
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
 
-                <div className="bg-teal-50 rounded-xl p-4 border border-teal-100">
-                  <h3 className="text-[10px] font-bold text-teal-400 uppercase mb-3 tracking-widest">Review Information</h3>
-                  <div className="space-y-3">
-                    <div>
-                      <p className="text-[10px] font-bold text-teal-600 uppercase">Reviewed By</p>
-                      <p className="text-sm font-bold text-teal-900">
-                        {viewModal.status === "Approved" 
-                          ? viewModal.approvedByName || viewModal.doctorName
-                          : viewModal.rejectedByName || viewModal.doctorName
-                        }
-                      </p>
+                    {/* Review History */}
+                    {(viewModal.approvedByName || viewModal.rejectedByName || viewModal.releasedByName) && (
+                      <div className="bg-white border border-gray-200 rounded-lg p-4">
+                        <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                          <Clock className="w-4 h-4 text-teal-500" /> Review Tracking
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          {viewModal.approvedByName && (
+                            <div className="bg-green-50 rounded-lg p-3 border border-green-100">
+                              <p className="text-[10px] font-bold text-green-600 uppercase mb-1">Approved By</p>
+                              <p className="text-sm font-bold text-gray-900">{viewModal.approvedByName}</p>
+                              <p className="text-[10px] text-gray-500 mt-1">{formatDate(viewModal.approvedAt)}</p>
+                            </div>
+                          )}
+                          {viewModal.rejectedByName && (
+                            <div className="bg-red-50 rounded-lg p-3 border border-red-100">
+                              <p className="text-[10px] font-bold text-red-600 uppercase mb-1">Rejected By</p>
+                              <p className="text-sm font-bold text-gray-900">{viewModal.rejectedByName}</p>
+                              <p className="text-[10px] text-gray-500 mt-1">{formatDate(viewModal.rejectedAt)}</p>
+                            </div>
+                          )}
+                          {viewModal.releasedByName && (
+                            <div className="bg-blue-50 rounded-lg p-3 border border-blue-100">
+                              <p className="text-[10px] font-bold text-blue-600 uppercase mb-1">Released By</p>
+                              <p className="text-sm font-bold text-gray-900">{viewModal.releasedByName}</p>
+                              <p className="text-[10px] text-gray-500 mt-1">{formatDate(viewModal.releasedAt)}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Treatment Plan & Notes */}
+                    {(viewModal.treatmentPlan || viewModal.notes || viewModal.reviewNotes) && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {(viewModal.treatmentPlan || claimDetails?.treatmentPlan) && (
+                          <div className="bg-purple-50 border border-purple-100 rounded-lg p-4">
+                            <h3 className="text-sm font-semibold text-purple-800 mb-2">Treatment Plan</h3>
+                            <p className="text-sm text-purple-900 whitespace-pre-wrap leading-relaxed">
+                              {claimDetails?.treatmentPlan || viewModal.treatmentPlan}
+                            </p>
+                          </div>
+                        )}
+                        {(viewModal.notes || viewModal.reviewNotes) && (
+                          <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 space-y-3">
+                            {viewModal.notes && (
+                              <div>
+                                <h3 className="text-sm font-semibold text-blue-800 mb-1">Claim Notes</h3>
+                                <p className="text-sm text-blue-900 leading-relaxed">{viewModal.notes}</p>
+                              </div>
+                            )}
+                            {viewModal.reviewNotes && (
+                              <div>
+                                <h3 className="text-sm font-semibold text-blue-800 mb-1">Reviewer Notes</h3>
+                                <p className="text-sm text-blue-900 leading-relaxed">{viewModal.reviewNotes}</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Claim Documents */}
+                    {viewModal.documentFiles && viewModal.documentFiles.length > 0 && (
+                      <div className="bg-white border border-gray-200 rounded-lg p-4">
+                        <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                          <FileText className="w-4 h-4 text-purple-500" /> Supporting Documents
+                        </h3>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                          {viewModal.documentFiles.map((file, idx) => (
+                            <div key={idx} className="relative rounded-lg overflow-hidden border border-gray-200 bg-gray-50 h-24 group">
+                              {file.toLowerCase().endsWith('.pdf') ? (
+                                <div className="flex items-center justify-center h-full">
+                                  <FileText className="w-6 h-6 text-gray-400" />
+                                </div>
+                              ) : (
+                                <img src={file} alt={`Doc ${idx + 1}`} className="w-full h-full object-contain" />
+                              )}
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <button 
+                                  onClick={() => setPreviewFile({ url: file, name: `Document ${idx + 1}`, field: "documentFiles" })}
+                                  className="px-2 py-1 bg-white text-gray-900 text-[10px] font-bold rounded shadow-lg hover:scale-105 transition-transform"
+                                >
+                                  View
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Administrative Details */}
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                      <h3 className="text-[10px] font-bold text-gray-400 uppercase mb-3 tracking-widest">Administrative Details</h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2 text-[10px]">
+                        <div className="flex justify-between border-b border-gray-200 pb-1">
+                          <span className="text-gray-500">Patient Name:</span>
+                          <span className="font-semibold text-gray-700">{viewModal.patientFirstName} {viewModal.patientLastName}</span>
+                        </div>
+                        <div className="flex justify-between border-b border-gray-200 pb-1">
+                          <span className="text-gray-500">Doctor Name:</span>
+                          <span className="font-semibold text-gray-700">{viewModal.doctorName || "-"}</span>
+                        </div>
+                        <div className="flex justify-between border-b border-gray-200 pb-1">
+                          <span className="text-gray-500">Insurance Provider:</span>
+                          <span className="font-semibold text-gray-700">{viewModal.insuranceProvider}</span>
+                        </div>
+                        <div className="flex justify-between border-b border-gray-200 pb-1">
+                          <span className="text-gray-500">Claim Type:</span>
+                          <span className="font-semibold text-gray-700">{viewModal.claimType}</span>
+                        </div>
+                        <div className="flex justify-between border-b border-gray-200 pb-1">
+                          <span className="text-gray-500">Created At:</span>
+                          <span className="text-gray-700">{formatDate(viewModal.createdAt)}</span>
+                        </div>
+                        <div className="flex justify-between border-b border-gray-200 pb-1">
+                          <span className="text-gray-500">Last Updated:</span>
+                          <span className="text-gray-700">{formatDate(viewModal.updatedAt)}</span>
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-[10px] font-bold text-teal-600 uppercase">Reviewed At</p>
-                      <p className="text-sm font-bold text-teal-900">
-                        {formatDate(viewModal.status === "Approved" ? viewModal.approvedAt : viewModal.rejectedAt)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
-                <h3 className="text-[10px] font-bold text-gray-400 uppercase mb-3 tracking-widest">Insurance & Claim</h3>
-                <div className="grid grid-cols-2 gap-y-4 gap-x-6">
-                  <div>
-                    <p className="text-[10px] font-bold text-gray-500 uppercase">Provider</p>
-                    <p className="text-sm font-bold text-gray-900">{viewModal.insuranceProvider}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold text-gray-500 uppercase">Policy Number</p>
-                    <p className="text-sm font-bold text-gray-900">{viewModal.policyNumber}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold text-gray-500 uppercase">Claim Amount</p>
-                    <p className="text-sm font-bold text-teal-600">₹{viewModal.claimAmount?.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold text-gray-500 uppercase">Department</p>
-                    <p className="text-sm font-bold text-gray-900">{viewModal.departmentName || "N/A"}</p>
-                  </div>
-                </div>
-              </div>
-
-              {viewModal.reviewNotes && (
-                <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
-                  <h3 className="text-[10px] font-bold text-blue-400 uppercase mb-2 tracking-widest">Review Notes</h3>
-                  <p className="text-sm font-semibold text-blue-900 leading-relaxed">{viewModal.reviewNotes}</p>
-                </div>
-              )}
-
-              {viewModal.status === "Rejected" && viewModal.rejectionReason && (
-                <div className="bg-red-50 rounded-xl p-4 border border-red-100">
-                  <h3 className="text-[10px] font-bold text-red-400 uppercase mb-2 tracking-widest">Rejection Reason</h3>
-                  <p className="text-sm font-semibold text-red-900 leading-relaxed">{viewModal.rejectionReason}</p>
-                </div>
-              )}
-            </>
-          )}
+                  </>
+                )}
+          </div>
         </div>
       </div>
-    </div>
-  )}
+    )}
+
+    {/* File Preview Modal */}
+    {previewFile && (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl relative">
+          {/* Header */}
+          <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-2xl z-10">
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">{previewFile.name}</h2>
+              <p className="text-xs text-gray-500">Document Preview</p>
+            </div>
+            <button onClick={() => setPreviewFile(null)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+              <X className="w-5 h-5 text-gray-500" />
+            </button>
+          </div>
+
+          {/* Content */}
+          <div className="p-4 flex justify-center items-center min-h-[400px] max-h-[80vh] overflow-auto">
+            {previewFile.url.toLowerCase().endsWith('.pdf') ? (
+              <iframe 
+                src={previewFile.url} 
+                className="w-full h-[70vh] rounded-lg border border-gray-200"
+                title="PDF Preview"
+              />
+            ) : (
+              <img 
+                src={previewFile.url} 
+                alt={previewFile.name} 
+                className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-sm"
+              />
+            )}
+          </div>
+          
+          {/* Footer */}
+          <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex justify-between items-center">
+            <p className="text-[10px] text-gray-400 font-medium">Claim ID: {viewModal?._id}</p>
+            <a 
+              href={previewFile.url} 
+              target="_blank" 
+              rel="noreferrer"
+              className="text-xs font-bold text-teal-600 hover:text-teal-700"
+            >
+              Open in New Tab
+            </a>
+          </div>
+        </div>
+      </div>
+    )}
     </div>
   );
 }

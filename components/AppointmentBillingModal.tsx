@@ -736,8 +736,17 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
              })));
              setActiveOffers(applicableOnes);
            }
-         } catch (offerErr) {
+         } catch (offerErr: any) {
            console.error("Error fetching offers:", offerErr);
+           // Show user-friendly message for permission denied error
+           if (offerErr.response?.status === 403) {
+             const errorMessage = offerErr.response?.data?.message || "";
+             if (errorMessage.includes("Permission denied") || errorMessage.includes("not allowed")) {
+               setErrors({
+                 general: "You don't have permission to view billing discounts. Please contact your administrator to enable this feature."
+               });
+             }
+           }
          }
       } catch (error) {
         console.error("Error fetching data:", error);
@@ -879,14 +888,16 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
         const headers = getAuthHeaders();
         if (!headers.Authorization) return;
        
+        // Consent APIs only accept patientId - no appointmentId
+        // Consent is scoped to the patient across all appointments
         const [signaturesRes, logsRes] = await Promise.all([
           axios.get("/api/clinic/consent-status", {
             headers,
-            params: { patientId: appointment.patientId, appointmentId: appointment._id },
+            params: { patientId: appointment.patientId },
           }),
           axios.get("/api/clinic/consent-log", {
             headers,
-            params: { patientId: appointment.patientId, appointmentId: appointment._id },
+            params: { patientId: appointment.patientId },
           }),
         ]);
 
@@ -908,6 +919,7 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
           });
         });
 
+        // Override with signed status if signature exists
         signatures.forEach((sig: any) => {
           logMap.set(sig.consentFormId, {
             ...sig,
@@ -923,7 +935,7 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
       }
     };
     fetchConsentStatuses();
-  }, [isOpen, appointment?.patientId, appointment?._id, getAuthHeaders]);
+  }, [isOpen, appointment?.patientId, getAuthHeaders]);
 
   // Send Consent Form on WhatsApp
   const handleSendConsentMsgOnWhatsapp = async () => {
