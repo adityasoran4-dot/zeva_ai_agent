@@ -107,6 +107,7 @@ interface PackageTreatmentSession {
 
 interface BilledTreatmentInfo {
   name: string;
+  billedAt: Date | string;
 }
 
 interface Offer {
@@ -782,33 +783,62 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
         String(b.appointmentId) === String(appointment._id) ||
         String(b.appointmentId?._id) === String(appointment._id);
       if (!apptMatch) return;
+      
+      // Use invoicedDate as the billing timestamp
+      const billedAt = b.invoicedDate || b.createdAt || new Date().toISOString();
+      
       if (b.treatment) {
         const names = String(b.treatment)
           .split(",")
           .map((t: string) => t.trim())
           .filter(Boolean);
         names.forEach((n: string) =>
-          list.push({ name: n.toLowerCase() })
+          list.push({ name: n.toLowerCase(), billedAt })
         );
       }
       if (Array.isArray(b.selectedPackageTreatments)) {
         b.selectedPackageTreatments.forEach((pt: any) => {
           const n = (pt?.treatmentName || "").toString().trim();
-          if (n) list.push({ name: n.toLowerCase() });
+          if (n) list.push({ name: n.toLowerCase(), billedAt });
         });
       }
     });
     return list;
   }, [billingHistory, appointment?._id]);
 
-  const isTreatmentBilledRecently = useCallback(
+  // Check if treatment was billed within the last 24 hours
+  // If yes, don't allow re-billing; if more than 24 hours, allow re-billing
+  const isTreatmentBilledWithin24Hours = useCallback(
     (treatmentName: string) => {
       const norm = (treatmentName || "").trim().toLowerCase();
-      // Check if this treatment has ever been billed for this appointment (not just last 24h)
-      return billedTreatmentInfos.some((bt) => bt.name === norm);
+      const now = new Date();
+      
+      // Find the most recent billing for this treatment
+      const matchingBillings = billedTreatmentInfos.filter((bt) => bt.name === norm);
+      
+      if (matchingBillings.length === 0) {
+        return false; // Never billed, can bill
+      }
+      
+      // Check if any of the billings were within the last 24 hours
+      for (const billing of matchingBillings) {
+        const billedAt = new Date(billing.billedAt);
+        const hoursDiff = (now.getTime() - billedAt.getTime()) / (1000 * 60 * 60);
+        
+        if (hoursDiff < 24) {
+          // Billed within 24 hours, don't allow re-billing
+          return true;
+        }
+      }
+      
+      // All billings are older than 24 hours, allow re-billing
+      return false;
     },
     [billedTreatmentInfos]
   );
+
+  // Keep the old function name as an alias for backward compatibility
+  const isTreatmentBilledRecently = isTreatmentBilledWithin24Hours;
 
   // Fetch patient balances (advance/pending)
   useEffect(() => {
@@ -1735,38 +1765,16 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
 
       // Check which selected treatments are in the bundle's serviceIds
       const eligibleTreatments: typeof currentTreatments = [];
-      let allRequiredServicesSelected = false;
+      let hasBundleServicesSelected = false;
       
       if (offer.serviceIds && Array.isArray(offer.serviceIds) && offer.serviceIds.length > 0) {
-        // Bundle has specific services - ALL must be selected
-        // First, check if ALL services in serviceIds are present in SELECTED treatments (including free ones)
-        const allServiceIdsMatched = offer.serviceIds.every(svc => {
-          return currentTreatments.some(treatment => {
-            if (typeof svc === 'string') {
-              return String(svc) === String(treatment.slug) || 
-                     String(svc).toLowerCase() === String(treatment.name).toLowerCase();
-            } else if (svc && typeof svc === 'object') {
-              return (
-                String(svc._id) === String(treatment.slug) || 
-                (svc.serviceSlug && String(svc.serviceSlug) === String(treatment.slug)) ||
-                (svc.name && String(svc.name).toLowerCase() === String(treatment.name).toLowerCase())
-              );
-            }
-            return false;
-          });
-        });
+        // Bundle has specific services - check if ANY treatments from the bundle are selected
+        // For "Buy 2 Get 1 Free", the bundle should apply when at least buyQty treatments are selected
+        // Not ALL services need to be selected - only those that the patient is actually receiving
         
-        // Only proceed if ALL required services are selected
-        if (!allServiceIdsMatched) {
-          console.log(`[BundleMatching] Bundle "${offer.title}" skipped: Not all required services selected (${offer.serviceIds.length} required)`);
-          continue;
-        }
-        
-        allRequiredServicesSelected = true;
-        
-        // Now collect eligible treatments from PAID treatments only (exclude free sessions)
+        // First, collect all treatments from the bundle that are selected
         for (const treatment of paidTreatments) {
-          const isEligible = offer.serviceIds.some(svc => {
+          const isInBundle = offer.serviceIds.some(svc => {
             if (typeof svc === 'string') {
               return String(svc) === String(treatment.slug) || 
                      String(svc).toLowerCase() === String(treatment.name).toLowerCase();
@@ -1780,25 +1788,32 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
             return false;
           });
           
-          if (isEligible) {
+          if (isInBundle) {
+            hasBundleServicesSelected = true;
             // Add treatment quantity times (if quantity > 1, count it multiple times)
             for (let i = 0; i < treatment.quantity; i++) {
               eligibleTreatments.push(treatment);
             }
           }
         }
+        
+        // For bundle offers, we DON'T require all services to be selected
+        // Just check if at least buyQty treatments from the bundle are selected
+        // hasBundleServicesSelected is already set based on whether ANY bundle services are selected
+        // The actual check happens later: eligibleTreatments.length >= offer.buyQty
       } else if (offer.applyOnAllServices) {
         // Bundle applies to all services - but only paid ones
+        hasBundleServicesSelected = true;
         eligibleTreatments.push(...paidTreatments.flatMap(t => 
           Array(t.quantity).fill(t)
         ));
-        allRequiredServicesSelected = true;
       }
 
-      console.log(`[BundleMatching] Bundle "${offer.title}": ${eligibleTreatments.length} eligible treatments from ${paidTreatments.length} paid treatments (need ${offer.buyQty}), All required: ${allRequiredServicesSelected}`);
+      console.log(`[BundleMatching] Bundle "${offer.title}": ${eligibleTreatments.length} eligible treatments from ${paidTreatments.length} paid treatments (need ${offer.buyQty}), Bundle services selected: ${hasBundleServicesSelected}`);
 
-      // Check if we have enough eligible treatments AND all required services are selected
-      if (allRequiredServicesSelected && eligibleTreatments.length >= offer.buyQty) {
+      // Check if we have enough eligible treatments from the bundle
+      // The bundle applies when at least buyQty treatments from the bundle are selected
+      if (hasBundleServicesSelected && eligibleTreatments.length >= offer.buyQty) {
         // Sort eligible treatments by price (ascending) to find lowest-priced ones for free sessions
         const sortedByPrice = [...eligibleTreatments].sort((a, b) => a.price - b.price);
         
