@@ -710,7 +710,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
   const [pkgSelectedTreatments, setPkgSelectedTreatments] = useState<Array<{ treatmentName: string; treatmentSlug: string; sessions: number; allocatedPrice: number }>>([]);
   const [pkgTreatmentDropdownOpen, setPkgTreatmentDropdownOpen] = useState(false);
   const [pkgTreatmentSearch, setPkgTreatmentSearch] = useState("");
-  const [pkgSubmitting, _setPkgSubmitting] = useState(false);
+  const [pkgSubmitting, setPkgSubmitting] = useState(false);
   const [pkgError, setPkgError] = useState("");
   const [pkgSuccess, setPkgSuccess] = useState("");
   const [addingPackageToPatient, _setAddingPackageToPatient] = useState(false);
@@ -782,8 +782,66 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
       treatments: pkgSelectedTreatments,
       addToPatient
     });
+
+    // If just creating package (not adding to patient), call API directly
+    if (!addToPatient) {
+      try {
+        setPkgSubmitting(true);
+        const headers = getAuthHeaders();
+        if (!headers) {
+          setPkgError("Authentication required");
+          return;
+        }
+
+        // Ensure treatments have proper number types
+        const normalizedTreatments = pkgSelectedTreatments.map(t => ({
+          treatmentName: t.treatmentName,
+          treatmentSlug: t.treatmentSlug,
+          sessions: parseInt(String(t.sessions)) || 1,
+          allocatedPrice: parseFloat(String(t.allocatedPrice)) || 0,
+        }));
+
+        const response = await axios.post(
+          "/api/clinic/packages",
+          {
+            name: pkgModalName.trim(),
+            totalPrice: packagePrice,
+            validityInMonths: parseInt(pkgModalValidityInMonths) || 0,
+            startDate: pkgModalStartDate,
+            endDate: pkgModalEndDate,
+            treatments: normalizedTreatments,
+          },
+          { headers }
+        );
+
+        if (response.data.success) {
+          setPkgSuccess("Package created successfully!");
+          setPkgError("");
+          
+          // Reset form after success
+          setTimeout(() => {
+            setShowCreatePackage(false);
+            setPkgModalName("");
+            setPkgModalPrice("");
+            setPkgModalValidityInMonths("");
+            setPkgModalStartDate(new Date().toISOString().split('T')[0]);
+            setPkgModalEndDate("");
+            setPkgSelectedTreatments([]);
+            setPkgSuccess("");
+          }, 2000);
+        } else {
+          setPkgError(response.data.message || "Failed to create package");
+        }
+      } catch (err: any) {
+        console.error("Error creating package:", err);
+        setPkgError(err.response?.data?.message || "An error occurred while creating the package");
+      } finally {
+        setPkgSubmitting(false);
+      }
+      return;
+    }
    
-    // ALWAYS open payment modal first (both for "Create Package" and "Create & Add to Patient")
+    // If adding to patient, open payment modal first
     setPkgTotalAmount(packagePrice);
     setPkgPaidAmount(packagePrice);
     setPkgPaymentType("Full");
@@ -1027,13 +1085,13 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
        
         // If "Create & Add to Patient" was clicked, immediately create the package and assign to patient
         if (shouldAddToPatient) {
-          _setPkgSubmitting(true);
+          setPkgSubmitting(true);
           
           // Step 1: Create the package via API
           const headers = getAuthHeaders();
           if (!headers) {
             setPkgError("Authentication required");
-            _setPkgSubmitting(false);
+            setPkgSubmitting(false);
             return;
           }
 
@@ -1122,7 +1180,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
          
           setPkgPendingToCreate(null);
           setShowPackagePaymentModal(false);
-          _setPkgSubmitting(false);
+          setPkgSubmitting(false);
           // Reset balance usage state
           setPkgUseAdvanceBalance(false);
           setPkgUseClaimBalance(false);
@@ -1207,7 +1265,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
       } catch (err: any) {
         console.error('Error handling package creation:', err);
         setPkgError(err.response?.data?.message || err.message || "Failed to create package");
-        _setPkgSubmitting(false);
+        setPkgSubmitting(false);
         setPkgPendingToCreate(null);
         setShowPackagePaymentModal(false);
       }
@@ -3881,7 +3939,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                             >
                               <Plus className="w-3 h-3" /> Add Package
                             </button>
-                            {/* <button
+                            <button
                               type="button"
                               onClick={() => {
                                 setShowCreatePackage(true);
@@ -3892,7 +3950,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                               className="px-3 py-1.5 border border-purple-300 bg-white text-purple-700 text-[10px] font-medium rounded-lg hover:bg-purple-50 transition-colors flex items-center gap-1"
                             >
                               <Package className="w-3 h-3" /> Create Package
-                            </button> */}
+                            </button>
                           </div>
                         ) : (
                           <div className="border border-purple-200 rounded-lg p-2 bg-purple-50 mb-2">
@@ -8345,7 +8403,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                   // Completed section: All completed treatments from appointments AND billing
                   // Include appointments with completed status (with or without invoice) and billing completed records
                   const completedFromAppointments = appointmentTreatments.filter((t: any) => 
-                    t.isCompleted || t.treatmentStatus === 'completed-no-invoice'
+                    t.treatmentStatus === 'invoice' || t.treatmentStatus === 'completed-no-invoice'
                   );
                   const completedFromBilling = billingTreatments.filter((t: any) => 
                     t.treatmentStatus === 'completed'
@@ -8357,10 +8415,13 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                     return t.treatmentStatus === 'pending';
                   }).filter(applyAllFilters);
                 } else if (treatmentFilter === 'invoice') {
-                  // Invoice section: Billing invoices + appointments with invoices
-                  const invoicedFromBilling = billingTreatments.map((t: any) => ({ ...t, invoiceSource: 'billing' }));
+                  // Invoice section: Billing invoices + appointments with invoices (exclude ongoing treatments)
+                  const invoicedFromBilling = billingTreatments.filter((t: any) => 
+                    t.treatmentStatus !== 'ongoing' // Exclude ongoing treatments from invoice section
+                  ).map((t: any) => ({ ...t, invoiceSource: 'billing' }));
                   const invoicedFromAppointments = appointmentTreatments.filter((t: any) => 
-                    t.invoiceNumber || t.treatmentStatus === 'invoice' || t.hasInvoice
+                    (t.invoiceNumber || t.treatmentStatus === 'invoice' || t.hasInvoice) &&
+                    t.treatmentStatus !== 'ongoing' // Exclude ongoing treatments from invoice section
                   ).map((t: any) => ({ ...t, invoiceSource: 'appointment' }));
                   filtered = [...invoicedFromBilling, ...invoicedFromAppointments].filter(applyAllFilters);
                 } else if (treatmentFilter === 'cancelled') {
@@ -8406,18 +8467,31 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                           count = 0
                             + appointmentTreatments.filter((t: any) => t.treatmentStatus === 'ongoing').length
                             + billingTreatments.filter((t: any) => t.treatmentStatus === 'pending').length
-                            + billingTreatments.length
-                            + appointmentTreatments.filter((t: any) => t.invoiceNumber || t.treatmentStatus === 'invoice' || t.hasInvoice).length
-                            + (appointmentTreatments.filter((t: any) => t.isCompleted || t.treatmentStatus === 'completed-no-invoice').length + billingTreatments.filter((t: any) => t.treatmentStatus === 'completed').length)
+                            + billingTreatments.filter((t: any) => t.treatmentStatus !== 'ongoing').length  // Exclude ongoing from billing count
+                            + appointmentTreatments.filter((t: any) => 
+                              (t.invoiceNumber || t.treatmentStatus === 'invoice' || t.hasInvoice) &&
+                              t.treatmentStatus !== 'ongoing'  // Exclude ongoing from invoice count
+                            ).length
+                            + (appointmentTreatments.filter((t: any) => 
+                              t.treatmentStatus === 'invoice' || t.treatmentStatus === 'completed-no-invoice'
+                            ).length + billingTreatments.filter((t: any) => t.treatmentStatus === 'completed').length)
                             + appointmentTreatments.filter((t: any) => t.treatmentStatus === 'cancelled').length;
                         } else if (f === 'ongoing') {
                           count = appointmentTreatments.filter((t: any) => t.treatmentStatus === 'ongoing').length;
                         } else if (f === 'pending') {
                           count = billingTreatments.filter((t: any) => t.treatmentStatus === 'pending').length;
                         } else if (f === 'invoice') {
-                          count = billingTreatments.length + appointmentTreatments.filter((t: any) => t.invoiceNumber || t.treatmentStatus === 'invoice' || t.hasInvoice).length;
+                          // Invoice count: Only count treatments with invoices, exclude ongoing treatments
+                          count = billingTreatments.filter((t: any) => t.treatmentStatus !== 'ongoing').length 
+                            + appointmentTreatments.filter((t: any) => 
+                              (t.invoiceNumber || t.treatmentStatus === 'invoice' || t.hasInvoice) &&
+                              t.treatmentStatus !== 'ongoing'
+                            ).length;
                         } else if (f === 'completed') {
-                          count = appointmentTreatments.filter((t: any) => t.isCompleted || t.treatmentStatus === 'completed-no-invoice').length + billingTreatments.filter((t: any) => t.treatmentStatus === 'completed').length;
+                          // Completed count: Appointments with invoice or completed-no-invoice + billing completed
+                          count = appointmentTreatments.filter((t: any) => 
+                            t.treatmentStatus === 'invoice' || t.treatmentStatus === 'completed-no-invoice'
+                          ).length + billingTreatments.filter((t: any) => t.treatmentStatus === 'completed').length;
                         } else if (f === 'cancelled') {
                           count = appointmentTreatments.filter((t: any) => t.treatmentStatus === 'cancelled').length;
                         }
