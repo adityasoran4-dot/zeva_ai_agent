@@ -72,6 +72,10 @@ function OffersPage() {
   const [editingOfferData, setEditingOfferData] = useState(null);
   const [viewingOffer, setViewingOffer] = useState(null);
   const [doctorNamesMap, setDoctorNamesMap] = useState({});
+  const [departmentNamesMap, setDepartmentNamesMap] = useState({});
+  const [serviceNamesMap, setServiceNamesMap] = useState({});
+  const [userNamesMap, setUserNamesMap] = useState({});
+  const [clinicNamesMap, setClinicNamesMap] = useState({});
   const [permissions, setPermissions] = useState({
     canCreate: false,
     canUpdate: false,
@@ -293,6 +297,16 @@ function OffersPage() {
   
   const userRole = getUserRole();
   
+  // Helper to resolve name from ID or Object
+  const resolveName = (item, map, fallback = "—") => {
+    if (!item) return fallback;
+    if (typeof item === 'object') {
+      return item.name || item.title || map[item._id] || map[item.id] || fallback;
+    }
+    // If it's an ID string, only show it if we have a name for it, otherwise show fallback
+    return map[item] || fallback;
+  };
+
   // Admin role bypasses all permission checks
   const finalCanRead = userRole === 'admin' ? true : permissions.canRead;
   const finalCanCreate = userRole === 'admin' ? true : permissions.canCreate;
@@ -378,46 +392,64 @@ function OffersPage() {
     }
   }, [permissionsLoaded, finalCanRead]);
 
-  // Fetch doctor names when viewing an offer
+  // Fetch master data names when viewing an offer
   useEffect(() => {
-    const fetchDoctorNames = async () => {
-      if (!viewingOffer || !viewingOffer.doctorIds || viewingOffer.doctorIds.length === 0) {
-        setDoctorNamesMap({});
-        return;
-      }
+    const fetchMasterData = async () => {
+      if (!viewingOffer) return;
 
-      // Extract doctor IDs (could be strings or objects)
-      const doctorIds = viewingOffer.doctorIds
-        .map(doc => typeof doc === 'object' ? doc._id || doc.id : doc)
-        .filter(id => id);
-
-      if (doctorIds.length === 0) {
-        setDoctorNamesMap({});
-        return;
-      }
+      const authHeaders = getAuthHeaders();
+      if (!authHeaders) return;
 
       try {
-        const authHeaders = getAuthHeaders();
-        // Fetch doctors from the correct API endpoint
-        const res = await axios.get('/api/lead-ms/get-agents?role=doctorStaff', {
-          headers: authHeaders,
-        });
+        // Fetch in parallel
+        const [doctorsRes, deptsRes, servicesRes, clinicsRes, agentsRes] = await Promise.all([
+          axios.get('/api/lead-ms/get-agents?role=doctorStaff', { headers: authHeaders }),
+          axios.get('/api/clinic/departments?module', { headers: authHeaders }),
+          axios.get('/api/clinic/services', { headers: authHeaders }),
+          axios.get('/api/clinics/myallClinic', { headers: authHeaders }),
+          axios.get('/api/lead-ms/get-agents', { headers: authHeaders })
+        ]);
 
-        if (res.data.success) {
-          const doctors = res.data.agents || res.data.data || [];
-          const namesMap = {};
-          doctors.forEach(doctor => {
-            namesMap[doctor._id] = doctor.name || doctor.title || 'Unknown Doctor';
-          });
-          setDoctorNamesMap(namesMap);
+        if (doctorsRes.data.success) {
+          const doctors = doctorsRes.data.agents || doctorsRes.data.data || [];
+          const map = {};
+          doctors.forEach(d => map[d._id] = d.name || d.title || 'Unknown Doctor');
+          setDoctorNamesMap(map);
+        }
+
+        if (deptsRes.data.success) {
+          const depts = deptsRes.data.departments || deptsRes.data.data || [];
+          const map = {};
+          depts.forEach(d => map[d._id] = d.name || d.title || 'Unknown Department');
+          setDepartmentNamesMap(map);
+        }
+
+        if (servicesRes.data.success) {
+          const services = servicesRes.data.services || servicesRes.data.data || [];
+          const map = {};
+          services.forEach(s => map[s._id] = s.name || s.mainTreatment || 'Unknown Service');
+          setServiceNamesMap(map);
+        }
+
+        if (clinicsRes.data.success) {
+          const clinic = clinicsRes.data.clinic || clinicsRes.data.data;
+          if (clinic) {
+            setClinicNamesMap({ [clinic._id]: clinic.name });
+          }
+        }
+
+        if (agentsRes.data.success) {
+          const agents = agentsRes.data.agents || agentsRes.data.data || [];
+          const map = {};
+          agents.forEach(a => map[a._id] = a.name || a.title || 'Unknown User');
+          setUserNamesMap(map);
         }
       } catch (err) {
-        console.error('Error fetching doctor names:', err);
-        setDoctorNamesMap({});
+        console.error('Error fetching master data:', err);
       }
     };
 
-    fetchDoctorNames();
+    fetchMasterData();
   }, [viewingOffer]);
 
   // Fetch clinic currency preference
@@ -1069,25 +1101,19 @@ function OffersPage() {
                     <div>
                       <p className="text-[10px] font-semibold text-teal-700 mb-1.5">Clinic</p>
                       <p className="text-xs text-gray-900 bg-teal-50 px-2 py-2 rounded-lg border border-teal-100 truncate">
-                        {typeof viewingOffer?.clinicId === 'object' && viewingOffer.clinicId?.name 
-                          ? viewingOffer.clinicId.name 
-                          : viewingOffer?.clinicId || "—"}
+                        {resolveName(viewingOffer?.clinicId, clinicNamesMap)}
                       </p>
                     </div>
                     <div>
                       <p className="text-[10px] font-semibold text-teal-700 mb-1.5">Created By</p>
                       <p className="text-xs text-gray-900 bg-teal-50 px-2 py-2 rounded-lg border border-teal-100 truncate">
-                        {typeof viewingOffer?.createdBy === 'object' && viewingOffer.createdBy?.name 
-                          ? viewingOffer.createdBy.name 
-                          : viewingOffer?.createdBy || "—"}
+                        {resolveName(viewingOffer?.createdBy, userNamesMap)}
                       </p>
                     </div>
                     <div>
                       <p className="text-[10px] font-semibold text-teal-700 mb-1.5">Updated By</p>
                       <p className="text-xs text-gray-900 bg-teal-50 px-2 py-2 rounded-lg border border-teal-100 truncate">
-                        {typeof viewingOffer?.updatedBy === 'object' && viewingOffer.updatedBy?.name 
-                          ? viewingOffer.updatedBy.name 
-                          : viewingOffer?.updatedBy || "—"}
+                        {resolveName(viewingOffer?.updatedBy, userNamesMap)}
                       </p>
                     </div>
                     <div>
@@ -1245,68 +1271,6 @@ function OffersPage() {
                       )}
                     </div>
                   </div>
-
-                  {/* APPLICABILITY CONTROL */}
-                  <div className="bg-white rounded-xl border border-teal-200 shadow-sm overflow-hidden">
-                    <div className="bg-teal-50 px-5 py-3 border-b border-teal-200">
-                      <h3 className="text-sm font-bold text-teal-900">Applicability Control</h3>
-                    </div>
-                    <div className="px-5 py-4 space-y-4">
-                      <div>
-                        <p className="text-[10px] font-semibold text-teal-700 mb-1.5">Apply On</p>
-                        <span className="inline-flex items-center px-3 py-2 bg-teal-50 text-teal-800 rounded-lg text-xs border border-teal-200 capitalize font-medium">
-                          {viewingOffer.applyOnAllServices ? "All Services" : 
-                           viewingOffer.departmentIds?.length > 0 ? "Selected Departments" :
-                           viewingOffer.doctorIds?.length > 0 ? "Selected Doctors" :
-                           viewingOffer.serviceIds?.length > 0 ? "Selected Services" : "—"}
-                        </span>
-                      </div>
-                      {viewingOffer.serviceIds?.length > 0 && (
-                        <div>
-                          <p className="text-[10px] font-semibold text-teal-700 mb-1.5">Selected Services</p>
-                          <div className="flex flex-wrap gap-2">
-                            {Array.isArray(viewingOffer.serviceIds) && viewingOffer.serviceIds.map((s, idx) => (
-                              <span key={idx} className="inline-flex items-center px-3 py-2 bg-teal-50 text-teal-800 rounded-lg text-xs border border-teal-200 font-medium">
-                                {typeof s === "object" && s?.name ? s.name : 
-                                 typeof s === "object" && s?.title ? s.title : 
-                                 typeof s === "string" ? s : "—"}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      {viewingOffer.departmentIds?.length > 0 && (
-                        <div>
-                          <p className="text-[10px] font-semibold text-teal-700 mb-1.5">Selected Departments</p>
-                          <div className="flex flex-wrap gap-2">
-                            {Array.isArray(viewingOffer.departmentIds) && viewingOffer.departmentIds.map((d, idx) => (
-                              <span key={idx} className="inline-flex items-center px-3 py-2 bg-teal-50 text-teal-800 rounded-lg text-xs border border-teal-200 font-medium">
-                                {typeof d === "object" && d?.name ? d.name : 
-                                 typeof d === "object" && d?.title ? d.title : 
-                                 typeof d === "string" ? d : "—"}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      {viewingOffer.doctorIds?.length > 0 && (
-                        <div>
-                          <p className="text-[10px] font-semibold text-teal-700 mb-1.5">Selected Doctors</p>
-                          <div className="flex flex-wrap gap-2">
-                            {Array.isArray(viewingOffer.doctorIds) && viewingOffer.doctorIds.map((doc, idx) => {
-                              const doctorId = typeof doc === 'object' ? (doc._id || doc.id) : doc;
-                              const doctorName = doctorNamesMap[doctorId] || (typeof doc === 'object' ? (doc.name || doc.title) : doc);
-                              return (
-                                <span key={idx} className="inline-flex items-center px-3 py-2 bg-teal-50 text-teal-800 rounded-lg text-xs border border-teal-200 font-medium">
-                                  {doctorName || "—"}
-                                </span>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
                 </div>
 
                 {/* RIGHT COLUMN */}
@@ -1317,6 +1281,18 @@ function OffersPage() {
                       <h3 className="text-sm font-bold text-teal-900">Stacking & Control</h3>
                     </div>
                     <div className="px-5 py-4 space-y-4">
+                      <div className="grid grid-cols-1 gap-4">
+                        <div>
+                          <p className="text-[10px] font-semibold text-teal-700 mb-1.5">Auto Apply Best Offer</p>
+                          <span className={`inline-flex items-center px-3 py-1 rounded-lg text-xs font-bold border ${
+                            viewingOffer.autoApplyBestOffer !== false 
+                              ? "bg-green-50 text-green-700 border-green-200" 
+                              : "bg-gray-50 text-gray-700 border-gray-200"
+                          }`}>
+                            {viewingOffer.autoApplyBestOffer !== false ? "ENABLED" : "DISABLED"}
+                          </span>
+                        </div>
+                      </div>
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <p className="text-[10px] font-semibold text-teal-700 mb-1.5">Allow Stacking</p>
@@ -1345,6 +1321,60 @@ function OffersPage() {
                           </span>
                         </div>
                       </div>
+                    </div>
+                  </div>
+
+                  {/* APPLICABILITY CONTROL */}
+                  <div className="bg-white rounded-xl border border-teal-200 shadow-sm overflow-hidden">
+                    <div className="bg-teal-50 px-5 py-3 border-b border-teal-200">
+                      <h3 className="text-sm font-bold text-teal-900">Applicability Control</h3>
+                    </div>
+                    <div className="px-5 py-4 space-y-4">
+                      <div>
+                        <p className="text-[10px] font-semibold text-teal-700 mb-1.5">Apply On</p>
+                        <span className="inline-flex items-center px-3 py-2 bg-teal-50 text-teal-800 rounded-lg text-xs border border-teal-200 capitalize font-medium">
+                          {viewingOffer.applyOnAllServices ? "All Services" : 
+                           viewingOffer.departmentIds?.length > 0 ? "Selected Departments" :
+                           viewingOffer.doctorIds?.length > 0 ? "Selected Doctors" :
+                           viewingOffer.serviceIds?.length > 0 ? "Selected Services" : "—"}
+                        </span>
+                      </div>
+                      {viewingOffer.serviceIds?.length > 0 && (
+                        <div>
+                          <p className="text-[10px] font-semibold text-teal-700 mb-1.5">Selected Services</p>
+                          <div className="flex flex-wrap gap-2">
+                            {Array.isArray(viewingOffer.serviceIds) && viewingOffer.serviceIds.map((s, idx) => (
+                              <span key={idx} className="inline-flex items-center px-3 py-2 bg-teal-50 text-teal-800 rounded-lg text-xs border border-teal-200 font-medium">
+                                {resolveName(s, serviceNamesMap)}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {viewingOffer.departmentIds?.length > 0 && (
+                        <div>
+                          <p className="text-[10px] font-semibold text-teal-700 mb-1.5">Selected Departments</p>
+                          <div className="flex flex-wrap gap-2">
+                            {Array.isArray(viewingOffer.departmentIds) && viewingOffer.departmentIds.map((d, idx) => (
+                              <span key={idx} className="inline-flex items-center px-3 py-2 bg-teal-50 text-teal-800 rounded-lg text-xs border border-teal-200 font-medium">
+                                {resolveName(d, departmentNamesMap)}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {viewingOffer.doctorIds?.length > 0 && (
+                        <div>
+                          <p className="text-[10px] font-semibold text-teal-700 mb-1.5">Selected Doctors</p>
+                          <div className="flex flex-wrap gap-2">
+                            {Array.isArray(viewingOffer.doctorIds) && viewingOffer.doctorIds.map((doc, idx) => (
+                              <span key={idx} className="inline-flex items-center px-3 py-2 bg-teal-50 text-teal-800 rounded-lg text-xs border border-teal-200 font-medium">
+                                {resolveName(doc, doctorNamesMap)}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
 

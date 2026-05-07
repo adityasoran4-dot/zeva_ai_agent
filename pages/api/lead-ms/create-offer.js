@@ -249,12 +249,10 @@ export default async function handler(req, res) {
       //   content: robotsMeta.content,
       //   noindex: robotsMeta.noindex,
       //   nofollow: robotsMeta.nofollow,
-      // }, null, 2));
-      
-      // You can store robotsMeta in the offer if needed, or just log it
-      // For now, we'll just log it
-    } catch (robotsError) {
-      // console.error("❌ Robots meta generation error (non-fatal):", robotsError.message);
+      //   canonical: robotsMeta.canonical,
+      // }));
+    } catch (seoErr) {
+      // console.error(`   ❌ [SEO] Error generating robots meta:`, seoErr.message);
     }
 
     return res.status(201).json({ success: true, offer });
