@@ -56,8 +56,12 @@ export default async function handler(req, res) {
       }
     }
 
-    const match = { patientId };
-    if (clinicId) match.clinicId = clinicId;
+    const match = { 
+      patientId: patientId,
+      clinicId: clinicId,
+      isAdvanceOnly: { $ne: true },
+      treatment: { $nin: ["Advance Payment", "Historical Advance Balance"] }
+    };
 
     // We track advance and pending separately (not net)
     const billings = await Billing.find(match)
@@ -69,6 +73,13 @@ export default async function handler(req, res) {
 
     // Debug logging
     console.log(`[Patient Balance] Found ${billings.length} billing records for patient ${patientId}`);
+    console.log(`[Patient Balance] Query match:`, JSON.stringify(match));
+    
+    // Log all billing records to see their pending amounts
+    if (billings.length > 0) {
+      const pendingAmounts = billings.map(b => ({ invoice: b.invoiceNumber, pending: b.pending, pendingUsed: b.pendingUsed }));
+      console.log(`[Patient Balance] All billing records pending amounts:`, JSON.stringify(pendingAmounts, null, 2));
+    }
     const recordsWithImages = billings.filter(b => b.pendingBalanceImage && b.pendingBalanceImage.length > 0);
     console.log(`[Patient Balance] Records with images: ${recordsWithImages.length}`);
     if (recordsWithImages.length > 0) {

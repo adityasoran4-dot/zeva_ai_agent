@@ -671,6 +671,12 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
     const [payingPendingClaim, setPayingPendingClaim] = useState(false);
     const [pendingClaimPayAmount, setPendingClaimPayAmount] = useState("");
     const [pendingClaimPayMethod, setPendingClaimPayMethod] = useState("Cash");
+    // Invoice-specific payment modal states
+    const [showInvoicePayModal, setShowInvoicePayModal] = useState(false);
+    const [selectedInvoiceForPayment, setSelectedInvoiceForPayment] = useState<any>(null);
+    const [invoicePayAmount, setInvoicePayAmount] = useState("");
+    const [invoicePayMethod, setInvoicePayMethod] = useState("Cash");
+    const [payingInvoicePending, setPayingInvoicePending] = useState(false);
   // Treatment Filter Type - Extended with Invoice and Cancelled sections
   const [treatmentFilter, setTreatmentFilter] = useState<'all' | 'ongoing' | 'completed' | 'pending' | 'invoice' | 'cancelled'>('all');
   
@@ -8287,11 +8293,15 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                     const invoiceNumber = billing.invoiceNumber || billing.invoiceNo || billing._id?.slice(-8).toUpperCase() || '';
                     const billingDate = billing.createdAt ? new Date(billing.createdAt).getTime() : 0;
                    
-                    // Calculate pending amount based on original amount
-                    // const pendingAmount = originalAmount - paid;
-                   
+                    // CRITICAL FIX: Use pending field directly from backend
+                    // The pending field is already calculated by the pre-save hook as: pending = amount - paid
+                    // pendingUsed is for tracking when THIS invoice cleared a PREVIOUS invoice's pending
+                    // It should NOT be subtracted from this invoice's own pending amount
+                    let remainingPending = pending;
+                    
                     // Check if this invoice's pending was cleared by a newer invoice
                     // Look for any newer invoice that has pendingUsed > 0
+                    // If a newer invoice has pendingUsed, it means it paid off this older invoice's pending
                     const hasNewerInvoiceWithPendingUsed = (billingHistory || []).some((otherBilling: any) => {
                       const otherDate = otherBilling.createdAt ? new Date(otherBilling.createdAt).getTime() : 0;
                       const otherPendingUsed = parseFloat(otherBilling.pendingUsed || 0) || 0;
@@ -8299,17 +8309,20 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                       return otherDate > billingDate && otherPendingUsed > 0;
                     });
                    
+                    // If a newer invoice paid this invoice's pending, mark it as cleared
+                    // The newer invoice's pendingUsed field tracks payment of older invoices' pending
+                    if (hasNewerInvoiceWithPendingUsed && remainingPending > 0) {
+                      remainingPending = 0; // This invoice's pending was paid by a newer invoice
+                    }
+                    
                     // Check if pending was cleared separately (pendingUsed > 0 means THIS invoice cleared previous pending)
                     const pendingClearedSeparately = pendingUsed > 0;
                    
-                    // Check if fully paid based on ACTUAL pending field from backend
-                    // If billing.pending = 0, it's completed. If billing.pending > 0, it's pending.
-                    // Use billing.pending field as the authoritative source
-                    const hasPendingAmount = pending > 0;
+                    // Check if fully paid based on remaining pending (after checking for newer invoice payments)
+                    const hasPendingAmount = remainingPending > 0;
                     const isFullyPaid = !hasPendingAmount;
                     
-                    // Status based on ACTUAL pending field from billing model
-                    // If billing.pending > 0 -> pending, otherwise -> completed
+                    // Status based on remaining pending amount
                     const treatmentStatus = hasPendingAmount ? 'pending' : 'completed';
                    
                     // Debug logging for invoice status calculation
@@ -8321,6 +8334,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                       paid,
                       pending,
                       pendingUsed,
+                      remainingPending,
                       billingDate: new Date(billingDate).toLocaleString(),
                       hasNewerInvoiceWithPendingUsed,
                       hasPendingAmount,
@@ -8356,7 +8370,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                       treatmentStatus,
                       amount,
                       paid,
-                      pendingAmount: pending,
+                      pendingAmount: remainingPending, // Use remaining pending after pendingUsed deduction
                       isFullyPaid,
                       invoiceNumber,
                       hasInvoice: true
@@ -8733,6 +8747,23 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                     <div className="flex items-center justify-between text-sm pt-2 border-t border-gray-100">
                                       <span className="text-gray-500">Pending:</span>
                                       <span className="font-bold text-red-600">{getCurrencySymbol(currency)} {pendingAmount.toFixed(2)}</span>
+                                    </div>
+                                  )}
+                                  {/* Pay Button for Pending Treatments */}
+                                  {isPending && hasPendingAmount && (
+                                    <div className="pt-2 border-t border-gray-100">
+                                      <button
+                                        onClick={() => {
+                                          setSelectedInvoiceForPayment(item);
+                                          setInvoicePayAmount(pendingAmount.toFixed(2));
+                                          setInvoicePayMethod("Cash");
+                                          setShowInvoicePayModal(true);
+                                        }}
+                                        className="w-full px-3 py-2 bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white text-xs font-bold rounded-lg transition-all shadow-sm flex items-center justify-center gap-1.5"
+                                      >
+                                        <DollarSign className="w-3.5 h-3.5" />
+                                        Pay Pending
+                                      </button>
                                     </div>
                                   )}
                                 </div>
@@ -9785,6 +9816,162 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                   className="w-full py-2.5 bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white font-bold rounded-lg transition-all"
                 >
                   {payingPendingClaim ? "Processing..." : "Confirm Payment"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Pay Invoice Pending Modal */}
+        {showInvoicePayModal && selectedInvoiceForPayment && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+            <div 
+              className="absolute inset-0 bg-gray-900/60 backdrop-blur-md" 
+              onClick={() => { 
+                if (!payingInvoicePending) { 
+                  setShowInvoicePayModal(false); 
+                  setSelectedInvoiceForPayment(null); 
+                  setInvoicePayAmount(""); 
+                  setInvoicePayMethod("Cash"); 
+                }
+              }} 
+            />
+            <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full">
+              {/* Header */}
+              <div className="bg-gradient-to-r from-red-600 to-orange-600 px-6 py-4 flex items-center justify-between rounded-t-2xl">
+                <div>
+                  <h3 className="text-lg font-bold text-white">Pay Invoice Pending</h3>
+                  <p className="text-red-100 text-xs mt-0.5">Invoice: {selectedInvoiceForPayment.invoiceNumber}</p>
+                </div>
+                <button 
+                  onClick={() => { 
+                    setShowInvoicePayModal(false); 
+                    setSelectedInvoiceForPayment(null); 
+                    setInvoicePayAmount(""); 
+                    setInvoicePayMethod("Cash"); 
+                  }} 
+                  className="text-white/80 hover:text-white"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-6 space-y-4">
+                {/* Invoice Info */}
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-xs text-amber-700 font-semibold">Treatment:</span>
+                    <span className="text-sm font-bold text-amber-900">{selectedInvoiceForPayment.treatmentName}</span>
+                  </div>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-xs text-amber-700 font-semibold">Total Amount:</span>
+                    <span className="text-sm font-bold text-amber-900">{getCurrencySymbol(currency)} {selectedInvoiceForPayment.amount.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-xs text-amber-700 font-semibold">Paid:</span>
+                    <span className="text-sm font-bold text-green-700">{getCurrencySymbol(currency)} {(selectedInvoiceForPayment.paid || 0).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between items-center pt-2 border-t border-amber-200">
+                    <span className="text-xs text-red-700 font-bold">Pending:</span>
+                    <span className="text-lg font-bold text-red-700">{getCurrencySymbol(currency)} {(selectedInvoiceForPayment.pendingAmount || 0).toFixed(2)}</span>
+                  </div>
+                </div>
+
+                {/* Quick Select */}
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => setInvoicePayAmount(((selectedInvoiceForPayment.pendingAmount || 0) / 2).toFixed(2))} 
+                    className="flex-1 py-1.5 text-xs font-semibold border border-red-300 text-red-700 rounded-lg hover:bg-red-50"
+                  >
+                    Half
+                  </button>
+                  <button 
+                    onClick={() => setInvoicePayAmount((selectedInvoiceForPayment.pendingAmount || 0).toFixed(2))} 
+                    className="flex-1 py-1.5 text-xs font-semibold bg-red-100 border border-red-300 text-red-700 rounded-lg hover:bg-red-200"
+                  >
+                    Full Amount
+                  </button>
+                </div>
+
+                {/* Amount */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Amount to Pay</label>
+                  <input
+                    type="number"
+                    value={invoicePayAmount}
+                    onChange={(e) => setInvoicePayAmount(e.target.value)}
+                    placeholder={`Max: ${(selectedInvoiceForPayment.pendingAmount || 0).toFixed(2)}`}
+                    min="0"
+                    max={selectedInvoiceForPayment.pendingAmount || 0}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                  />
+                </div>
+
+                {/* Payment Method */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Payment Method</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {["Cash", "Card", "BT"].map((m) => (
+                      <button 
+                        key={m} 
+                        onClick={() => setInvoicePayMethod(m)} 
+                        className={`py-1.5 text-xs font-semibold rounded-lg border transition-all ${ 
+                          invoicePayMethod === m 
+                            ? "bg-red-600 text-white border-red-600" 
+                            : "bg-white text-gray-600 border-gray-300 hover:border-red-400" 
+                        }`}
+                      >
+                        {m}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Submit */}
+                <button
+                  disabled={payingInvoicePending || !invoicePayAmount || Number(invoicePayAmount) <= 0 || Number(invoicePayAmount) > (selectedInvoiceForPayment.pendingAmount || 0)}
+                  onClick={async () => {
+                    const payAmt = Number(invoicePayAmount);
+                    const maxPending = selectedInvoiceForPayment.pendingAmount || 0;
+                    if (!payAmt || payAmt <= 0 || payAmt > maxPending) return;
+                    
+                    setPayingInvoicePending(true);
+                    try {
+                      const headers = getAuthHeaders();
+                      const res = await axios.post(
+                        `/api/clinic/billing/pay-invoice-pending/${selectedInvoiceForPayment.data._id}`,
+                        {
+                          amount: payAmt,
+                          paymentMethod: invoicePayMethod,
+                          notes: `Payment towards pending balance for invoice ${selectedInvoiceForPayment.invoiceNumber}`,
+                        },
+                        { headers }
+                      );
+                      
+                      if (res.data.success) {
+                        setShowInvoicePayModal(false);
+                        setSelectedInvoiceForPayment(null);
+                        setInvoicePayAmount("");
+                        setInvoicePayMethod("Cash");
+                        
+                        // Refresh balance and billing history
+                        const updatedBalance = await fetchPatientBalance(patientData._id);
+                        if (updatedBalance) setBalance(updatedBalance as typeof balance);
+                        await fetchBillingHistory();
+                        
+                        alert("Payment recorded successfully!");
+                      } else {
+                        alert(res.data.message || "Payment failed");
+                      }
+                    } catch (err: any) {
+                      console.error("Error paying invoice pending:", err);
+                      alert(err.response?.data?.message || "Payment failed");
+                    } finally {
+                      setPayingInvoicePending(false);
+                    }
+                  }}
+                  className="w-full py-2.5 bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 disabled:opacity-50 text-white font-bold rounded-lg transition-all"
+                >
+                  {payingInvoicePending ? "Processing..." : "Confirm Payment"}
                 </button>
               </div>
             </div>

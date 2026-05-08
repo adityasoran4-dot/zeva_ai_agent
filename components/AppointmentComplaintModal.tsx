@@ -315,6 +315,11 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
   const [bookingNextSession, setBookingNextSession] = useState(false);
   const [nextSessionBooked, setNextSessionBooked] = useState(false);
   const [nextSessionError, setNextSessionError] = useState<string>("");
+  // Rooms state
+  interface Room { _id: string; name: string; }
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [nextSessionRoom, setNextSessionRoom] = useState<string>("");
+  const [loadingRooms, setLoadingRooms] = useState(false);
 
   // Upcoming appointments state
   interface UpcomingAppointment { _id: string; startDate: string; fromTime: string; toTime: string; status: string; followType: string; }
@@ -617,10 +622,8 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
       setNextSessionTime("09:00");
       setNextSessionBooked(false);
       setNextSessionError("");
-      setNextSessionDate(new Date().toISOString().slice(0, 10));
-      setNextSessionTime("09:00");
-      setNextSessionBooked(false);
-      setNextSessionError("");
+      setRooms([]);
+      setNextSessionRoom("");
       setUpcomingAppointments([]);
       setLoadingUpcoming(false);
       setConsentStatus(null);
@@ -735,6 +738,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
       }
     };
     fetchConsentForms();
+    fetchRooms();
 
     const fetchDetails = async () => {
       setLoading(true);
@@ -1024,7 +1028,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
       const toDate = new Date(0, 0, 0, hh, mm + 30);
       const toTime = `${String(toDate.getHours()).padStart(2, "0")}:${String(toDate.getMinutes()).padStart(2, "0")}`;
 
-      await axios.post("/api/clinic/appointments", {
+      const appointmentData: any = {
         patientId: details.patientId,
         doctorId: details.doctorId,
         startDate: nextSessionDate,
@@ -1035,7 +1039,14 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
         bookedFrom: "doctor",
         referral: "direct",
         emergency: "no",
-      }, { headers });
+      };
+
+      // Add roomId if selected
+      if (nextSessionRoom) {
+        appointmentData.roomId = nextSessionRoom;
+      }
+
+      await axios.post("/api/clinic/appointments", appointmentData, { headers });
       setNextSessionBooked(true);
       // Refresh upcoming list
       if (details?.patientId) fetchUpcomingAppointments(details.patientId);
@@ -1078,6 +1089,22 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
       // silently ignore
     } finally {
       setLoadingServices(false);
+    }
+  };
+
+  // Fetch all clinic rooms
+  const fetchRooms = async () => {
+    setLoadingRooms(true);
+    try {
+      const headers = getAuthHeaders();
+      const res = await axios.get("/api/clinic/rooms", { headers });
+      if (res.data?.success) {
+        setRooms(res.data.rooms || []);
+      }
+    } catch {
+      // silently ignore
+    } finally {
+      setLoadingRooms(false);
     }
   };
 
@@ -3421,6 +3448,23 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
                                 const h12 = h % 12 || 12;
                                 return <option key={t} value={t}>{`${h12}:${String(m).padStart(2, "0")} ${ampm}`}</option>;
                               })}
+                            </select>
+                          </div>
+                          <div className="col-span-2">
+                            <label className="block text-xs text-gray-500 mb-1.5">Select Room</label>
+                            <select
+                              value={nextSessionRoom}
+                              onChange={(e) => { setNextSessionRoom(e.target.value); setNextSessionBooked(false); setNextSessionError(""); }}
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
+                            >
+                              <option value="">Select a room...</option>
+                              {loadingRooms ? (
+                                <option disabled>Loading rooms...</option>
+                              ) : (
+                                rooms.map((room) => (
+                                  <option key={room._id} value={room._id}>{room.name}</option>
+                                ))
+                              )}
                             </select>
                           </div>
                         </div>
