@@ -2,8 +2,10 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import dbConnect from '../../../lib/database';
 import Service from '../../../models/Service';
 import Appointment from '../../../models/Appointment';
+import Clinic from '../../../models/Clinic';
 import { getUserFromReq } from '../lead-ms/auth.js';
 import { getClinicIdFromUser } from '../lead-ms/permissions-helper.js';
+import { isNewClinicInMockPeriod, generateMockServicePerformance } from '../../../lib/mockDataGenerator';
 
 export default async function handler(
   req: NextApiRequest,
@@ -37,6 +39,32 @@ export default async function handler(
     }
 
     console.log('🏥 Using clinicId:', clinicId);
+
+    // Get clinic to check registeredAt
+    let clinic = null;
+    if (authUser.role === 'clinic') {
+      clinic = await Clinic.findOne({ owner: authUser._id });
+    } else if (clinicId) {
+      clinic = await Clinic.findById(clinicId);
+    }
+
+    // Check if clinic is within 2-day mock data period
+    if (clinic && isNewClinicInMockPeriod(clinic.registeredAt)) {
+      // Check if they have any real appointment data
+      const appointmentCount = await Appointment.countDocuments({ clinicId });
+      
+      if (appointmentCount === 0) {
+        console.log('📊 Returning mock service performance for new clinic:', clinic._id);
+        const mockData = generateMockServicePerformance();
+        
+        return res.status(200).json({
+          success: true,
+          data: mockData,
+          isMockData: true,
+          message: 'Showing sample service performance data for new clinic!',
+        });
+      }
+    }
 
     // Get date filter params from query
     const { startDate, endDate, date } = req.query;

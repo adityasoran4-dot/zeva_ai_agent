@@ -30,27 +30,96 @@ export const SuccessPopup: React.FC<SuccessPopupProps> = ({ isOpen, onClose: _on
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[99999] p-4" style={{ zIndex: 99999 }}>
-      <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl">
-        <div className="text-center">
-          <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3" style={{ backgroundColor: '#00b480' }}>
-            <span className="text-2xl text-white">🎉</span>
+    <div
+      className="fixed inset-0 flex items-center justify-center z-[99999] p-4"
+      style={{
+        zIndex: 99999,
+        backgroundColor: 'rgba(30, 58, 138, 0.7)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
+      }}
+    >
+      <div
+        className="relative bg-white rounded-3xl max-w-md w-full shadow-2xl overflow-hidden"
+        style={{ animation: 'popupIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)' }}
+      >
+        {/* Top gradient banner */}
+        <div className="h-2 w-full" style={{ background: 'linear-gradient(to right, #00b480, #008f66, #3b82f6)' }} />
+
+        <div className="px-8 py-8 text-center">
+          {/* Animated checkmark circle */}
+          <div className="relative mx-auto mb-5 w-20 h-20">
+            <div
+              className="absolute inset-0 rounded-full opacity-20"
+              style={{ backgroundColor: '#00b480', animation: 'ping 1.5s ease-out infinite' }}
+            />
+            <div
+              className="relative w-20 h-20 rounded-full flex items-center justify-center shadow-lg"
+              style={{ background: 'linear-gradient(135deg, #00b480, #008f66)' }}
+            >
+              <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
           </div>
-          <h3 className="text-xl font-bold text-gray-900 mb-2">
+
+          {/* Title */}
+          <h3 className="text-2xl font-extrabold text-gray-900 mb-2 tracking-tight">
             Registration Complete!
           </h3>
-          {/* <p className="text-sm text-gray-600 mb-5">
-            Your clinic profile is under review. We'll notify you once approved.
-          </p> */}
-          {/* <button
-            onClick={handleRedirect}
-            className="text-white font-semibold py-2.5 px-6 rounded-xl transition-all duration-300 hover:opacity-90 text-sm"
-            style={{ background: `linear-gradient(to right, #00b480, #008f66)` }}
-          >
-            Go to Home Page
-          </button> */}
+          <p className="text-gray-500 text-sm mb-6 leading-relaxed">
+            Welcome to <span className="font-semibold text-[#00b480]">ZEVA</span>! Your clinic has been successfully registered.
+            <br />Redirecting you to the dashboard...
+          </p>
+
+          {/* Info cards */}
+          <div className="grid grid-cols-3 gap-3 mb-6">
+            <div className="bg-green-50 border border-green-100 rounded-2xl p-3">
+              <div className="text-2xl mb-1">🏥</div>
+              <p className="text-xs font-semibold text-green-800">Clinic Active</p>
+            </div>
+            <div className="bg-blue-50 border border-blue-100 rounded-2xl p-3">
+              <div className="text-2xl mb-1">⏱️</div>
+              <p className="text-xs font-semibold text-blue-800">30-Day Trial</p>
+            </div>
+            <div className="bg-purple-50 border border-purple-100 rounded-2xl p-3">
+              <div className="text-2xl mb-1">📊</div>
+              <p className="text-xs font-semibold text-purple-800">Dashboard Ready</p>
+            </div>
+          </div>
+
+          {/* Progress bar */}
+          <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+            <div
+              className="h-1.5 rounded-full"
+              style={{
+                background: 'linear-gradient(to right, #00b480, #3b82f6)',
+                animation: 'progressBar 2s ease-in-out forwards',
+              }}
+            />
+          </div>
+          <p className="text-xs text-gray-400 mt-2">Loading your dashboard...</p>
         </div>
+
+        {/* Bottom blue accent */}
+        <div className="h-1 w-full" style={{ background: 'linear-gradient(to right, #3b82f6, #6366f1)' }} />
       </div>
+
+      <style jsx>{`
+        @keyframes popupIn {
+          from { opacity: 0; transform: scale(0.7) translateY(30px); }
+          to   { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        @keyframes ping {
+          0%   { transform: scale(1); opacity: 0.2; }
+          80%  { transform: scale(2); opacity: 0; }
+          100% { transform: scale(2); opacity: 0; }
+        }
+        @keyframes progressBar {
+          from { width: 0%; }
+          to   { width: 100%; }
+        }
+      `}</style>
     </div>
   );
 };
@@ -506,7 +575,12 @@ const RegisterClinic = (): React.ReactNode => {
     } catch (err: any) {
       const errorMessage =
         err?.response?.data?.message || "Unknown error occurred while registering owner.";
-      showToastMessage(`Owner registration failed: ${errorMessage}`, "error");
+      if (err?.response?.status === 409) {
+        showToastMessage("This email is already registered. Please use a different email or login.", "error");
+        setErrors((prev) => ({ ...prev, email: "This email is already registered" }));
+      } else {
+        showToastMessage(`Registration failed: ${errorMessage}`, "error");
+      }
       console.error("Owner registration error:", err);
       return;
     }
@@ -557,6 +631,25 @@ const RegisterClinic = (): React.ReactNode => {
           
           // Show success message
           setShowSuccessPopup(true);
+          
+          // Reset form fields
+          setForm({
+            email: "",
+            name: "",
+            address: "",
+            pricing: "",
+            timings: "",
+            latitude: 0,
+            longitude: 0,
+          });
+          setContactInfo({
+            name: "",
+            phone: "",
+            website: "",
+          });
+          setOwnerPassword("");
+          setErrors({});
+          setSlugPreview(null);
           
           // Optionally redirect to dashboard after a short delay
           setTimeout(() => {

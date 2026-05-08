@@ -22,6 +22,11 @@ export default function DemoQuickPopup() {
       setOpen(true);
       setModal(false);
     }
+    // Auto-detect region from URL
+    if (router.pathname.includes('india')) {
+      setOpen(true);
+      setModal(false);
+    }
     const handler = () => {
       setOpen(true);
       setModal(true);
@@ -45,7 +50,7 @@ export default function DemoQuickPopup() {
 
   const validatePhone = (digits: string) => {
     if (!digits) return "Phone number is required.";
-    if (!/^\d{7,15}$/.test(digits)) return "Enter 7–15 digit number.";
+    if (!/^\d{7,12}$/.test(digits)) return "Enter 7–12 digit number.";
     return null;
   };
 
@@ -82,6 +87,10 @@ export default function DemoQuickPopup() {
       });
       if (data.success) {
         setSuccess(true);
+        // Determine region based on current path
+        const isIndia = router.pathname.includes('india');
+        const region = isIndia ? 'india' : 'uae';
+        
         setTimeout(() => {
           setOpen(false);
           setSuccess(false);
@@ -89,7 +98,9 @@ export default function DemoQuickPopup() {
           setEmail("");
           setPhone("");
           setClinicName("");
-        }, 3000);
+          // Redirect to thank you page
+          router.push(`/demo-thank-you?region=${region}`);
+        }, 1500);
       } else {
         setError(data.message || "Failed to submit request.");
       }
@@ -113,10 +124,10 @@ export default function DemoQuickPopup() {
           aria-hidden="true"
         />
         <div className="relative w-[560px] max-w-[92vw] rounded-2xl overflow-hidden shadow-2xl border border-gray-200 bg-white">
-          <div className="bg-[#0A1F44] text-white px-5 py-4">
+          <div className="bg-blue-500 text-white px-5 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-[#D4AF37]" />
+                <span className="w-2.5 h-2.5 rounded-full bg-white" />
                 <div className="font-bold">Book Your Demo</div>
               </div>
               <button
@@ -127,17 +138,14 @@ export default function DemoQuickPopup() {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="mt-1 text-[13px] text-blue-200">
-              See Zeva in action. Schedule your personalized demo today.
             </div>
-          </div>
           <div className="px-6 py-5">
             {success ? (
               <div className="py-10 text-center">
                 <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 mb-4">
                   <CheckCircle2 className="w-8 h-8" />
                 </div>
-                <h3 className="text-xl font-bold text-[#0A1F44] mb-2">
+                <h3 className="text-xl font-bold text-white mb-2">
                   Request Received!
                 </h3>
                 <p className="text-gray-600">
@@ -192,7 +200,7 @@ export default function DemoQuickPopup() {
                       </label>
                       <input
                         type="tel"
-                        placeholder="+971 XX XXX XXXX"
+                        placeholder="+91 XX XXX XXXX"
                         className={`w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#D4AF37] border-gray-300 dark:bg-white dark:text-gray-900 dark:border-gray-300 placeholder-gray-400 dark:placeholder-gray-400 ${phoneError ? "border-red-400 focus:ring-red-400" : ""}`}
                         inputMode="numeric"
                         pattern="[0-9]*"
@@ -230,7 +238,7 @@ export default function DemoQuickPopup() {
                   <button
                     type="submit"
                     disabled={loading || !!nameError || !!phoneError}
-                    className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[#D4AF37] to-[#F0D98C] text-[#0A1F44] font-semibold px-4 py-2 disabled:opacity-50 transition-all"
+                    className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-blue-500 text-white font-semibold px-4 py-2 disabled:opacity-50 transition-all"
                   >
                     {loading ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -255,10 +263,10 @@ export default function DemoQuickPopup() {
   return (
     <div className="fixed bottom-6 right-6 z-50 w-[360px] max-w-[90vw]">
       <div className="rounded-2xl overflow-hidden shadow-2xl border border-gray-200 bg-white">
-        <div className="bg-[#0A1F44] text-white px-5 py-4">
+        <div className="bg-blue-500 text-white px-5 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#D4AF37]" />
+              <span className="w-2.5 h-2.5 rounded-full bg-white" />
               <div className="font-bold">Book Your Demo</div>
             </div>
             <button
@@ -268,9 +276,6 @@ export default function DemoQuickPopup() {
             >
               <X className="w-5 h-5" />
             </button>
-          </div>
-          <div className="mt-1 text-[13px] text-blue-200">
-            See Zeva in action. Schedule your personalized demo today.
           </div>
         </div>
         <div className="px-5 py-4">
@@ -328,7 +333,7 @@ export default function DemoQuickPopup() {
                     </label>
                     <input
                       type="tel"
-                      placeholder="+971 XX XXX XXXX"
+                      placeholder="+91 XX XXX XXXX"
                       className={`w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#D4AF37] border-gray-300 dark:bg-white dark:text-gray-900 dark:border-gray-300 placeholder-gray-400 dark:placeholder-gray-400 ${phoneError ? "border-red-400 focus:ring-red-400" : ""}`}
                       inputMode="numeric"
                       pattern="[0-9]*"
@@ -366,7 +371,7 @@ export default function DemoQuickPopup() {
                 <button
                   type="submit"
                   disabled={loading || !!nameError || !!phoneError}
-                  className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[#D4AF37] to-[#F0D98C] text-[#0A1F44] font-semibold px-4 py-2 disabled:opacity-50 transition-all"
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-blue-500 text-white font-semibold px-4 py-2 disabled:opacity-50 transition-all"
                 >
                   {loading ? (
                     <Loader2 className="w-4 h-4 animate-spin" />

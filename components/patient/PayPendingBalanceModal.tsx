@@ -7,7 +7,8 @@ import {
   DollarSign,
   Landmark,
   Zap,
-
+  
+  Wallet,
  
 } from "lucide-react";
 import axios from "axios";
@@ -79,14 +80,22 @@ const PayPendingBalanceModal: React.FC<PayPendingBalanceModalProps> = ({
   const [notes, setNotes] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [payType, setPayType] = useState<"partial" | "full" | null>(null);
+  const [payType, setPayType] = useState<"partial" | "full" | "custom" | null>(null);
   const [clinicCurrency, setClinicCurrency] = useState<string>("INR");
+  const [enteredAmount, setEnteredAmount] = useState<string>("");
+  const [useAdvanceBalance, setUseAdvanceBalance] = useState<boolean>(false);
+  const [advanceBalance, setAdvanceBalance] = useState<number>(0);
+  const [advanceUsed, setAdvanceUsed] = useState<number>(0);
 
   useEffect(() => {
     if (isOpen) {
       setAmount("");
       setPayType(null);
+      setEnteredAmount("");
+      setUseAdvanceBalance(false);
+      setAdvanceUsed(0);
       fetchClinicCurrency();
+      fetchPatientBalance();
     }
   }, [isOpen]);
 
@@ -105,12 +114,43 @@ const PayPendingBalanceModal: React.FC<PayPendingBalanceModalProps> = ({
     }
   };
 
+  const fetchPatientBalance = async () => {
+    try {
+      const token = getTokenByPath();
+      if (!token || !patientId) return;
+      const res = await axios.get(`/api/clinic/patient-balance/${patientId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.data.success && res.data.balances) {
+        const advanceBal = Number(res.data.balances.advanceBalance || 0);
+        setAdvanceBalance(advanceBal);
+      }
+    } catch (e) {
+      console.error('Error fetching patient balance:', e);
+    }
+  };
+
   const handlePayTypeSelect = (type: "partial" | "full") => {
     setPayType(type);
     if (type === "partial") {
-      setAmount((pendingBalance / 2).toFixed(2));
+      const halfAmount = (pendingBalance / 2).toFixed(2);
+      setEnteredAmount(halfAmount);
+      calculateAmountToPay(Number(halfAmount), useAdvanceBalance);
     } else {
-      setAmount(pendingBalance.toFixed(2));
+      setEnteredAmount(pendingBalance.toFixed(2));
+      calculateAmountToPay(pendingBalance, useAdvanceBalance);
+    }
+  };
+
+  const calculateAmountToPay = (enteredAmt: number, useAdvance: boolean) => {
+    if (useAdvance && advanceBalance > 0) {
+      const advanceToUse = Math.min(advanceBalance, enteredAmt);
+      setAdvanceUsed(advanceToUse);
+      const calculatedAmount = Math.max(0, enteredAmt - advanceToUse);
+      setAmount(calculatedAmount.toFixed(2));
+    } else {
+      setAdvanceUsed(0);
+      setAmount(enteredAmt.toFixed(2));
     }
   };
 
@@ -247,9 +287,73 @@ const PayPendingBalanceModal: React.FC<PayPendingBalanceModalProps> = ({
             </div>
           </div>
 
+          {/* Enter Amount Input */}
+          {payType && (
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 text-xs sm:text-sm font-bold text-gray-700">
+                Enter Amount
+              </label>
+              <div className="relative group">
+                <div className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-500 transition-colors">
+                  <span className="text-base sm:text-lg font-bold">{getCurrencySymbol(clinicCurrency)}</span>
+                </div>
+                <input
+                  type="number"
+                  value={enteredAmount}
+                  onChange={(e) => {
+                    const entered = Number(e.target.value);
+                    setEnteredAmount(e.target.value);
+                    setPayType("custom");
+                    calculateAmountToPay(entered, useAdvanceBalance);
+                  }}
+                  placeholder="0.00"
+                  step="0.01"
+                  min="0.01"
+                  max={pendingBalance}
+                  className="w-full pl-12 sm:pl-16 pr-4 py-3 sm:py-4 bg-gray-50 border border-gray-200 rounded-xl sm:rounded-2xl focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none transition-all text-lg sm:text-xl font-bold text-gray-700 placeholder:text-gray-300"
+                  required
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Advance Balance Option */}
+          {advanceBalance > 0 && payType && (
+            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
+              <label className="flex items-center justify-between cursor-pointer">
+                <div className="flex items-center gap-3">
+                  <Wallet className="w-5 h-5 text-emerald-600" />
+                  <div>
+                    <div className="text-xs font-bold text-emerald-800">Use Advance Balance</div>
+                    <div className="text-[10px] text-emerald-600">Available: {formatCurrency(advanceBalance)}</div>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={useAdvanceBalance}
+                  onChange={(e) => {
+                    setUseAdvanceBalance(e.target.checked);
+                    const entered = Number(enteredAmount);
+                    if (entered > 0) {
+                      calculateAmountToPay(entered, e.target.checked);
+                    }
+                  }}
+                  className="w-5 h-5 text-emerald-600 rounded focus:ring-emerald-500 border-gray-300"
+                />
+              </label>
+              {useAdvanceBalance && advanceUsed > 0 && (
+                <div className="mt-2 pt-2 border-t border-emerald-200">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-emerald-700 font-semibold">Advance Applied:</span>
+                    <span className="text-emerald-800 font-bold">-{formatCurrency(advanceUsed)}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="space-y-2">
             <label className="flex items-center gap-2 text-xs sm:text-sm font-bold text-gray-700">
-              {/* <DollarSign className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500" /> */}
               Amount to Pay
             </label>
             <div className="relative group">
@@ -261,7 +365,7 @@ const PayPendingBalanceModal: React.FC<PayPendingBalanceModalProps> = ({
                 value={amount}
                 onChange={(e) => {
                   setAmount(e.target.value);
-                  setPayType(null);
+                  setPayType("custom");
                 }}
                 placeholder="0.00"
                 step="0.01"
@@ -269,8 +373,14 @@ const PayPendingBalanceModal: React.FC<PayPendingBalanceModalProps> = ({
                 max={pendingBalance}
                 className="w-full pl-12 sm:pl-16 pr-4 py-3 sm:py-4 bg-gray-50 border border-gray-200 rounded-xl sm:rounded-2xl focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none transition-all text-lg sm:text-xl font-bold text-gray-700 placeholder:text-gray-300"
                 required
+                readOnly
               />
             </div>
+            {payType === "partial" && (
+              <div className="text-[10px] text-gray-500 mt-1">
+                Partial payment (50% = {formatCurrency(pendingBalance / 2)}){useAdvanceBalance && advanceUsed > 0 ? ` - Advance: {formatCurrency(advanceUsed)}` : ''}
+              </div>
+            )}
           </div>
 
           <div className="space-y-3">

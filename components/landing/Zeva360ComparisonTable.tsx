@@ -95,9 +95,9 @@ const Zeva360ComparisonTable: React.FC = () => {
             <p className="text-sm text-gray-700 mb-4">
               <span className="font-semibold text-blue-700">Zeva360</span> gives you everything you need to grow your clinic
             </p>
-            <button className="inline-flex items-center px-6 py-2.5 bg-blue-700 hover:bg-blue-800 text-white rounded-lg font-semibold text-sm transition-all">
+            {/* <button className="inline-flex items-center px-6 py-2.5 bg-blue-700 hover:bg-blue-800 text-white rounded-lg font-semibold text-sm transition-all">
               See All Features
-            </button>
+            </button> */}
           </div>
         </div>
       </div>

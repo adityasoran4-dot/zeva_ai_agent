@@ -2,6 +2,7 @@ import dbConnect from "../../../lib/database";
 import UserPackage from "../../../models/UserPackage";
 import PatientRegistration from "../../../models/PatientRegistration";
 import { getAuthorizedStaffUser } from "../../../server/staff/authHelpers";
+import { getClinicIdFromUser } from "../lead-ms/permissions-helper";
 
 export default async function handler(req, res) {
   await dbConnect();
@@ -22,24 +23,33 @@ export default async function handler(req, res) {
   if (method === 'GET') {
     try {
       const { status, search } = req.query;
-      const clinicId = user.clinicId;
+      
+      // Get clinicId using the helper function that handles all user roles correctly
+      const { clinicId, error: clinicError } = await getClinicIdFromUser(user);
+      
+      if (clinicError || !clinicId) {
+        return res.status(403).json({ 
+          success: false,
+          message: clinicError || "Unable to determine clinic access" 
+        });
+      }
 
-      console.log('Fetching packages for clinicId:', clinicId);
+      console.log('=== USER PACKAGES DEBUG ===');
+      console.log('User ID:', user._id);
+      console.log('User role:', user.role);
+      console.log('Resolved clinicId:', clinicId);
       console.log('Status filter:', status);
       console.log('Search query:', search);
 
-      // TEMPORARY DEBUG MODE: Comment out clinicId filter to see ALL packages
-      // Uncomment the next line for production: let query = { clinicId };
-      let query = {}; // TEMPORARY - remove clinicId filter for debugging
-      
-      console.log('⚠️ WARNING: Currently fetching packages from ALL clinics for debugging!');
+      // Filter by clinicId to ensure data isolation
+      let query = { clinicId };
 
       // Only apply status filter if it's provided and valid
       if (status && ['pending', 'approved', 'rejected'].includes(status)) {
         query.approvalStatus = status;
       }
 
-      console.log('Query:', JSON.stringify(query));
+      console.log('MongoDB Query:', JSON.stringify(query));
 
       const packages = await UserPackage.find(query)
         .populate({
@@ -50,7 +60,11 @@ export default async function handler(req, res) {
         .sort({ createdAt: -1 })
         .lean();
 
-      console.log('Found packages:', packages.length);
+      console.log('Found packages count:', packages.length);
+      if (packages.length > 0) {
+        console.log('First package clinicId:', packages[0]?.clinicId?.toString());
+        console.log('First package approvalStatus:', packages[0]?.approvalStatus);
+      }
 
       let filteredPackages = packages;
       if (search) {
@@ -74,7 +88,16 @@ export default async function handler(req, res) {
     try {
       const { packageId } = req.query;
       const { action } = req.body;
-      const clinicId = user.clinicId;
+      
+      // Get clinicId using the helper function
+      const { clinicId, error: clinicError } = await getClinicIdFromUser(user);
+      
+      if (clinicError || !clinicId) {
+        return res.status(403).json({ 
+          success: false,
+          message: clinicError || "Unable to determine clinic access" 
+        });
+      }
 
       if (!packageId) {
         return res.status(400).json({ success: false, message: "Package ID is required" });

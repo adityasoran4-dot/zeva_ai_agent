@@ -2082,11 +2082,11 @@ export default function Home() {
                                                                         setPhotoIndexByClinic(prev => ({ ...prev, [clinic._id]: prevIndex }));
                                                                     }
                                                                 }}
-                                                                className="absolute left-3 top-1/2 -translate-y-1/2 bg-white/80 backdrop-blur-sm text-[#1e293b] hover:bg-white text-xs rounded-full p-2 shadow-md z-20"
+                                                                className="absolute left-3 top-1/2 -translate-y-1/2 bg-white/90 backdrop-blur-sm text-[#0f172a] hover:bg-white hover:text-[#0284c7] rounded-full w-9 h-9 flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200 z-20 border border-white/50"
                                                                 aria-label="Previous photo"
                                                                 title="Previous photo"
                                                             >
-                                                                <ChevronLeft className="w-4 h-4" />
+                                                                <ChevronLeft className="w-5 h-5" strokeWidth={2.5} />
                                                             </button>
                                                             <button
                                                                 type="button"
@@ -2098,11 +2098,11 @@ export default function Home() {
                                                                         setPhotoIndexByClinic(prev => ({ ...prev, [clinic._id]: nextIndex }));
                                                                     }
                                                                 }}
-                                                                className="absolute right-3 top-1/2 -translate-y-1/2 bg-white/80 backdrop-blur-sm text-[#1e293b] hover:bg-white text-xs rounded-full p-2 shadow-md z-20"
+                                                                className="absolute right-3 top-1/2 -translate-y-1/2 bg-white/90 backdrop-blur-sm text-[#0f172a] hover:bg-white hover:text-[#0284c7] rounded-full w-9 h-9 flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200 z-20 border border-white/50"
                                                                 aria-label="Next photo"
                                                                 title="Next photo"
                                                             >
-                                                                <ChevronRight className="w-4 h-4" />
+                                                                <ChevronRight className="w-5 h-5" strokeWidth={2.5} />
                                                             </button>
                                                         </>
                                                     )}
@@ -2205,7 +2205,7 @@ export default function Home() {
 
                                 {/* Pagination Controls - Arrow Icons Only */}
                                 {totalPages > 1 && (
-                                    <div className="flex items-center justify-center gap-2 mt-6 pb-6">
+                                    <div className="flex items-center justify-center gap-3 mt-6 pb-6">
                                         <button
                                             onClick={() => {
                                                 setCurrentPage(prev => Math.max(1, prev - 1));
@@ -2217,10 +2217,11 @@ export default function Home() {
                                                 }
                                             }}
                                             disabled={currentPage === 1}
-                                            className="p-2 rounded-full border border-gray-200 bg-white hover:bg-cyan-50 hover:border-cyan-300 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:border-gray-200 transition-all"
+                                            className="w-10 h-10 flex items-center justify-center rounded-full border-2 border-gray-200 bg-white hover:bg-gradient-to-br hover:from-[#0284c7] hover:to-[#0ea5e9] hover:border-transparent hover:text-white disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:border-gray-200 disabled:hover:text-gray-600 transition-all duration-200 shadow-sm hover:shadow-md"
                                             title="Previous"
+                                            aria-label="Previous page"
                                         >
-                                            <ChevronLeft className="w-4 h-4 text-gray-600" />
+                                            <ChevronLeft className="w-5 h-5" strokeWidth={2.5} />
                                         </button>
                                         <button
                                             onClick={() => {
@@ -2233,11 +2234,11 @@ export default function Home() {
                                                 }
                                             }}
                                             disabled={currentPage === totalPages}
-                                            className="p-2 rounded-full border border-gray-200 bg-white hover:bg-cyan-50 hover:border-cyan-300 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:border-gray-200 transition-all"
+                                            className="w-10 h-10 flex items-center justify-center rounded-full border-2 border-gray-200 bg-white hover:bg-gradient-to-br hover:from-[#0284c7] hover:to-[#0ea5e9] hover:border-transparent hover:text-white disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:border-gray-200 disabled:hover:text-gray-600 transition-all duration-200 shadow-sm hover:shadow-md"
                                             title="Next"
+                                            aria-label="Next page"
                                         >
-                                            <ChevronRight className="w-4 h-4 text-gray-600" />
-                                            <ChevronLeft className="w-4 h-4 text-gray-600" />
+                                            <ChevronRight className="w-5 h-5" strokeWidth={2.5} />
                                         </button>
                                     </div>
                                 )}

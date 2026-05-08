@@ -1,5 +1,6 @@
 import dbConnect from "../../../../lib/database";
 import Billing from "../../../../models/Billing";
+import InsuranceClaim from "../../../../models/InsuranceClaim";
 import { getUserFromReq } from "../../lead-ms/auth";
 
 export default async function handler(req, res) {
@@ -61,7 +62,7 @@ export default async function handler(req, res) {
     // We track advance and pending separately (not net)
     const billings = await Billing.find(match)
       .select(
-        "pending advance advanceUsed pendingUsed pastAdvance pastAdvanceUsed pastAdvanceType pendingBalanceImage createdAt",
+        "pending advance advanceUsed pendingUsed pendingClaimUsed pastAdvance pastAdvanceUsed pastAdvanceType pendingBalanceImage claimAmountUsed createdAt",
       )
       .sort({ createdAt: -1 }) // Sort by newest first
       .lean();
@@ -171,11 +172,76 @@ export default async function handler(req, res) {
       ),
     );
 
+    // Aggregate insurance claim amounts - ONLY include "Released" claims
+    const claimMatch = { patientId, status: "Released" };
+    // Don't filter by clinicId for now to see all claims
+    console.log(`[Patient Balance] Querying claims with:`, claimMatch);
+    const claims = await InsuranceClaim.find(claimMatch)
+      .select("claimAmount advanceAmount claimType status pendingClaim")
+      .lean();
+    
+    console.log(`[Patient Balance] Found ${claims.length} insurance claims for patient ${patientId}`);
+    console.log(`[Patient Balance] Claims data:`, JSON.stringify(claims));
+    
+    let totalClaimAmount = 0;
+    for (const c of claims) {
+      console.log(`[Patient Balance] Processing claim ${c._id}:`, {
+        claimType: c.claimType,
+        claimAmount: c.claimAmount,
+        advanceAmount: c.advanceAmount,
+        status: c.status
+      });
+      // For Advance type: use claimAmount, for Paid type: use advanceAmount
+      if (c.claimType === "Advance") {
+        totalClaimAmount += Number(c.claimAmount || 0);
+        console.log(`[Patient Balance] Added claimAmount for Advance type:`, c.claimAmount);
+      } else if (c.claimType === "Paid") {
+        totalClaimAmount += Number(c.advanceAmount || 0);
+        console.log(`[Patient Balance] Added advanceAmount for Paid type:`, c.advanceAmount);
+      } else {
+        console.log(`[Patient Balance] Unknown claimType:`, c.claimType);
+      }
+    }
+    
+    console.log(`[Patient Balance] Total original claim amount: ${totalClaimAmount}`);
+    
+    // Calculate total claimAmountUsed from all billings
+    const totalClaimAmountUsed = billings.reduce(
+      (sum, b) => sum + Number(b.claimAmountUsed || 0), 0
+    );
+    
+    console.log(`[Patient Balance] Total claim amount used: ${totalClaimAmountUsed}`);
+    console.log(`[Patient Balance] Individual billing claimAmountUsed values:`, billings.map(b => ({ _id: b._id, claimAmountUsed: b.claimAmountUsed })));
+    
+    // Calculate remaining claim amount
+    const claimAmount = Math.max(0, Number((totalClaimAmount - totalClaimAmountUsed).toFixed(2)));
+    console.log(`[Patient Balance] Final claim amount: ${claimAmount}`);
+    
+    // Calculate total pending claim amount from released claims
+    const totalPendingClaim = claims.reduce(
+      (sum, c) => sum + Number(c.pendingClaim || 0), 0
+    );
+    console.log(`[Patient Balance] Total pending claim from claims: ${totalPendingClaim}`);
+    
+    // Calculate total pending claim amount that has been paid in billings
+    // Use the pendingClaimUsed field which tracks pending claim payments
+    const totalPendingClaimPaid = billings.reduce((sum, b) => {
+      const pendingClaimUsedAmount = Number(b.pendingClaimUsed || 0);
+      return sum + pendingClaimUsedAmount;
+    }, 0);
+    console.log(`[Patient Balance] Total pending claim paid in billings: ${totalPendingClaimPaid}`);
+    
+    // Final pending claim = total from claims - amount already paid
+    const finalPendingClaim = Math.max(0, Number((totalPendingClaim - totalPendingClaimPaid).toFixed(2)));
+    console.log(`[Patient Balance] Final pending claim after payments: ${finalPendingClaim}`);
+
     return res.status(200).json({
       success: true,
       balances: {
         advanceBalance,
         pendingBalance,
+        claimAmount,
+        pendingClaim: finalPendingClaim,
         pastAdvanceBalance,
         pastAdvance50PercentBalance,
         pastAdvance54PercentBalance,

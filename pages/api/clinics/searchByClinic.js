@@ -10,7 +10,9 @@ export default async function handler(req, res) {
 
   const regex = new RegExp(q, 'i'); // case-insensitive search
 
-  const clinics = await Clinic.find({ name: regex })
+  const clinics = await Clinic.find({ 
+    name: { $regex: regex, $not: /zeva/i } // Exclude Zeva clinics
+  })
     .select('name address treatments pricing timings photos location slug slugLocked')
     .limit(10)
     .lean();

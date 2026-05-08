@@ -8,7 +8,19 @@ export const WhatsAppIcon: React.FC<{ className?: string }> = ({ className }) =>
   </svg>
 );
 
-const Zeva360Header: React.FC = () => {
+interface Zeva360HeaderProps {
+  whatsappUrl?: string;
+  whatsappNumber?: string;
+  homeUrl?: string;
+}
+
+const Zeva360Header: React.FC<Zeva360HeaderProps> = ({
+  whatsappUrl,
+  whatsappNumber = "971502983757",
+  homeUrl = "/clinic-management-system-uae",
+}) => {
+  // Use provided whatsappUrl or construct it from whatsappNumber
+  const finalWhatsappUrl = whatsappUrl || `https://wa.me/${whatsappNumber}`;
   const [scrolled, setScrolled] = React.useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
 
@@ -36,9 +48,9 @@ const Zeva360Header: React.FC = () => {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 items-center h-full gap-4 pr-12 md:pr-0">
+        <div className="grid grid-cols-2 md:grid-cols-3 items-center h-full gap-4 pr-12 md:pr-0">
           {/* Logo */}
-          <Link href="/zeva360.system" className="flex items-center gap-3 min-w-0 flex-1 md:flex-none">
+          <Link href={homeUrl} className="flex items-center gap-3 min-w-0 flex-1 md:flex-none col-span-1">
             <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
               <span className="text-white font-extrabold text-base">Z</span>
             </div>
@@ -47,17 +59,13 @@ const Zeva360Header: React.FC = () => {
             </span>
           </Link>
 
-          {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center justify-center gap-8 text-base">
-            <a href="#features" className="text-gray-600 hover:text-blue-600 transition-colors font-medium">Features</a>
-            <a href="#solutions" className="text-gray-600 hover:text-blue-600 transition-colors font-medium">Solutions</a>
-            <a href="#testimonials" className="text-gray-600 hover:text-blue-600 transition-colors font-medium">Reviews</a>
-          </nav>
+          {/* Spacer for desktop layout */}
+          <div className="hidden md:block"></div>
 
-          {/* Desktop Actions */}
-          <div className="hidden md:flex items-center gap-3 justify-end">
+          {/* WhatsApp Button */}
+          <div className="flex items-center justify-end col-span-1">
             <a
-              href="https://wa.me/971502983757"
+              href={finalWhatsappUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-green-500 text-green-500 text-sm font-medium hover:bg-green-500 hover:text-white transition-all"
@@ -65,7 +73,6 @@ const Zeva360Header: React.FC = () => {
               <WhatsAppIcon className="w-4 h-4" />
               <span>WhatsApp</span>
             </a>
-           
           </div>
         </div>
       </div>
@@ -74,43 +81,15 @@ const Zeva360Header: React.FC = () => {
       {mobileMenuOpen && (
         <div className="md:hidden bg-white border-t border-gray-200">
           <nav className="px-6 py-4 space-y-3">
-            <a 
-              href="#features" 
-              className="block py-2 text-base text-gray-700 hover:text-blue-600"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Features
-            </a>
-            <a 
-              href="#solutions" 
-              className="block py-2 text-base text-gray-700 hover:text-blue-600"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Solutions
-            </a>
-            <a 
-              href="#testimonials" 
-              className="block py-2 text-base text-gray-700 hover:text-blue-600"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Reviews
-            </a>
             <div className="pt-3 border-t border-gray-200 space-y-3">
               <a
-                href="https://wa.me/971502983757"
+                href={finalWhatsappUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-2 text-base text-gray-700"
               >
                 <WhatsAppIcon className="w-5 h-5" />
                 <span>WhatsApp</span>
-              </a>
-              <a
-                href="#demo"
-                className="block w-full text-center px-5 py-2.5 bg-orange-500 text-white rounded-lg font-semibold"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Book Demo
               </a>
             </div>
           </nav>

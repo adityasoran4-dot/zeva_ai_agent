@@ -244,6 +244,7 @@ const ClinicDashboard: NextPageWithLayout = () => {
   const [permissionsLoaded, setPermissionsLoaded] = useState(false);
   const [navigationItemsLoaded, setNavigationItemsLoaded] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [isShowingMockData, setIsShowingMockData] = useState<boolean>(false);
  
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showCalendar, setShowCalendar] = useState<boolean>(false);
@@ -1341,6 +1342,14 @@ const ClinicDashboard: NextPageWithLayout = () => {
         if (data.success && data.stats) {
           dashboardStatsData = data.stats;
           setStats(data.stats);
+          
+          // Check if this is mock data
+          const isMockData = (data as any).isMockData || false;
+          setIsShowingMockData(isMockData);
+          
+          if (isMockData) {
+            console.log('📊 Dashboard showing mock data for new user');
+          }
          
           // Map dashboardStats API data to module keys
           // Common module key patterns
@@ -2840,10 +2849,18 @@ const ClinicDashboard: NextPageWithLayout = () => {
 
         console.log('Billing Stats Response:', res.data);
         if (res.data.success) {
-          setTopPackagesData(res.data.topPackagesData || []);
-          setTopServicesData(res.data.topServicesData || []);
-          console.log('Top Packages Data:', res.data.topPackagesData);
-          console.log('Top Services Data:', res.data.topServicesData);
+          // Handle both real data and mock data field names
+          const packagesData = res.data.topPackagesData || res.data.topPackages || [];
+          const servicesData = res.data.topServicesData || res.data.topServices || [];
+          
+          setTopPackagesData(packagesData);
+          setTopServicesData(servicesData);
+          console.log('Top Packages Data:', packagesData);
+          console.log('Top Services Data:', servicesData);
+          
+          if (res.data.isMockData) {
+            console.log('📊 Showing mock billing stats');
+          }
         }
       } catch (error) {
         console.error('Error fetching billing stats:', error);
@@ -2879,8 +2896,14 @@ const ClinicDashboard: NextPageWithLayout = () => {
 
         console.log('Membership Stats Response:', res.data);
         if (res.data.success) {
-          setMembershipData(res.data.membershipData || []);
-          console.log('Membership Data:', res.data.membershipData);
+          // Handle both real data and mock data field names
+          const memData = res.data.membershipData || res.data.data?.membershipData || res.data.data || [];
+          setMembershipData(Array.isArray(memData) ? memData : []);
+          console.log('Membership Data:', memData);
+          
+          if (res.data.isMockData) {
+            console.log('📊 Showing mock membership stats');
+          }
         }
       } catch (error) {
         console.error('Error fetching membership stats:', error);
@@ -3030,21 +3053,37 @@ const ClinicDashboard: NextPageWithLayout = () => {
         console.log('✅ Doctor Performance Trend Response:', perf);
 
         if (fin.success || perf.success) {
+          // Handle mock data flag
+          if (fin.isMockData || perf.isMockData) {
+            console.log('📊 Showing mock financial/doctor performance data');
+          }
+          
           // Prefer revenueTrend from doctor-performance; fallback to existing if missing
           const revenueTrendData = perf?.data?.revenueTrend ?? fin?.revenueTrendData ?? [];
           // Doctor Revenue now sourced from doctor-performance
-          const doctorRevenueData = (perf?.data?.revenuePerDoctor || []).map((d: any) => ({
+          const doctorRevenueData = (perf?.data?.revenuePerDoctor || perf?.data?.data?.revenuePerDoctor || []).map((d: any) => ({
             name: d.doctorName || 'Unknown Doctor',
-            revenue: Number(d.estimatedRevenue || 0),
-            sessions: d.completedAppointments || d.appointmentCount || 0
+            revenue: Number(d.estimatedRevenue || d.revenue || 0),
+            sessions: d.completedAppointments || d.appointmentCount || d.sessions || 0
           }));
           // Keep sort by revenue desc for chart readability
           doctorRevenueData.sort((a: any, b: any) => b.revenue - a.revenue);
+          
+          // Handle top services from financial reports
+          const topServicesData = fin?.topServicesData || fin?.data?.topServicesData || [];
+          
           setFinancialData({
             revenueTrendData,
-            paymentMethodsData: fin?.paymentMethodsData || [],
+            paymentMethodsData: fin?.paymentMethodsData || fin?.data?.paymentMethodsData || [],
             doctorRevenueData,
-            topServicesData: fin?.topServicesData || [],
+            topServicesData,
+          });
+          
+          console.log('✅ Financial Data Set:', {
+            revenueTrendData: revenueTrendData.length,
+            paymentMethodsData: (fin?.paymentMethodsData || fin?.data?.paymentMethodsData || []).length,
+            doctorRevenueData: doctorRevenueData.length,
+            topServicesData: topServicesData.length
           });
         }
       } catch (error) {
@@ -3918,6 +3957,39 @@ const ClinicDashboard: NextPageWithLayout = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 overflow-x-hidden">
+      {/* Mock Data Banner */}
+      {isShowingMockData && (
+        <div className="mb-4 mt-3 mx-2 sm:mx-4 lg:mx-6">
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-3 sm:p-4 shadow-sm">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0">
+                <svg className="w-5 h-5 text-blue-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-blue-900 mb-1">
+                  🎉 Welcome! Showing Sample Data
+                </h3>
+                <p className="text-xs sm:text-sm text-blue-700">
+                  This is sample data to help you understand how the dashboard works. 
+                  Start creating appointments, leads, and patients to see your real data appear!
+                </p>
+              </div>
+              <button
+                onClick={() => setIsShowingMockData(false)}
+                className="flex-shrink-0 text-blue-400 hover:text-blue-600 transition-colors"
+                title="Dismiss"
+              >
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modern Dashboard Layout */}
       <div className="w-full px-2 sm:px-4 lg:px-6 py-4 sm:py-6">
         {/* Dashboard Header */}
@@ -5153,19 +5225,17 @@ const ClinicDashboard: NextPageWithLayout = () => {
                                   </ResponsiveContainer>
                                 ) : (
                                   <div className="h-full flex items-center justify-center text-gray-400">
-                                    <p className="text-sm">No patient data available</p>
+                                    <p className="text-sm">Loading patient data...</p>
                                   </div>
                                 )}
                               </div>
                             </div>
 
                             {/* Bottom Row - Gender Distribution and Top Patients Side by Side */}
-                            {/* Only show this row if there's gender data OR top patients data */}
-                            {(patientDemographics.genderDistribution && patientDemographics.genderDistribution.length > 0) || 
-                             (patientDemographics.topPatients && patientDemographics.topPatients.length > 0) ? (
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Always show this row with mock/real data */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 {/* Left - Gender Distribution Donut Chart */}
-                                {patientDemographics.genderDistribution && patientDemographics.genderDistribution.length > 0 && (
+                                {patientDemographics.genderDistribution && patientDemographics.genderDistribution.length > 0 ? (
                                   <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
                                     <div className="mb-4">
                                       <h3 className="text-base font-bold text-black">Gender Distribution</h3>
@@ -5210,7 +5280,7 @@ const ClinicDashboard: NextPageWithLayout = () => {
                                       </ResponsiveContainer>
                                     </div>
                                   </div>
-                                )}
+                                ) : null}
                                 
                                 {/* Right - Top Patients Table */}
                                 {patientDemographics.topPatients && patientDemographics.topPatients.length > 0 && (
@@ -5267,9 +5337,8 @@ const ClinicDashboard: NextPageWithLayout = () => {
                                   )}
                                 </div>
                               </div>
-                                )}
+                              )}
                               </div>
-                            ) : null}
 
                             {/* Patient Visit Frequency Section - Full Width */}
                             <div className="bg-white rounded-lg border border-gray-200 shadow-sm mt-9 p-6">

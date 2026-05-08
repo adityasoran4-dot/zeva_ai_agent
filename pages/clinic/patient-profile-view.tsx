@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import axios from 'axios';
 import {
@@ -7,7 +7,8 @@ import {
   Mail, Clock, Shield, X, CheckCircle, XCircle,
   ExternalLink,
   AlertTriangle, Plus, FileImage, Wallet, ClipboardList, Send, Pill, ClipboardCheck,
-  ChevronDown, Search, Loader2, Check,  Camera, Image as ImageIcon, Eye
+  ChevronDown, Search, Loader2, Check,  Camera, Image as ImageIcon, Eye, Edit2, Trash2, Paperclip,
+  Filter
 } from 'lucide-react';
 import ClinicLayout from '../../components/ClinicLayout';
 import withClinicAuth from '../../components/withClinicAuth';
@@ -36,7 +37,7 @@ const getStoredToken = () => {
 
 const getAuthHeaders = () => {
   const token = getStoredToken();
-  return token ? { Authorization: `Bearer ${token}` } : null;
+  return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
 const getUserRole = () => {
@@ -76,7 +77,7 @@ const TransferSection = ({ patientId, patientData, onTransferComplete }: { patie
     const fetchData = async () => {
       try {
         const headers = getAuthHeaders() || {};
-        
+       
         // Fetch memberships
         const membershipsRes = await axios.get('/api/clinic/memberships', { headers });
         if (membershipsRes.data.success) {
@@ -91,7 +92,7 @@ const TransferSection = ({ patientId, patientData, onTransferComplete }: { patie
 
         // Fetch public packages - COMMENTED OUT: Only fetch patient packages now
         // if (patientData?._id) {
-        //   const publicPackagesRes = await axios.get('/api/clinic/public-package', { 
+        //   const publicPackagesRes = await axios.get('/api/clinic/public-package', {
         //     headers,
         //     params: {
         //       patientId: patientData._id,
@@ -118,7 +119,7 @@ const TransferSection = ({ patientId, patientData, onTransferComplete }: { patie
           const headers = getAuthHeaders() || {};
           const res = await axios.get(`/api/clinic/membership-usage/${patientId}?membershipId=${selectedMembershipId}`, { headers });
           console.log('Membership usage API response:', res.data);
-          
+         
           // Handle different response structures
           if (res.data.success) {
             const usageData = res.data.usage || res.data.data || res.data;
@@ -200,14 +201,14 @@ const TransferSection = ({ patientId, patientData, onTransferComplete }: { patie
     setTransferSubmitting(true);
     try {
       const headers = getAuthHeaders() || {};
-      
+     
       if (transferType === "membership") {
         // Check if there are remaining benefits to transfer (same as PatientUpdateForm)
         // Calculate remaining consultations from total and used
         const totalConsultations = membershipUsage?.totalFreeConsultations || 0;
         const usedConsultations = membershipUsage?.usedFreeConsultations || 0;
         const remainingConsultations = Math.max(0, totalConsultations - usedConsultations);
-        
+       
         if (!selectedMembershipId || !membershipUsage || remainingConsultations <= 0) {
           alert('No remaining membership benefits to transfer');
           setTransferSubmitting(false);
@@ -361,7 +362,7 @@ const TransferSection = ({ patientId, patientData, onTransferComplete }: { patie
                 const totalConsultations = membershipUsage.totalFreeConsultations || 0;
                 const usedConsultations = membershipUsage.usedFreeConsultations || 0;
                 const remainingConsultations = Math.max(0, totalConsultations - usedConsultations);
-                
+               
                 return (
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                     <div className="text-[11px]">
@@ -420,7 +421,7 @@ const TransferSection = ({ patientId, patientData, onTransferComplete }: { patie
                 const usedSess = packageUsage?.totalSessions || 0;
                 // Always calculate remaining from total and used to ensure consistency
                 const remainingSess = Math.max(0, totalSess - usedSess);
-                
+               
                 return (
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                     <div className="text-[11px]">
@@ -535,14 +536,16 @@ const PatientProfileDashboard = ({ patientData, onClose, onPatientUpdated }: { p
   const [loadingPackages, setLoadingPackages] = useState(false);
   const [billingHistory, setBillingHistory] = useState<any>(null);
   const [loadingBilling, setLoadingBilling] = useState(false);
-  
+  const [billingSearchQuery, setBillingSearchQuery] = useState('');
+  const [billingSearchType, setBillingSearchType] = useState<'all' | 'invoice' | 'treatment'>('all');
+
   // Cashback state
   const [validCashback, setValidCashback] = useState<any>(null);
   const [allAppointmentsData, setAllAppointmentsData] = useState<any[]>([]);
   const [loadingTreatmentAppointments, setLoadingTreatmentAppointments] = useState(false);
   const [mediaDocuments, setMediaDocuments] = useState<any[]>([]);
   const [loadingMedia, setLoadingMedia] = useState(false);
-  
+ 
   // Consent Form Status States
   const [consentStatuses, setConsentStatuses] = useState<any[]>([]);
   const [loadingConsentStatus, setLoadingConsentStatus] = useState(false);
@@ -550,19 +553,19 @@ const PatientProfileDashboard = ({ patientData, onClose, onPatientUpdated }: { p
   const [selectedConsentId, setSelectedConsentId] = useState("");
   const [sendingConsent, setSendingConsent] = useState(false);
   const [consentSent, setConsentSent] = useState(false);
-  
+ 
   // Package Link State
   const [sendingPackageLink, setSendingPackageLink] = useState(false);
 // Created Packages State (from UserPackage model)
 const [createdPackages, setCreatedPackages] = useState<any[]>([]);
 const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
-  
+ 
   // Progress Notes & Prescription States
   const [progressNotes, setProgressNotes] = useState<any[]>([]);
   const [prescriptions, setPrescriptions] = useState<any[]>([]);
   const [loadingProgressNotes, setLoadingProgressNotes] = useState(false);
   const [loadingPrescriptions, setLoadingPrescriptions] = useState(false);
-  
+ 
   // Stats state - fetched on mount
   const [statsData, setStatsData] = useState({
     totalVisits: 0,
@@ -574,7 +577,60 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
     insuranceClaimsPending: 0,
   });
   const [loadingStats, setLoadingStats] = useState(false);
-  
+
+  // Insurance Claims state
+  const [insuranceClaims, setInsuranceClaims] = useState<any[]>([]);
+  const [claimsLoading, setClaimsLoading] = useState(false);
+  const [claimViewModal, setClaimViewModal] = useState<any>(null);
+  const [claimEditModal, setClaimEditModal] = useState<any>(null);
+    const [claimTrackingModal, setClaimTrackingModal] = useState<any>(null);
+  const [claimEditData, setClaimEditData] = useState<any>({});
+  const [claimEditLoading, setClaimEditLoading] = useState(false);
+  const [claimEditUploadingFiles, setClaimEditUploadingFiles] = useState(false);
+  const [claimDepartments, setClaimDepartments] = useState<any[]>([]);
+  const [claimServices, setClaimServices] = useState<any[]>([]);
+  const [claimDoctors, setClaimDoctors] = useState<any[]>([]);
+  // New claim form state
+  const [showNewClaimForm, setShowNewClaimForm] = useState(false);
+  const [newClaimSubmitting, setNewClaimSubmitting] = useState(false);
+  const [newClaimUploadingFiles, setNewClaimUploadingFiles] = useState(false);
+  const [newClaimData, setNewClaimData] = useState<any>({
+    insuranceProvider: "",
+    policyNumber: "",
+    expiryDate: "",
+    insuranceCardFile: "",
+    tableOfBenefitsFile: "",
+    departmentId: "",
+    departmentName: "",
+    serviceId: "",
+    serviceName: "",
+    services: [], // Array to store multiple services
+    doctorId: "",
+    doctorName: "",
+    claimAmount: "",
+    claimType: "Paid",
+    coPayPercent: "",
+    coPayType: "Patient Pays",
+    notes: "",
+    documentFiles: [],
+    advanceStatus: "Full Pay",
+    advanceAmount: 0,
+  });
+  const [newClaimDepartments, setNewClaimDepartments] = useState<any[]>([]);
+  const [newClaimServices, setNewClaimServices] = useState<any[]>([]);
+  const [newClaimDoctors, setNewClaimDoctors] = useState<any[]>([]);
+ 
+  // Package payment balance tracking
+  const [pkgAvailableBalance, setPkgAvailableBalance] = useState({
+    advanceBalance: 0,
+    claimAmount: 0,
+  });
+  const [pkgUseAdvanceBalance, setPkgUseAdvanceBalance] = useState(false);
+  const [pkgUseClaimBalance, setPkgUseClaimBalance] = useState(false);
+  const [pkgAdvanceUsedAmount, setPkgAdvanceUsedAmount] = useState(0);
+  const [pkgClaimUsedAmount, setPkgClaimUsedAmount] = useState(0);
+  const [pkgLoadingBalance, setPkgLoadingBalance] = useState(false);
+ 
   // Financial snapshot state - initialized from patientData.initialBalance if available
   const [financialData, setFinancialData] = useState({
     totalSpent: 0,
@@ -586,18 +642,23 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
   const [balance, setBalance] = useState({
     pendingBalance: Number(patientData?.initialBalance?.pendingBalance || 0),
     advanceBalance: Number(patientData?.initialBalance?.advanceBalance || 0),
+    claimAmount: Number(patientData?.initialBalance?.claimAmount || 0),
+    pendingClaim: Number(patientData?.initialBalance?.pendingClaim || 0),
     pastAdvanceBalance: Number(patientData?.initialBalance?.pastAdvanceBalance || 0),
     pastAdvance50PercentBalance: Number(patientData?.initialBalance?.pastAdvance50PercentBalance || 0),
     pastAdvance54PercentBalance: Number(patientData?.initialBalance?.pastAdvance54PercentBalance || 0),
     pastAdvance159FlatBalance: Number(patientData?.initialBalance?.pastAdvance159FlatBalance || 0),
     pendingBalanceImages: [] as string[],
   });
+  // Patient is risky if they have pending claim from balance (authoritative source from patient-balance API)
+  const isRiskyPatient = balance.pendingClaim > 0;
   const [balanceLoading, setBalanceLoading] = useState(false);
   const [uploadLoading, setUploadLoading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [showUploadImageModal, setShowUploadImageModal] = useState(false);
   const [showImageViewer, setShowImageViewer] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [docViewerUrl, setDocViewerUrl] = useState<string | null>(null);
   const [mediaSubTab, setMediaSubTab] = useState<'before-after' | 'payment-proofs'>('before-after');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -606,8 +667,21 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
   const [showAddPastAdvancePayment54PercentModal, setShowAddPastAdvancePayment54PercentModal] = useState(false);
   const [showAddPastAdvancePayment159FlatModal, setShowAddPastAdvancePayment159FlatModal] = useState(false);
   const [showPayPendingModal, setShowPayPendingModal] = useState(false);
-  const [treatmentFilter, setTreatmentFilter] = useState<'all' | 'ongoing' | 'completed' | 'pending'>('all');
+    const [showPayPendingClaimModal, setShowPayPendingClaimModal] = useState(false);
+    const [payingPendingClaim, setPayingPendingClaim] = useState(false);
+    const [pendingClaimPayAmount, setPendingClaimPayAmount] = useState("");
+    const [pendingClaimPayMethod, setPendingClaimPayMethod] = useState("Cash");
+  // Treatment Filter Type - Extended with Invoice and Cancelled sections
+  const [treatmentFilter, setTreatmentFilter] = useState<'all' | 'ongoing' | 'completed' | 'pending' | 'invoice' | 'cancelled'>('all');
   
+  // Advanced Treatment Filters
+  const [treatmentDateRange, setTreatmentDateRange] = useState<{ from: string; to: string }>({ from: '', to: '' });
+  const [treatmentDoctorFilter, setTreatmentDoctorFilter] = useState<string>('');
+  const [treatmentSearch, setTreatmentSearch] = useState<string>('');
+  const [treatmentSortBy, setTreatmentSortBy] = useState<'date' | 'name' | 'amount' | 'status'>('date');
+  const [treatmentSortOrder, setTreatmentSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState<boolean>(false);
+ 
   // Track invoice numbers that have been paid but billing history hasn't updated yet
   // Persisted in sessionStorage to survive page refreshes
   const [manuallyPaidInvoices, setManuallyPaidInvoices] = useState<Set<string>>(() => {
@@ -633,14 +707,13 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
   const [pkgModalValidityInMonths, setPkgModalValidityInMonths] = useState("");
   const [pkgModalStartDate, setPkgModalStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [pkgModalEndDate, setPkgModalEndDate] = useState("");
-  const [pkgTreatments, setPkgTreatments] = useState<Array<{ name: string; slug: string; type?: string; mainTreatment?: string | null }>>([]);
   const [pkgSelectedTreatments, setPkgSelectedTreatments] = useState<Array<{ treatmentName: string; treatmentSlug: string; sessions: number; allocatedPrice: number }>>([]);
   const [pkgTreatmentDropdownOpen, setPkgTreatmentDropdownOpen] = useState(false);
   const [pkgTreatmentSearch, setPkgTreatmentSearch] = useState("");
   const [pkgSubmitting, setPkgSubmitting] = useState(false);
   const [pkgError, setPkgError] = useState("");
   const [pkgSuccess, setPkgSuccess] = useState("");
-  const [addingPackageToPatient, setAddingPackageToPatient] = useState(false);
+  const [addingPackageToPatient, _setAddingPackageToPatient] = useState(false);
   const [allServices, setAllServices] = useState<any[]>([]);
   const [loadingServices, setLoadingServices] = useState(false);
 
@@ -662,7 +735,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
     if (typeof window !== 'undefined' && patientData._id) {
       try {
         sessionStorage.setItem(
-          `manuallyPaidInvoices_${patientData._id}`, 
+          `manuallyPaidInvoices_${patientData._id}`,
           JSON.stringify(Array.from(manuallyPaidInvoices))
         );
         console.log('💾 Saved manuallyPaidInvoices to sessionStorage:', manuallyPaidInvoices.size, 'invoices');
@@ -689,22 +762,6 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
     }
   };
 
-  // Fetch services for package creation
-  const fetchPkgTreatments = async () => {
-    try {
-      const headers = getAuthHeaders();
-      if (!headers) return;
-      const res = await axios.get("/api/clinic/services", { headers });
-      if (res.data?.success) {
-        const flat: Array<{ name: string; slug: string; type?: string; mainTreatment?: string | null }> = [];
-        (res.data.services || []).forEach((svc: any) => {
-          flat.push({ name: svc.name, slug: svc.serviceSlug || svc._id, type: "service", mainTreatment: null });
-        });
-        setPkgTreatments(flat);
-      }
-    } catch { /* ignore */ }
-  };
-
   // Create package and optionally add to patient
   const handleCreatePackageModal = async (addToPatient: boolean) => {
     setPkgError("");
@@ -718,107 +775,100 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
       setPkgError(`Total allocated prices (${totalAllocated.toFixed(2)}) must equal the package price (${packagePrice.toFixed(2)})`);
       return;
     }
-    setPkgSubmitting(true);
-    try {
-      const headers = getAuthHeaders();
-      if (!headers) return;
-      const res = await axios.post("/api/clinic/packages", {
-        name: pkgModalName.trim(),
-        totalPrice: packagePrice,
-        validityInMonths: parseInt(pkgModalValidityInMonths) || 0,
-        startDate: pkgModalStartDate,
-        endDate: pkgModalEndDate,
-        treatments: pkgSelectedTreatments,
-      }, { headers });
-      if (res.data?.success) {
-        const newPkgId = res.data.package?._id || res.data.packageId || null;
-        if (addToPatient && newPkgId && patientData?._id) {
-          setAddingPackageToPatient(true);
-          try {
-            await axios.post("/api/clinic/assign-package-to-patient", {
-              patientId: patientData._id,
-              packageId: newPkgId,
-              validityInMonths: parseInt(pkgModalValidityInMonths) || 0,
-              startDate: pkgModalStartDate,
-              endDate: pkgModalEndDate,
-            }, { headers });
-            setPkgSuccess("Package created and added to patient profile!");
+   
+    console.log('Package validation passed:', {
+      name: pkgModalName,
+      price: packagePrice,
+      treatments: pkgSelectedTreatments,
+      addToPatient
+    });
 
-            // Refresh patient data and available packages
-            const [patientRes, pRes] = await Promise.all([
-              axios.get(`/api/staff/get-patient-data/${patientData._id}`, { headers }),
-              axios.get('/api/clinic/packages', { headers })
-            ]);
-
-            if (pRes.data.success) setAllAvailablePackages(pRes.data.packages || []);
-
-            if (patientRes.data) {
-              const freshData = patientRes.data;
-
-              // Update the main patient state via callback
-              if (onPatientUpdated) {
-                onPatientUpdated({
-                  ...patientData,
-                  membership: freshData?.membership || 'No',
-                  membershipId: freshData?.membershipId || '',
-                  membershipStartDate: freshData?.membershipStartDate || '',
-                  membershipEndDate: freshData?.membershipEndDate || '',
-                  memberships: Array.isArray(freshData?.memberships) ? freshData.memberships : [],
-                  package: freshData?.package || 'No',
-                  packageId: freshData?.packageId || '',
-                  packages: Array.isArray(freshData?.packages) ? freshData.packages : [],
-                });
-              }
-
-              // Update editFormData with fresh saved data
-              setEditFormData({
-                membership: freshData?.membership || 'No',
-                membershipId: freshData?.membershipId || '',
-                membershipStartDate: freshData?.membershipStartDate || '',
-                membershipEndDate: freshData?.membershipEndDate || '',
-                memberships: Array.isArray(freshData?.memberships) ? freshData.memberships : [],
-                package: freshData?.package || 'No',
-                packageId: freshData?.packageId || '',
-                packages: Array.isArray(freshData?.packages) ? freshData.packages : [],
-              });
-
-              // Refresh packages/memberships display for the lower section
-               fetchPackagesAndMemberships({
-                 memberships: Array.isArray(freshData?.memberships) ? freshData.memberships : (patientData?.memberships || []),
-                 packages: Array.isArray(freshData?.packages) ? freshData.packages : (patientData?.packages || []),
-               });
-
-               // Refresh overview stats
-               fetchOverviewData();
-             }
-          } catch (err) {
-            console.error('Error refreshing data after package creation:', err);
-            setPkgSuccess("Package created. (Could not refresh patient profile)");
-          } finally {
-            setAddingPackageToPatient(false);
-          }
-        } else {
-          setPkgSuccess("Package created successfully!");
-          // Refresh available packages list
-          const pRes = await axios.get('/api/clinic/packages', { headers });
-          if (pRes.data.success) setAllAvailablePackages(pRes.data.packages || []);
+    // If just creating package (not adding to patient), call API directly
+    if (!addToPatient) {
+      try {
+        setPkgSubmitting(true);
+        const headers = getAuthHeaders();
+        if (!headers) {
+          setPkgError("Authentication required");
+          return;
         }
-        // Reset form
-        setPkgModalName(""); 
-        setPkgModalPrice(""); 
-        setPkgModalValidityInMonths("");
-        setPkgModalStartDate(new Date().toISOString().split('T')[0]);
-        setPkgModalEndDate("");
-        setPkgSelectedTreatments([]); 
-        setPkgTreatmentSearch("");
-      } else {
-        setPkgError(res.data?.message || "Failed to create package");
+
+        // Ensure treatments have proper number types
+        const normalizedTreatments = pkgSelectedTreatments.map(t => ({
+          treatmentName: t.treatmentName,
+          treatmentSlug: t.treatmentSlug,
+          sessions: parseInt(String(t.sessions)) || 1,
+          allocatedPrice: parseFloat(String(t.allocatedPrice)) || 0,
+        }));
+
+        const response = await axios.post(
+          "/api/clinic/packages",
+          {
+            name: pkgModalName.trim(),
+            totalPrice: packagePrice,
+            validityInMonths: parseInt(pkgModalValidityInMonths) || 0,
+            startDate: pkgModalStartDate,
+            endDate: pkgModalEndDate,
+            treatments: normalizedTreatments,
+          },
+          { headers }
+        );
+
+        if (response.data.success) {
+          setPkgSuccess("Package created successfully!");
+          setPkgError("");
+          
+          // Reset form after success
+          setTimeout(() => {
+            setShowCreatePackage(false);
+            setPkgModalName("");
+            setPkgModalPrice("");
+            setPkgModalValidityInMonths("");
+            setPkgModalStartDate(new Date().toISOString().split('T')[0]);
+            setPkgModalEndDate("");
+            setPkgSelectedTreatments([]);
+            setPkgSuccess("");
+          }, 2000);
+        } else {
+          setPkgError(response.data.message || "Failed to create package");
+        }
+      } catch (err: any) {
+        console.error("Error creating package:", err);
+        setPkgError(err.response?.data?.message || "An error occurred while creating the package");
+      } finally {
+        setPkgSubmitting(false);
       }
-    } catch (err: any) {
-      setPkgError(err.response?.data?.message || "Failed to create package");
-    } finally {
-      setPkgSubmitting(false);
+      return;
     }
+   
+    // If adding to patient, open payment modal first
+    setPkgTotalAmount(packagePrice);
+    setPkgPaidAmount(packagePrice);
+    setPkgPaymentType("Full");
+    setPkgPaymentMethod("Cash");
+   
+    // Ensure treatments have proper number types
+    const normalizedTreatments = pkgSelectedTreatments.map(t => ({
+      treatmentName: t.treatmentName,
+      treatmentSlug: t.treatmentSlug,
+      sessions: parseInt(String(t.sessions)) || 1,
+      allocatedPrice: parseFloat(String(t.allocatedPrice)) || 0,
+    }));
+   
+    // Store the package data to be created after payment
+    setPkgPendingToCreate({
+      name: pkgModalName.trim(),
+      totalPrice: packagePrice,
+      validityInMonths: parseInt(pkgModalValidityInMonths) || 0,
+      startDate: pkgModalStartDate,
+      endDate: pkgModalEndDate,
+      treatments: normalizedTreatments,
+      addToPatient: addToPatient, // Flag to know if should add to patient after creation
+    });
+   
+    // Fetch patient balance before showing payment modal
+    fetchPkgPatientBalance();
+    setShowPackagePaymentModal(true);
   };
 
   // ---- Editable Membership & Package State ----
@@ -847,11 +897,13 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
   const [addMembEndDate, setAddMembEndDate] = useState('');
   const [selectedPackageToAdd, setSelectedPackageToAdd] = useState('');
   const [showPackagePaymentModal, setShowPackagePaymentModal] = useState(false);
-  const [pkgPaymentType, setPkgPaymentType] = useState<"Full" | "Partial">("Full");
+  const [pkgPaymentType, setPkgPaymentType] = useState<"Full" | "Partial" | "Custom">("Full");
   const [pkgPaymentMethod, setPkgPaymentMethod] = useState<string>("Cash");
   const [pkgPaidAmount, setPkgPaidAmount] = useState<number>(0);
+  const [pkgEnteredAmount, setPkgEnteredAmount] = useState<number>(0);
   const [pkgTotalAmount, setPkgTotalAmount] = useState<number>(0);
   const [pkgPendingToAssign, setPkgPendingToAssign] = useState<any>(null);
+  const [pkgPendingToCreate, setPkgPendingToCreate] = useState<any>(null); // Store package data to create after payment
   const [pmMembershipUsageMap, setPmMembershipUsageMap] = useState<any>({});
   const [showSaveConfirmModal, setShowSaveConfirmModal] = useState(false);
 
@@ -881,8 +933,8 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
         if (res.data.success && res.data.clinic?.currency) {
           setCurrency(res.data.clinic.currency);
         }
-      } catch (e) { 
-        console.error('Error fetching clinic currency:', e); 
+      } catch (e) {
+        console.error('Error fetching clinic currency:', e);
       }
     };
     fetchClinicCurrency();
@@ -956,7 +1008,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
       setTimeout(() => setPmToast(null), 3000);
       return;
     }
-    
+   
     // Only add to the memberships array - do NOT set individual fields
     setEditFormData((prev: any) => ({
       ...prev,
@@ -978,20 +1030,254 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
       setTimeout(() => setPmToast(null), 3000);
       return;
     }
-    
+   
     const selectedPkg = allAvailablePackages.find((pkg: any) => pkg._id === selectedPackageToAdd);
     if (selectedPkg) {
       setPkgTotalAmount(selectedPkg.totalPrice || 0);
+      setPkgEnteredAmount(selectedPkg.totalPrice || 0);
+      // Initialize pkgPaidAmount to full amount - advance will be auto-calculated when modal loads
       setPkgPaidAmount(selectedPkg.totalPrice || 0);
       setPkgPaymentType("Full");
       setPkgPendingToAssign(selectedPkg);
+      // Fetch patient balance before showing payment modal
+      fetchPkgPatientBalance();
       setShowPackagePaymentModal(true);
     }
   };
 
-  const finalizePmAddPackage = (paidAmount: number, paymentStatus: "Unpaid" | "Partial" | "Full", paymentMethod: string) => {
-    if (!pkgPendingToAssign) return;
+  // Helper function to calculate amount to pay based on entered amount and balance usage
+  const calculatePkgAmountToPay = (enteredAmt: number) => {
+    let totalBalanceUsed = 0;
     
+    // Calculate advance used
+    if (pkgUseAdvanceBalance) {
+      const advanceToUse = Math.min(pkgAvailableBalance.advanceBalance, enteredAmt);
+      setPkgAdvanceUsedAmount(advanceToUse);
+      totalBalanceUsed += advanceToUse;
+    } else {
+      setPkgAdvanceUsedAmount(0);
+    }
+    
+    // Calculate claim used on remaining after advance
+    if (pkgUseClaimBalance) {
+      const remainingAfterAdvance = Math.max(0, enteredAmt - totalBalanceUsed);
+      const claimToUse = Math.min(pkgAvailableBalance.claimAmount, remainingAfterAdvance);
+      setPkgClaimUsedAmount(claimToUse);
+      totalBalanceUsed += claimToUse;
+    } else {
+      setPkgClaimUsedAmount(0);
+    }
+    
+    // Calculate final amount to pay
+    const amountToPay = Math.max(0, enteredAmt - totalBalanceUsed);
+    setPkgPaidAmount(amountToPay);
+  };
+
+  const finalizePmAddPackage = async (paidAmount: number, paymentStatus: "Unpaid" | "Partial" | "Full", paymentMethod: string) => {
+    // Case 1: Creating a new package (with or without adding to patient)
+    if (pkgPendingToCreate) {
+      try {
+        const shouldAddToPatient = pkgPendingToCreate.addToPatient;
+        
+        // Use the paymentStatus passed from the button click (respects user's Full/Partial choice)
+        // Don't recalculate - the button already determined the correct status
+        const actualPaymentStatus = paymentStatus;
+       
+        // If "Create & Add to Patient" was clicked, immediately create the package and assign to patient
+        if (shouldAddToPatient) {
+          setPkgSubmitting(true);
+          
+          // Step 1: Create the package via API
+          const headers = getAuthHeaders();
+          if (!headers) {
+            setPkgError("Authentication required");
+            setPkgSubmitting(false);
+            return;
+          }
+
+          const createRes = await axios.post("/api/clinic/packages", {
+            name: pkgPendingToCreate.name,
+            totalPrice: pkgPendingToCreate.totalPrice,
+            validityInMonths: pkgPendingToCreate.validityInMonths,
+            startDate: pkgPendingToCreate.startDate,
+            endDate: pkgPendingToCreate.endDate,
+            treatments: pkgPendingToCreate.treatments,
+          }, { headers });
+
+          if (!createRes.data?.success) {
+            throw new Error(createRes.data?.message || "Failed to create package");
+          }
+
+          const realPackageId = createRes.data.package?._id || createRes.data.packageId;
+          
+          // Step 2: Assign the package to patient
+          await axios.post("/api/clinic/assign-package-to-patient", {
+            patientId: patientData._id,
+            packageId: realPackageId,
+            validityInMonths: pkgPendingToCreate.validityInMonths,
+            startDate: pkgPendingToCreate.startDate,
+            endDate: pkgPendingToCreate.endDate,
+            totalPrice: pkgPendingToCreate.totalPrice,
+            paidAmount: paidAmount,
+            paymentStatus: actualPaymentStatus,
+            paymentMethod: paymentMethod,
+          }, { headers });
+
+          // Step 3: Create billing record if balance was used or payment was made
+          if (pkgAdvanceUsedAmount > 0 || pkgClaimUsedAmount > 0 || paidAmount > 0) {
+            try {
+              await axios.post("/api/clinic/package-billing", {
+                patientId: patientData._id,
+                packageName: pkgPendingToCreate.name,
+                packageId: realPackageId,
+                totalAmount: pkgPendingToCreate.totalPrice,
+                paidAmount: paidAmount,
+                paymentMethod: paymentMethod,
+                paymentStatus: actualPaymentStatus,
+                advanceBalanceUsed: pkgAdvanceUsedAmount || 0,
+                claimAmountUsed: pkgClaimUsedAmount || 0,
+                treatments: pkgPendingToCreate.treatments,
+              }, { headers });
+              console.log('Package billing created with balance usage');
+            } catch (billingErr: any) {
+              console.error('Error creating package billing:', billingErr);
+              // Don't fail the whole operation, just log the error
+            }
+          }
+
+          // Add to editFormData.packages to show in "Added Packages" section
+          const newPkgData = {
+            packageId: realPackageId,
+            assignedDate: new Date().toISOString(),
+            validityInMonths: pkgPendingToCreate.validityInMonths,
+            startDate: pkgPendingToCreate.startDate,
+            endDate: pkgPendingToCreate.endDate,
+            totalPrice: pkgPendingToCreate.totalPrice,
+            paidAmount: paidAmount,
+            paymentStatus: actualPaymentStatus,
+            paymentMethod: paymentMethod,
+            advanceBalanceUsed: pkgAdvanceUsedAmount,
+            claimAmountUsed: pkgClaimUsedAmount,
+          };
+          
+          setEditFormData((prev: any) => ({
+            ...prev,
+            package: 'Yes',
+            packages: [
+              ...(prev.packages || []),
+              newPkgData
+            ],
+          }));
+
+          // Reset create package form
+          setPkgModalName("");
+          setPkgModalPrice("");
+          setPkgModalValidityInMonths("");
+          setPkgModalStartDate(new Date().toISOString().split('T')[0]);
+          setPkgModalEndDate("");
+          setPkgSelectedTreatments([]);
+          setPkgTreatmentSearch("");
+         
+          setPkgPendingToCreate(null);
+          setShowPackagePaymentModal(false);
+          setPkgSubmitting(false);
+          // Reset balance usage state
+          setPkgUseAdvanceBalance(false);
+          setPkgUseClaimBalance(false);
+          setPkgAdvanceUsedAmount(0);
+          setPkgClaimUsedAmount(0);
+         
+          setPkgSuccess("Package created and added to patient successfully!");
+          setTimeout(() => setPkgSuccess(""), 3000);
+          
+          // Refresh the packages list and patient data to show the newly added package
+          try {
+            const headers = getAuthHeaders();
+            
+            // Fetch updated patient data from API
+            const patientRes = await axios.get(`/api/clinic/patient-registration?id=${patientData._id}`, { headers });
+            if (patientRes.data.success && patientRes.data.patient) {
+              // Update patient data with fresh packages
+              onPatientUpdated?.(patientRes.data.patient);
+              
+              // Call fetchPackagesAndMemberships with the fresh patient data to update the UI
+              await fetchPackagesAndMemberships({
+                packages: patientRes.data.patient.packages || [],
+                memberships: patientRes.data.patient.memberships || []
+              });
+            }
+            
+            // Also refresh the available packages list
+            const pRes = await axios.get('/api/clinic/packages', { headers });
+            if (pRes.data.success) setAllAvailablePackages(pRes.data.packages || []);
+          } catch (err) {
+            console.error('Error refreshing data:', err);
+          }
+        } else {
+          // "Create Package" only - add to editFormData to save later
+          const newPkgData = {
+            packageId: `temp_${Date.now()}`, // Temporary ID, will be replaced after save
+            isNewPackage: true, // Flag to indicate this needs to be created
+            packageName: pkgPendingToCreate.name,
+            totalPrice: pkgPendingToCreate.totalPrice,
+            validityInMonths: pkgPendingToCreate.validityInMonths,
+            startDate: pkgPendingToCreate.startDate,
+            endDate: pkgPendingToCreate.endDate,
+            treatments: pkgPendingToCreate.treatments,
+            assignedDate: new Date().toISOString(),
+            paidAmount: paidAmount, // Cash/card payment only
+            paymentStatus: actualPaymentStatus, // Use the status from button click
+            paymentMethod: paymentMethod,
+            addToPatient: shouldAddToPatient, // Keep flag to know behavior after save
+            // Track balance usage
+            advanceBalanceUsed: pkgAdvanceUsedAmount,
+            claimAmountUsed: pkgClaimUsedAmount,
+          };
+         
+          setEditFormData((prev: any) => ({
+            ...prev,
+            packages: [
+              ...(prev.packages || []),
+              newPkgData
+            ],
+          }));
+         
+          // Reset create package form
+          setPkgModalName("");
+          setPkgModalPrice("");
+          setPkgModalValidityInMonths("");
+          setPkgModalStartDate(new Date().toISOString().split('T')[0]);
+          setPkgModalEndDate("");
+          setPkgSelectedTreatments([]);
+          setPkgTreatmentSearch("");
+         
+          setPkgPendingToCreate(null);
+          setShowPackagePaymentModal(false);
+          // Reset balance usage state
+          setPkgUseAdvanceBalance(false);
+          setPkgUseClaimBalance(false);
+          setPkgAdvanceUsedAmount(0);
+          setPkgClaimUsedAmount(0);
+         
+          setPkgSuccess("Package created! Click 'Save Changes' to save.");
+          setTimeout(() => setPkgSuccess(""), 3000);
+        }
+      } catch (err: any) {
+        console.error('Error handling package creation:', err);
+        setPkgError(err.response?.data?.message || err.message || "Failed to create package");
+        setPkgSubmitting(false);
+        setPkgPendingToCreate(null);
+        setShowPackagePaymentModal(false);
+      }
+      return;
+    }
+   
+    // Case 2: Adding existing package to patient (original flow)
+    if (!pkgPendingToAssign) return;
+   
+    // Use the paymentStatus passed from the button click (respects user's Full/Partial choice)
+    const actualPaymentStatus = paymentStatus;
+   
     // Dynamically calculate start and end dates based on current date
     const now = new Date();
     const startDate = formatPmDate(now);
@@ -1001,28 +1287,35 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
       endDateObj.setMonth(endDateObj.getMonth() + validity);
     }
     const endDate = validity > 0 ? formatPmDate(endDateObj) : null;
-    
+   
     setEditFormData((prev: any) => ({
       ...prev,
       packages: [
-        ...(prev.packages || []), 
-        { 
-          packageId: pkgPendingToAssign._id, 
+        ...(prev.packages || []),
+        {
+          packageId: pkgPendingToAssign._id,
           assignedDate: new Date().toISOString(),
           validityInMonths: validity,
           startDate: startDate,
           endDate: endDate,
           totalPrice: pkgPendingToAssign.totalPrice || 0,
-          paidAmount: paidAmount,
-          paymentStatus: paymentStatus,
+          paidAmount: paidAmount, // Cash/card payment only
+          paymentStatus: actualPaymentStatus, // Based on total amount paid (including balances)
           paymentMethod: paymentMethod,
+          // Track balance usage
+          advanceBalanceUsed: pkgAdvanceUsedAmount,
+          claimAmountUsed: pkgClaimUsedAmount,
         }
       ],
     }));
     setSelectedPackageToAdd('');
     setShowAddPackageDropdown(false);
     setShowPackagePaymentModal(false);
-    setPkgPendingToAssign(null);
+    // Reset balance usage state
+    setPkgUseAdvanceBalance(false);
+    setPkgUseClaimBalance(false);
+    setPkgAdvanceUsedAmount(0);
+    setPkgClaimUsedAmount(0);
     setPmToast({ message: 'Package added with payment', type: 'success' });
     setTimeout(() => setPmToast(null), 3000);
   };
@@ -1032,7 +1325,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
     setEditFormData((prev: any) => {
       const list = Array.isArray(prev.memberships) ? prev.memberships : [];
       const newList = list.filter((_: any, idx: number) => idx !== indexToRemove);
-      
+     
       // If this was the last membership, also clear the main membership fields
       if (newList.length === 0) {
         return {
@@ -1044,7 +1337,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
           membership: "No",
         };
       }
-      
+     
       return {
         ...prev,
         memberships: newList,
@@ -1057,7 +1350,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
     setEditFormData((prev: any) => {
       const list = Array.isArray(prev.packages) ? prev.packages : [];
       const newList = list.filter((_: any, idx: number) => idx !== indexToRemove);
-      
+     
       // If this was the last package, also clear the main package fields
       if (newList.length === 0) {
         return {
@@ -1067,12 +1360,33 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
           package: "No",
         };
       }
-      
+     
       return {
         ...prev,
         packages: newList,
       };
     });
+  };
+
+  // Fetch patient balance for package payment modal
+  const fetchPkgPatientBalance = async () => {
+    if (!patientData?._id) return;
+    setPkgLoadingBalance(true);
+    try {
+      const headers = getAuthHeaders();
+      if (!headers) return;
+      const res = await axios.get(`/api/clinic/patient-balance/${patientData._id}`, { headers });
+      const data = res?.data?.balances || {};
+      setPkgAvailableBalance({
+        advanceBalance: Number(data.advanceBalance || 0),
+        claimAmount: Number(data.claimAmount || 0),
+      });
+    } catch (error) {
+      console.error('Error fetching patient balance for package:', error);
+      setPkgAvailableBalance({ advanceBalance: 0, claimAmount: 0 });
+    } finally {
+      setPkgLoadingBalance(false);
+    }
   };
 
   const handlePmSave = async () => {
@@ -1084,24 +1398,139 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
     setShowSaveConfirmModal(false);
     try {
       setPmSaving(true);
-      const headers = getAuthHeaders() || {};
-        
-      // Determine if we should use array data or individual fields
-      const hasMembershipsArray = Array.isArray(editFormData.memberships) && editFormData.memberships.length > 0;
-      const hasPackagesArray = Array.isArray(editFormData.packages) && editFormData.packages.length > 0;
-        
-      // Auto-sync: If individual membershipId exists but memberships array is empty, create the array entry
-      let finalMemberships = Array.isArray(editFormData.memberships) ? editFormData.memberships : [];
-      if (!hasMembershipsArray && editFormData.membershipId && !finalMemberships.some((m: any) => m.membershipId === editFormData.membershipId)) {
-        finalMemberships = [{
-          membershipId: editFormData.membershipId,
-          startDate: editFormData.membershipStartDate || new Date().toISOString(),
-          endDate: editFormData.membershipEndDate || new Date(new Date().setMonth(new Date().getMonth() + 6)).toISOString(),
-        }];
+      const headers = getAuthHeaders();
+      if (!headers) {
+        setPmToast({ message: 'Authentication required', type: 'error' });
+        setTimeout(() => setPmToast(null), 3000);
+        setPmSaving(false);
+        return;
       }
-        
+       
+      // Step 1: Create any new packages first
+      const packagesToSave = Array.isArray(editFormData.packages) ? [...editFormData.packages] : [];
+      const newPackages = packagesToSave.filter((p: any) => p.isNewPackage);
+     
+      if (newPackages.length > 0) {
+        console.log('Creating new packages:', newPackages);
+       
+        for (const newPkg of newPackages) {
+          try {
+            // Create the package
+            const createRes = await axios.post("/api/clinic/packages", {
+              name: newPkg.packageName,
+              totalPrice: newPkg.totalPrice,
+              validityInMonths: newPkg.validityInMonths,
+              startDate: newPkg.startDate,
+              endDate: newPkg.endDate,
+              treatments: newPkg.treatments,
+            }, { headers });
+           
+            if (createRes.data?.success) {
+              const realPackageId = createRes.data.package?._id || createRes.data.packageId;
+             
+              // Only assign to patient if addToPatient flag is true
+              if (newPkg.addToPatient) {
+                await axios.post("/api/clinic/assign-package-to-patient", {
+                  patientId: patientData._id,
+                  packageId: realPackageId,
+                  validityInMonths: newPkg.validityInMonths,
+                  startDate: newPkg.startDate,
+                  endDate: newPkg.endDate,
+                  totalPrice: newPkg.totalPrice,
+                  paidAmount: newPkg.paidAmount,
+                  paymentStatus: newPkg.paymentStatus,
+                  paymentMethod: newPkg.paymentMethod,
+                }, { headers });
+
+                // Create billing record if balance was used or payment was made
+                if (newPkg.advanceBalanceUsed > 0 || newPkg.claimAmountUsed > 0 || newPkg.paidAmount > 0) {
+                  try {
+                    await axios.post("/api/clinic/package-billing", {
+                      patientId: patientData._id,
+                      packageName: newPkg.packageName,
+                      packageId: realPackageId,
+                      totalAmount: newPkg.totalPrice,
+                      paidAmount: newPkg.paidAmount,
+                      paymentMethod: newPkg.paymentMethod,
+                      paymentStatus: newPkg.paymentStatus,
+                      advanceBalanceUsed: newPkg.advanceBalanceUsed || 0,
+                      claimAmountUsed: newPkg.claimAmountUsed || 0,
+                      treatments: newPkg.treatments,
+                    }, { headers });
+                    console.log('Package billing created with balance usage');
+                  } catch (billingErr: any) {
+                    console.error('Error creating package billing:', billingErr);
+                    // Don't fail the whole operation, just log the error
+                  }
+                }
+              }
+             
+              // Update the package in the array with real ID and remove isNewPackage flag
+              const pkgIndex = packagesToSave.findIndex((p: any) => p.packageId === newPkg.packageId);
+              if (pkgIndex !== -1) {
+                packagesToSave[pkgIndex] = {
+                  ...packagesToSave[pkgIndex],
+                  packageId: realPackageId,
+                  isNewPackage: false,
+                };
+              }
+             
+              console.log(`Package created: ${realPackageId}${newPkg.addToPatient ? ' and assigned to patient' : ''}`);
+            }
+          } catch (err: any) {
+            console.error('Error creating package:', err);
+            setPmToast({
+              message: `Failed to create package "${newPkg.packageName}": ${err.response?.data?.message || err.message}`,
+              type: 'error'
+            });
+            setTimeout(() => setPmToast(null), 4000);
+            setPmSaving(false);
+            return;
+          }
+        }
+      }
+       
+      // Step 1.5: Create billing records for existing packages with balance usage
+      const existingPackagesWithBalance = packagesToSave.filter((p: any) => 
+        !p.isNewPackage && (p.advanceBalanceUsed > 0 || p.claimAmountUsed > 0)
+      );
+      
+      if (existingPackagesWithBalance.length > 0) {
+        for (const existingPkg of existingPackagesWithBalance) {
+          try {
+            // Find the package details to get the name
+            const pkgDetails = allAvailablePackages.find((pkg: any) => pkg._id === existingPkg.packageId);
+            const packageName = pkgDetails?.name || existingPkg.packageName || 'Package';
+            
+            await axios.post("/api/clinic/package-billing", {
+              patientId: patientData._id,
+              packageName: packageName,
+              packageId: existingPkg.packageId,
+              totalAmount: existingPkg.totalPrice || 0,
+              paidAmount: existingPkg.paidAmount || 0,
+              paymentMethod: existingPkg.paymentMethod || 'Cash',
+              paymentStatus: existingPkg.paymentStatus || 'Unpaid',
+              advanceBalanceUsed: existingPkg.advanceBalanceUsed || 0,
+              claimAmountUsed: existingPkg.claimAmountUsed || 0,
+              treatments: pkgDetails?.treatments || [],
+            }, { headers });
+            console.log('Billing created for existing package with balance usage:', existingPkg.packageId);
+          } catch (billingErr: any) {
+            console.error('Error creating billing for existing package:', billingErr);
+            // Don't fail the whole operation, just log the error
+          }
+        }
+      }
+       
+      // Step 2: Prepare final packages array (with real IDs now)
+      const hasPackagesArray = packagesToSave.length > 0;
+      let finalPackages = packagesToSave.map((p: any) => {
+        // Remove isNewPackage flag, packageName, treatments, and addToPatient from the saved data
+        const { isNewPackage, packageName, treatments, addToPatient, ...rest } = p;
+        return rest;
+      });
+       
       // Auto-sync: If individual packageId exists but packages array is empty, create the array entry
-      let finalPackages = Array.isArray(editFormData.packages) ? editFormData.packages : [];
       if (!hasPackagesArray && editFormData.packageId && !finalPackages.some((p: any) => p.packageId === editFormData.packageId)) {
         finalPackages = [{
           packageId: editFormData.packageId,
@@ -1112,24 +1541,20 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
           paymentMethod: editFormData.packagePaymentMethod || '',
         }];
       }
-        
-      console.log('🔍 Current editFormData:', {
-        membership: editFormData.membership,
-        membershipId: editFormData.membershipId,
-        memberships: editFormData.memberships,
-        package: editFormData.package,
-        packageId: editFormData.packageId,
-        packages: editFormData.packages,
-      });
-        
-      console.log('🔄 After auto-sync:', {
-        finalMemberships,
-        finalPackages,
-      });
-        
+       
+      // Determine memberships
+      const hasMembershipsArray = Array.isArray(editFormData.memberships) && editFormData.memberships.length > 0;
+      let finalMemberships = Array.isArray(editFormData.memberships) ? editFormData.memberships : [];
+      if (!hasMembershipsArray && editFormData.membershipId && !finalMemberships.some((m: any) => m.membershipId === editFormData.membershipId)) {
+        finalMemberships = [{
+          membershipId: editFormData.membershipId,
+          startDate: editFormData.membershipStartDate || new Date().toISOString(),
+          endDate: editFormData.membershipEndDate || new Date(new Date().setMonth(new Date().getMonth() + 6)).toISOString(),
+        }];
+      }
+       
       const payload = {
         updateType: 'details',
-        // Use array data if available, otherwise use individual fields
         membership: finalMemberships.length > 0 ? 'Yes' : (editFormData.membership || 'No'),
         membershipId: finalMemberships.length > 0 ? finalMemberships[0]?.membershipId : (editFormData.membershipId || ''),
         membershipStartDate: finalMemberships.length > 0 ? finalMemberships[0]?.startDate : (editFormData.membershipStartDate || ''),
@@ -1153,36 +1578,27 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
         insuranceType: patientData.insuranceType,
         notes: patientData.notes,
       };
-        
+       
       console.log('🟢 Saving payload:', JSON.stringify(payload, null, 2));
-        
-      // Make PUT request (same as PatientUpdateForm)
+       
+      // Step 3: Save patient data
       const res = await axios.put(`/api/staff/get-patient-data/${patientData._id}`, payload, { headers });
       const result = res.data;
-        
+       
       console.log('📡 API Response:', result);
-        
+       
       if (res.status === 200 || res.status === 201) {
         setPmToast({ message: result.message || 'Patient updated successfully!', type: 'success' });
         setTimeout(() => setPmToast(null), 3000);
-          
-        // Fetch fresh patient data to ensure we have the latest saved data
+         
+        // Fetch fresh patient data
         let freshData: any = null;
         try {
           const patientRes = await axios.get(`/api/staff/get-patient-data/${patientData._id}`, { headers });
           if (patientRes.data) {
             freshData = patientRes.data;
-                    
-            console.log('✅ Fresh data from API:', {
-              membership: freshData.membership,
-              membershipId: freshData.membershipId,
-              memberships: freshData.memberships,
-              package: freshData.package,
-              packageId: freshData.packageId,
-              packages: freshData.packages,
-            });
-                    
-            // Update the main patient state via callback - this will trigger re-fetch of packages/memberships
+           
+            // Update the main patient state via callback
             if (onPatientUpdated) {
               onPatientUpdated({
                 ...patientData,
@@ -1196,7 +1612,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                 packages: Array.isArray(freshData?.packages) ? freshData.packages : [],
               });
             }
-                    
+           
             // Update editFormData with fresh saved data
             setEditFormData({
               membership: freshData?.membership || 'No',
@@ -1212,13 +1628,20 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
         } catch (fetchError) {
           console.error('Error fetching fresh patient data:', fetchError);
         }
-          
-        // Also refresh packages/memberships display for the lower section
-        // Pass fresh data to avoid stale closure issue
+         
+        // Refresh packages/memberships display
         fetchPackagesAndMemberships({
           memberships: Array.isArray(freshData?.memberships) ? freshData.memberships : (patientData?.memberships || []),
           packages: Array.isArray(freshData?.packages) ? freshData.packages : (patientData?.packages || []),
         });
+       
+        // Refresh available packages list
+        try {
+          const pRes = await axios.get('/api/clinic/packages', { headers });
+          if (pRes.data.success) setAllAvailablePackages(pRes.data.packages || []);
+        } catch (err) {
+          console.error('Error refreshing packages:', err);
+        }
       } else {
         setPmToast({ message: result.message || 'Failed to update patient details', type: 'error' });
         setTimeout(() => setPmToast(null), 3000);
@@ -1276,7 +1699,6 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
       color: 'text-purple-600',
       bgColor: 'bg-purple-100'
     },
-    
     {
       label: 'Insurance Claims Pending',
       value: loadingStats ? '...' : statsData.insuranceClaimsPending,
@@ -1314,8 +1736,8 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
     });
 
     // From billing — add payment entries
-    const billings = Array.isArray(billingHistory) 
-      ? billingHistory.filter((b: any) => !b.isAdvanceOnly && b.treatment !== "Advance Payment" && b.treatment !== "Historical Advance Balance") 
+    const billings = Array.isArray(billingHistory)
+      ? billingHistory.filter((b: any) => !b.isAdvanceOnly && b.treatment !== "Advance Payment" && b.treatment !== "Historical Advance Balance")
       : [];
     billings.slice(0, 3).forEach((b: any) => {
       if (b.paid > 0) {
@@ -1415,11 +1837,11 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
     if (patientData?._id) {
       // 1. Fetch Overview & Dashboard Stats
       fetchOverviewData();
-      
+     
       // 2. Fetch Appointments & Billing (needed for Overview Timeline & Financials)
       fetchAppointments();
       fetchBillingHistory();
-      
+     
       // 3. Fetch Real Advance & Pending Balances
       setBalanceLoading(true);
       fetchPatientBalance(patientData._id).then((data: any) => {
@@ -1494,6 +1916,9 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
         if (data) setBalance(data as typeof balance);
       }).finally(() => setBalanceLoading(false));
     }
+    if (activeTab === 'insurance' && patientData?._id) {
+      fetchInsuranceClaims();
+    }
   }, [activeTab]);
 
   const fetchAppointments = async () => {
@@ -1511,7 +1936,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
         `/api/clinic/all-appointments?page=1&limit=1000&fromDate=${oneYearAgo.toISOString().split('T')[0]}&toDate=${oneYearAhead.toISOString().split('T')[0]}`,
         { headers }
       );
-      
+     
       if (response.data.success) {
         const patientAppointments = response.data.appointments?.filter(
           (apt: any) => apt.patientId?.toString() === patientData._id?.toString()
@@ -1534,11 +1959,11 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
       if (!headers || !patientData?._id) return;
 
       // Fetch upcoming appointments from dedicated API
-      const response = await axios.get('/api/clinic/patient-upcoming-appointments', { 
+      const response = await axios.get('/api/clinic/patient-upcoming-appointments', {
         headers,
         params: { patientId: patientData._id }
       });
-      
+     
       if (response.data.success) {
         const upcomingAppts = response.data.appointments || [];
         setUpcomingAppointments(upcomingAppts);
@@ -1563,15 +1988,15 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
         axios.get('/api/clinic/memberships', { headers }),
         axios.get('/api/clinic/packages', { headers })
       ]);
-      
+     
       const allMemberships = mRes.data?.memberships || [];
       const allPackages = pRes.data?.packages || [];
-      
+     
       // Get patient's assigned package IDs and membership IDs
       // Use freshPatientData if provided (avoids stale closure after save)
       let patientPackageIds = (freshPatientData?.packages || patientData?.packages || []).map((p: any) => p.packageId);
       let patientMembershipIds = (freshPatientData?.memberships || patientData?.memberships || []).map((m: any) => m.membershipId);
-      
+     
       // Fetch package usage data for this patient
       let packageUsageData = [];
       let packageTransferredOutData: any[] = [];
@@ -1584,7 +2009,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
       } catch (err: any) {
         console.error('Error fetching package usage:', err.message);
       }
-      
+     
       // Fetch membership usage data for this patient
       let membershipUsageData: any = null;
       let membershipTransferredOutData: any[] = [];
@@ -1598,32 +2023,32 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
       } catch (err: any) {
         console.error('Error fetching membership usage:', err.message);
       }
-      
+     
       // Process packages with usage data - separate active, transferred-in, and transferred-out
       const transferredOutPackageIds = new Set(packageTransferredOutData.map(p => String(p.packageId)));
-      
+     
       // Filter patientPackageIds to exclude transferred-out packages
-      patientPackageIds = patientPackageIds.filter((pkgId: any) => 
+      patientPackageIds = patientPackageIds.filter((pkgId: any) =>
         !transferredOutPackageIds.has(String(pkgId))
       );
-      
-      const patientPackages = allPackages.filter((pkg: any) => 
+     
+      const patientPackages = allPackages.filter((pkg: any) =>
         patientPackageIds.includes(pkg._id)
       ).map((pkg: any) => {
         const calculatedTotalSessions = pkg.treatments?.reduce((sum: number, t: any) => sum + (parseInt(t.sessions) || 0), 0) || 0;
-        
+       
         // Find the patient's package assignment to get assigned date
         // Use freshPatientData for newest assignments if available
         const currentPackages = freshPatientData?.packages || patientData?.packages || [];
         const patientPackage = currentPackages.find((p: any) => p.packageId === pkg._id);
-        
+       
         // Find usage data for this package
         const usage = packageUsageData.find((u: any) => u.packageName === pkg.name);
-        
+       
         // Calculate used sessions from usage data
         let usedSessions = 0;
         let treatmentsWithUsage = pkg.treatments || [];
-        
+       
         if (usage) {
           usedSessions = usage.totalSessions || 0;
           // Enrich treatments with usage details
@@ -1637,7 +2062,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
             };
           });
         }
-        
+       
         return {
           ...pkg,
           validityInMonths: patientPackage?.validityInMonths || pkg.validityInMonths || 0,
@@ -1660,7 +2085,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
           remainingSessions: usage?.remainingSessions || null
         };
       });
-      
+     
       // Separate transferred-in packages from usage data
       const transferredInPkgs = packageUsageData
         .filter((u: any) => u.isTransferred && u.transferredFrom)
@@ -1676,7 +2101,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
           treatments: u.treatments || [],
           billingHistory: u.billingHistory || []
         }));
-      
+     
       // Process memberships with usage data - separate active, transferred-in, and transferred-out
       // Filter patientMembershipIds to exclude transferred-out memberships
       const transferredOutMembershipIds = new Set(
@@ -1684,17 +2109,17 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
           .filter((t: any) => t.type === 'out')
           .map((t: any) => String(t.membershipId))
       );
-      patientMembershipIds = patientMembershipIds.filter((membershipId: any) => 
+      patientMembershipIds = patientMembershipIds.filter((membershipId: any) =>
         !transferredOutMembershipIds.has(String(membershipId))
       );
-      
-      const patientMemberships = allMemberships.filter((membership: any) => 
+     
+      const patientMemberships = allMemberships.filter((membership: any) =>
         patientMembershipIds.includes(membership._id)
       ).map((membership: any) => {
         // Find the patient's membership assignment to get dates
         const currentMemberships = freshPatientData?.memberships || patientData?.memberships || [];
         const patientMembership = currentMemberships.find((m: any) => m.membershipId === membership._id);
-        
+       
         // Enrich with usage data
         const enrichedMembership = {
           ...membership,
@@ -1705,15 +2130,15 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
           paymentMethod: membershipUsageData?.paymentMethod || patientMembership?.paymentMethod || '',
           status: 'active'
         };
-        
+       
         // Add usage data if available
         if (membershipUsageData) {
           (enrichedMembership as any).usageData = membershipUsageData;
         }
-        
+       
         return enrichedMembership;
       });
-      
+     
       // Separate transferred-in memberships from usage data
       const transferredInMembs = membershipUsageData && membershipUsageData.isTransferred ? [{
         membershipName: membershipUsageData.membershipName,
@@ -1728,7 +2153,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
         isExpired: false,
         hasFreeConsultations: membershipUsageData.hasFreeConsultations || false
       }] : [];
-      
+     
       setPackages(patientPackages);
       // Fetch user packages (created via public form)
       try {
@@ -1737,10 +2162,10 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
           const approvedUserPackages = patientRegRes.data.patient.userPackages.filter(
             (pkg: any) => pkg.approvalStatus === 'approved'
           );
-          
+         
           // Initially set from patient record (partial data)
           setUserPackages(approvedUserPackages);
-          
+         
           const publicPkgRes = await axios.get('/api/clinic/public-package', {
             headers,
             params: {
@@ -1748,20 +2173,20 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
               clinicId: patientData.clinicId,
             },
           });
-          
+         
           if (publicPkgRes.data.success && publicPkgRes.data.existingPackages) {
             const fullUserPackages = approvedUserPackages.map((userPkg: any) => {
               const fullPkg = publicPkgRes.data.existingPackages.find(
                 (p: any) => p._id === userPkg.packageId
               );
-              
+             
               if (fullPkg) {
                 // Find usage data for this user package
                 const usage = packageUsageData.find((u: any) => u.packageName === fullPkg.packageName);
-                
+               
                 let usedSessions = 0;
                 let treatmentsWithUsage = fullPkg.treatments || [];
-                
+               
                 if (usage) {
                   usedSessions = usage.totalSessions || 0;
                   // Enrich treatments with usage details
@@ -1775,7 +2200,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                     };
                   });
                 }
-                
+               
                 return {
                   ...fullPkg,
                   validityInMonths: fullPkg.validityInMonths || 0,
@@ -1790,7 +2215,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                   treatments: treatmentsWithUsage
                 };
               }
-              
+             
               return userPkg;
             });
             setUserPackages(fullUserPackages);
@@ -1821,27 +2246,33 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
       if (!headers) return [];
 
       const response = await axios.get(`/api/clinic/billing-history/${patientData._id}`, { headers });
-      
+     
       if (response.data.success) {
         const billings = response.data.billings || [];
         setBillingHistory(billings);
         calculateFinancialSnapshot(billings);
-        
+       
         // Calculate valid cashback from billing history
         const today = new Date();
         today.setHours(0, 0, 0, 0); // Reset time to start of day
-        
+       
         console.log('[CashbackProfile] Checking cashback validity:', {
           totalBillings: billings.length,
           today: today.toISOString()
         });
-        
-        // Find all billings with valid cashback
+       
+        // Find all billings with valid cashback (excluding refunded ones)
         const cashbackBillings = billings.filter((billing: any) => {
-          if (!billing.isCashbackApplied || !billing.cashbackAmount || billing.cashbackAmount <= 0) {
+          // Skip refunded billings
+          if (billing.isOfferRefunded) {
+            console.log('[CashbackProfile] Skipping refunded billing:', billing.invoiceNumber);
             return false;
           }
           
+          if (!billing.isCashbackApplied || !billing.cashbackAmount || billing.cashbackAmount <= 0) {
+            return false;
+          }
+         
           // Check if cashback has not expired
           if (billing.cashbackEndDate) {
             const endDate = new Date(billing.cashbackEndDate);
@@ -1850,35 +2281,38 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
             console.log('[CashbackProfile] Billing:', billing.invoiceNumber, {
               cashbackAmount: billing.cashbackAmount,
               endDate: billing.cashbackEndDate,
-              isValid
+              isValid,
+              isRefunded: billing.isOfferRefunded
             });
             return isValid; // Not expired
           }
-          
+         
           return false;
         });
-        
+       
         console.log('[CashbackProfile] Valid cashback billings:', cashbackBillings.length);
-        
+       
         // Calculate total EARNED cashback (still valid, not expired)
         const totalCashbackEarned = cashbackBillings.reduce((sum: number, billing: any) => {
           return sum + (billing.cashbackAmount || 0);
         }, 0);
-        
-        // Calculate total USED cashback (from all billings)
-        const totalCashbackUsed = billings.reduce((sum: number, billing: any) => {
-          return sum + (billing.cashbackWalletUsed || 0);
-        }, 0);
-        
+       
+        // Calculate total USED cashback (from non-refunded billings only)
+        const totalCashbackUsed = billings
+          .filter((billing: any) => !billing.isOfferRefunded)  // Exclude refunded
+          .reduce((sum: number, billing: any) => {
+            return sum + (billing.cashbackWalletUsed || 0);
+          }, 0);
+       
         // Calculate AVAILABLE cashback = Earned - Used
         const availableCashbackAmount = Math.max(0, totalCashbackEarned - totalCashbackUsed);
-        
+       
         console.log('[CashbackProfile] Cashback calculation:', {
           totalEarned: totalCashbackEarned,
           totalUsed: totalCashbackUsed,
           available: availableCashbackAmount
         });
-        
+       
         // Get the nearest expiry date (from earned cashback billings)
         let nearestExpiry = null;
         if (cashbackBillings.length > 0) {
@@ -1887,17 +2321,18 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
           });
           nearestExpiry = sortedByExpiry[0].cashbackEndDate;
         }
-        
+       
         if (availableCashbackAmount > 0 && nearestExpiry) {
           setValidCashback({
             amount: availableCashbackAmount,
             expiryDate: nearestExpiry,
+            endsAt: nearestExpiry, // Use the same date as endsAt from the offer
             daysRemaining: Math.ceil((new Date(nearestExpiry).getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
           });
         } else {
           setValidCashback(null);
         }
-        
+       
         return billings;
       }
     } catch (error: any) {
@@ -1913,7 +2348,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
   // Fetch appointments data for Treatment section
   const fetchTreatmentsFromAppointments = async () => {
     if (!patientData?._id) return;
-    
+   
     setLoadingTreatmentAppointments(true);
     try {
       const headers = getAuthHeaders();
@@ -1928,7 +2363,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
         `/api/clinic/all-appointments?page=1&limit=1000&fromDate=${oneYearAgo.toISOString().split('T')[0]}&toDate=${oneYearAheadTx.toISOString().split('T')[0]}`,
         { headers }
       );
-      
+     
       if (response.data.success) {
         const patientAppointments = response.data.appointments?.filter(
           (apt: any) => apt.patientId?.toString() === patientData._id?.toString()
@@ -1971,13 +2406,14 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
       oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
 
       // Fetch appointments, package-usage, and billing in parallel
-      const [appointmentsRes, packageUsageRes, billingRes] = await Promise.all([
+      const [appointmentsRes, packageUsageRes, billingRes, insuranceClaimsRes] = await Promise.all([
         axios.get(
           `/api/clinic/all-appointments?page=1&limit=1000&fromDate=${oneYearAgo.toISOString().split('T')[0]}&toDate=${today}`,
           { headers }
         ),
         axios.get(`/api/clinic/package-usage/${patientData._id}`, { headers }).catch(() => ({ data: { success: false } })),
-        fetchBillingHistory() // Use the unified function here
+        fetchBillingHistory(), // Use the unified function here
+        axios.get(`/api/clinic/insurance-claims?patientId=${patientData._id}`, { headers }).catch(() => ({ data: { success: false } }))
       ]);
 
       let totalVisits = 0;
@@ -1988,12 +2424,23 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
       let pendingSessions = 0;
       let insuranceClaimsPending = 0;
 
+      // Insurance
+      if (insuranceClaimsRes.data.success) {
+        const claims = insuranceClaimsRes.data.data || [];
+        // Filter claims based on statuses that indicate they are still in the pipeline
+        insuranceClaimsPending = claims.filter((c: any) =>
+          ['Under Review', 'Approved'].includes(c.status)
+        ).length;
+      } else {
+        insuranceClaimsPending = patientData?.insurance === 'Yes' ? 1 : 0;
+      }
+
       // Calculate from appointments
       if (appointmentsRes.data.success) {
         const patientAppointments = appointmentsRes.data.appointments?.filter(
           (apt: any) => apt.patientId === patientData._id
         ) || [];
-        
+       
         // Count total visits based on specific statuses
         // Statuses that count as visits: Arrived, Waiting, Consultation, Approved, Rescheduled, Completed, Discharge, invoice
         const visitStatuses = ['arrived', 'waiting', 'consultation', 'approved', 'rescheduled', 'completed', 'discharge', 'invoice'];
@@ -2001,7 +2448,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
           const status = (apt.status || '').toLowerCase();
           return visitStatuses.includes(status);
         }).length;
-        
+       
         patientAppointments.forEach((apt: any) => {
           const status = (apt.status || apt.appointmentStatus || '').toLowerCase();
           if (['cancelled', 'rejected', 'no show', 'no-show'].includes(status)) {
@@ -2027,46 +2474,24 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
         });
       }
 
-      // Completed invoices from billing history - Use same logic as treatment section
+      // Completed invoices from billing history - Only count where billing.pending = 0
       if (billingRes) {
         const billings: any[] = billingRes;
-        
+       
         // Filter out advance payments first
         const treatmentBillings = billings.filter((b: any) => {
-          const isAdvance = b.isAdvanceOnly || 
-                           b.treatment === "Advance Payment" || 
+          const isAdvance = b.isAdvanceOnly ||
+                           b.treatment === "Advance Payment" ||
                            b.treatment === "Historical Advance Balance";
           return !isAdvance;
         });
-        
-        // Apply the same completed/pending logic as treatment section
+       
+        // Count only billing records where pending field = 0 (no pending amount)
         completedInvoices = treatmentBillings.filter((billing: any) => {
-          const amount = parseFloat(billing.amount) || 0;
-          const paid = parseFloat(billing.paid || billing.paidAmount || 0) || 0;
           const pending = parseFloat(billing.pending || 0) || 0;
-          const pendingUsed = parseFloat(billing.pendingUsed || 0) || 0;
-          const billingDate = billing.createdAt ? new Date(billing.createdAt).getTime() : 0;
-          
-          // Check if this invoice's pending was cleared by a newer invoice
-          const hasNewerInvoiceWithPendingUsed = treatmentBillings.some((otherBilling: any) => {
-            const otherDate = otherBilling.createdAt ? new Date(otherBilling.createdAt).getTime() : 0;
-            const otherPendingUsed = parseFloat(otherBilling.pendingUsed || 0) || 0;
-            return otherDate > billingDate && otherPendingUsed > 0;
-          });
-          
-          const hasPendingAmount = pending > 0;
-          const pendingClearedSeparately = pendingUsed > 0;
-          
-          // Same logic as treatment section
-          const isFullyPaid = (!hasPendingAmount && (paid >= amount || pendingClearedSeparately)) ||
-                             (hasPendingAmount && hasNewerInvoiceWithPendingUsed);
-          
-          return isFullyPaid;
+          return pending === 0;
         }).length;
       }
-
-      // Insurance
-      insuranceClaimsPending = patientData?.insurance === 'Yes' ? 1 : 0;
 
       setStatsData({
         totalVisits,
@@ -2207,7 +2632,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
         mobileNumber: patientData.mobileNumber || "",
         email: patientData.email || "",
       };
-      
+     
       const encodedPatientData = encodeURIComponent(JSON.stringify(patientDataObj));
       const consentUrl = `https://zeva360.com/consent-form/${selectedConsentId}?patient=${encodedPatientData}`;
 
@@ -2237,7 +2662,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
 
       if (data && data?.success) {
         setConsentSent(true);
-        
+       
         // Log the sent consent form
         try {
           const selectedForm = consentForms.find((f) => f._id === selectedConsentId);
@@ -2252,7 +2677,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
             },
             { headers }
           );
-          
+         
           // Refresh consent statuses
           setTimeout(() => {
             fetchConsentStatuses();
@@ -2367,12 +2792,12 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
 
       // Build params - need at least one valid ID
       const params: any = {};
-      
+     
       // Only add patientId if it's a valid string
       if (patientData._id && typeof patientData._id === 'string' && patientData._id.length > 0) {
         params.patientId = patientData._id;
       }
-      
+     
       // Only add clinicId if it's a valid string
       if (patientData.clinicId && typeof patientData.clinicId === 'string' && patientData.clinicId.length > 0) {
         params.clinicId = patientData.clinicId;
@@ -2459,6 +2884,8 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
       return {
         pendingBalance: Number(data.pendingBalance || 0),
         advanceBalance: Number(data.advanceBalance || 0),
+        claimAmount: Number(data.claimAmount || 0),
+        pendingClaim: Number(data.pendingClaim || 0),
         pastAdvanceBalance: Number(data.pastAdvanceBalance || 0),
         pastAdvance50PercentBalance: Number(data.pastAdvance50PercentBalance || 0),
         pastAdvance54PercentBalance: Number(data.pastAdvance54PercentBalance || 0),
@@ -2466,25 +2893,396 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
         pendingBalanceImages: Array.isArray(data.pendingBalanceImages) ? data.pendingBalanceImages : [],
       };
     } catch {
-      return { 
-        pendingBalance: 0, 
-        advanceBalance: 0, 
-        pastAdvanceBalance: 0, 
-        pastAdvance50PercentBalance: 0, 
-        pastAdvance54PercentBalance: 0, 
+      return {
+        pendingBalance: 0,
+        advanceBalance: 0,
+        claimAmount: 0,
+        pendingClaim: 0,
+        pastAdvanceBalance: 0,
+        pastAdvance50PercentBalance: 0,
+        pastAdvance54PercentBalance: 0,
         pastAdvance159FlatBalance: 0,
         pendingBalanceImages: [],
       };
     }
   };
 
+  // Fetch insurance claims for this patient
+  const fetchInsuranceClaims = async () => {
+    if (!patientData?._id) return;
+    setClaimsLoading(true);
+    try {
+      const headers = getAuthHeaders();
+      if (!headers) return;
+      const res = await axios.get(`/api/clinic/insurance-claims?patientId=${patientData._id}`, { headers });
+      if (res.data.success) {
+        setInsuranceClaims(res.data.data || []);
+      }
+    } catch (err) {
+      console.error("Error fetching insurance claims:", err);
+    } finally {
+      setClaimsLoading(false);
+    }
+  };
+
+  // Fetch dropdown data for claim editing
+  const fetchClaimDropdowns = async () => {
+    try {
+      const headers = getAuthHeaders();
+      if (!headers) return;
+      const [deptRes, svcRes, docRes] = await Promise.all([
+        axios.get("/api/clinic/departments", { headers }),
+        axios.get("/api/clinic/services", { headers }),
+        axios.get("/api/admin/get-all-doctor-staff", { headers }),
+      ]);
+      if (deptRes.data.success) setClaimDepartments(deptRes.data.departments || []);
+      if (svcRes.data.success) setClaimServices(svcRes.data.services || []);
+      if (docRes.data.success) setClaimDoctors(docRes.data.data || []);
+    } catch (err) {
+      console.error("Error fetching claim dropdowns:", err);
+    }
+  };
+
+  // Handle claim edit save
+  const handleClaimEditSave = async () => {
+    if (!claimEditModal?._id) return;
+    setClaimEditLoading(true);
+    try {
+      const headers = getAuthHeaders();
+      if (!headers) { setClaimEditLoading(false); return; }
+      const res = await axios.patch(`/api/clinic/insurance-claims/${claimEditModal._id}`, claimEditData, { headers: headers });
+      if (res.data.success) {
+        setClaimEditModal(null);
+        fetchInsuranceClaims();
+      } else {
+        alert(res.data.message || "Failed to update claim");
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.message || "Failed to update claim");
+    } finally {
+      setClaimEditLoading(false);
+    }
+  };
+
+  // Delete insurance claim
+  const deleteClaim = async (claimId: string) => {
+    if (!confirm("Are you sure you want to delete this insurance claim? This action cannot be undone.")) {
+      return;
+    }
+    try {
+      const headers = getAuthHeaders();
+      if (!headers) return;
+      const res = await axios.delete(`/api/clinic/insurance-claims/${claimId}`, { headers });
+      if (res.data.success) {
+        fetchInsuranceClaims();
+      } else {
+        alert(res.data.message || "Failed to delete claim");
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.message || "Failed to delete claim");
+    }
+  };
+
+  // Open claim edit modal
+  const openClaimEditModal = (claim: any) => {
+    setClaimEditData({
+      insuranceProvider: claim.insuranceProvider || "",
+      policyNumber: claim.policyNumber || "",
+      expiryDate: claim.expiryDate ? new Date(claim.expiryDate).toISOString().split('T')[0] : "",
+      insuranceCardFile: claim.insuranceCardFile || "",
+      tableOfBenefitsFile: claim.tableOfBenefitsFile || "",
+      departmentId: claim.departmentId || "",
+      departmentName: claim.departmentName || "",
+      serviceId: claim.serviceId || "",
+      serviceName: claim.serviceName || "",
+      services: claim.services || [],
+      doctorId: claim.doctorId || "",
+      doctorName: claim.doctorName || "",
+      claimAmount: claim.claimAmount || "",
+      claimType: claim.claimType || "Paid",
+      coPayPercent: claim.coPayPercent || "",
+      coPayType: claim.coPayType || "Patient Pays",
+      notes: claim.notes || "",
+      documentFiles: claim.documentFiles || [],
+      advanceStatus: claim.advanceStatus || "Full Pay",
+      advanceAmount: claim.advanceAmount || 0,
+    });
+    setClaimEditModal(claim);
+    fetchClaimDropdowns();
+  };
+
+  // Fetch dropdowns for new claim form
+  const fetchNewClaimDropdowns = async () => {
+    try {
+      const headers = getAuthHeaders();
+      if (!headers) return;
+      const [deptRes, svcRes, docRes] = await Promise.all([
+        axios.get("/api/clinic/departments", { headers }),
+        axios.get("/api/clinic/services", { headers }),
+        axios.get("/api/admin/get-all-doctor-staff", { headers }),
+      ]);
+      if (deptRes.data.success) setNewClaimDepartments(deptRes.data.departments || []);
+      if (svcRes.data.success) setNewClaimServices(svcRes.data.services || []);
+      if (docRes.data.success) setNewClaimDoctors(docRes.data.data || []);
+    } catch (err) {
+      console.error("Error fetching new claim dropdowns:", err);
+    }
+  };
+
+  // Handle new claim field changes
+  const handleNewClaimChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setNewClaimData((prev: any) => {
+      const updated = { ...prev, [name]: value };
+      // Handle direct advanceAmount input (for both Advance and Paid types)
+      if (name === "advanceAmount") {
+        updated.advanceAmount = parseFloat(value) || 0;
+      }
+      if (name === "claimType" && value !== "Advance") {
+        updated.advanceStatus = "Full Pay";
+        updated.advanceAmount = 0;
+      }
+      if (name === "claimType" && value === "Advance") {
+        updated.advanceStatus = "Full Pay";
+        updated.advanceAmount = 0;
+      }
+      return updated;
+    });
+  };
+
+  const handleNewClaimDepartmentChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const deptId = e.target.value;
+    const dept = newClaimDepartments.find((d: any) => d._id === deptId);
+    setNewClaimData((prev: any) => ({
+      ...prev,
+      departmentId: deptId,
+      departmentName: dept ? dept.name : "",
+      serviceId: "",
+      serviceName: "",
+      services: [], // Clear services when department changes
+    }));
+  };
+
+  const handleNewClaimServiceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const serviceId = e.target.value;
+    if (!serviceId) return;
+
+    const service = newClaimServices.find((s: any) => s._id === serviceId);
+    if (!service) return;
+
+    setNewClaimData((prev: any) => {
+      // Check if service is already selected
+      const isAlreadySelected = prev.services.some((s: any) => s.serviceId === serviceId);
+     
+      let updatedServices;
+      if (isAlreadySelected) {
+        // If already selected, maybe the user wants to remove it?
+        // Or we just keep it. Usually in single-select UI that adds to list,
+        // selecting again doesn't do anything or removes it.
+        // Let's make it add only if not present.
+        updatedServices = prev.services;
+      } else {
+        updatedServices = [...prev.services, { serviceId: service._id, serviceName: service.name }];
+      }
+
+      return {
+        ...prev,
+        services: updatedServices,
+        serviceId: serviceId,
+        serviceName: service.name,
+      };
+    });
+  };
+
+  const handleNewClaimDoctorChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const docId = e.target.value;
+    const doc = newClaimDoctors.find((d: any) => d._id === docId);
+    setNewClaimData((prev: any) => ({
+      ...prev,
+      doctorId: docId,
+      doctorName: doc ? doc.name : "",
+    }));
+  };
+
+  const handleNewClaimFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: string) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setNewClaimUploadingFiles(true);
+      const headers = getAuthHeaders();
+      const uploadFormData = new FormData();
+      uploadFormData.append(field, file);
+      const res = await fetch("/api/clinic/insurance-claims/upload", {
+        method: "POST",
+        headers: { Authorization: (headers as any)?.Authorization || "" },
+        body: uploadFormData,
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (field === "insuranceCard") {
+          setNewClaimData((prev: any) => ({ ...prev, insuranceCardFile: data.data.insuranceCardFile }));
+        } else if (field === "tableOfBenefits") {
+          setNewClaimData((prev: any) => ({ ...prev, tableOfBenefitsFile: data.data.tableOfBenefitsFile }));
+        } else if (field === "documents") {
+          setNewClaimData((prev: any) => ({ ...prev, documentFiles: [...prev.documentFiles, ...data.data.documentFiles] }));
+        }
+      }
+    } catch (err) {
+      console.error("File upload error:", err);
+    } finally {
+      setNewClaimUploadingFiles(false);
+    }
+  };
+
+  const handleNewClaimDocumentsUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    try {
+      setNewClaimUploadingFiles(true);
+      const headers = getAuthHeaders();
+      const uploadFormData = new FormData();
+      files.forEach(f => uploadFormData.append("documents", f));
+      const res = await fetch("/api/clinic/insurance-claims/upload", {
+        method: "POST",
+        headers: { Authorization: (headers as any)?.Authorization || "" },
+        body: uploadFormData,
+      });
+      const data = await res.json();
+      if (data.success && data.data.documentFiles) {
+        setNewClaimData((prev: any) => ({ ...prev, documentFiles: [...prev.documentFiles, ...data.data.documentFiles] }));
+      }
+    } catch (err) {
+      console.error("Document upload error:", err);
+    } finally {
+      setNewClaimUploadingFiles(false);
+    }
+  };
+
+  const handleClaimEditFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: string) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setClaimEditUploadingFiles(true);
+      const headers = getAuthHeaders();
+      const uploadFormData = new FormData();
+      uploadFormData.append(field, file);
+      const res = await fetch("/api/clinic/insurance-claims/upload", {
+        method: "POST",
+        headers: { Authorization: (headers as any)?.Authorization || "" },
+        body: uploadFormData,
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (field === "insuranceCard") {
+          setClaimEditData((prev: any) => ({ ...prev, insuranceCardFile: data.data.insuranceCardFile }));
+        } else if (field === "tableOfBenefits") {
+          setClaimEditData((prev: any) => ({ ...prev, tableOfBenefitsFile: data.data.tableOfBenefitsFile }));
+        } else if (field === "documents") {
+          setClaimEditData((prev: any) => ({ ...prev, documentFiles: [...(prev.documentFiles || []), ...data.data.documentFiles] }));
+        }
+      }
+    } catch (err) {
+      console.error("File upload error:", err);
+    } finally {
+      setClaimEditUploadingFiles(false);
+    }
+  };
+
+  const handleClaimEditDocumentsUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    try {
+      setClaimEditUploadingFiles(true);
+      const headers = getAuthHeaders();
+      const uploadFormData = new FormData();
+      files.forEach(f => uploadFormData.append("documents", f));
+      const res = await fetch("/api/clinic/insurance-claims/upload", {
+        method: "POST",
+        headers: { Authorization: (headers as any)?.Authorization || "" },
+        body: uploadFormData,
+      });
+      const data = await res.json();
+      if (data.success && data.data.documentFiles) {
+        setClaimEditData((prev: any) => ({ ...prev, documentFiles: [...(prev.documentFiles || []), ...data.data.documentFiles] }));
+      }
+    } catch (err) {
+      console.error("Document upload error:", err);
+    } finally {
+      setClaimEditUploadingFiles(false);
+    }
+  };
+
+  const submitNewClaim = async () => {
+    if (!patientData?._id) return;
+
+    // Check if patient has pending claim using balance.pendingClaim (from patient-balance API)
+    // This is the authoritative source as it accounts for billing payments
+    if (balance.pendingClaim > 0) {
+      alert(`Cannot create new claim. This patient has a pending claim of ${formatAED(balance.pendingClaim)}. Please clear the pending claim first.`);
+      return;
+    }
+
+    try {
+      setNewClaimSubmitting(true);
+      const headers = getAuthHeaders();
+      const res = await fetch("/api/clinic/insurance-claims", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(headers as any) },
+        body: JSON.stringify({
+          patientId: patientData._id,
+          insuranceProvider: newClaimData.insuranceProvider,
+          policyNumber: newClaimData.policyNumber,
+          expiryDate: newClaimData.expiryDate,
+          insuranceCardFile: newClaimData.insuranceCardFile,
+          tableOfBenefitsFile: newClaimData.tableOfBenefitsFile,
+          departmentId: newClaimData.departmentId,
+          departmentName: newClaimData.departmentName,
+          serviceId: newClaimData.serviceId,
+          serviceName: newClaimData.serviceName,
+          services: newClaimData.services, // Send the services array
+          doctorId: newClaimData.doctorId,
+          doctorName: newClaimData.doctorName,
+          claimAmount: newClaimData.claimAmount,
+          claimType: newClaimData.claimType,
+          coPayPercent: newClaimData.coPayPercent,
+          coPayType: newClaimData.coPayType,
+          notes: newClaimData.notes,
+          documentFiles: newClaimData.documentFiles,
+          advanceStatus: newClaimData.advanceStatus,
+          advanceAmount: newClaimData.advanceAmount,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setShowNewClaimForm(false);
+        setNewClaimData({
+          insuranceProvider: "", policyNumber: "", expiryDate: "",
+          insuranceCardFile: "", tableOfBenefitsFile: "",
+          departmentId: "", departmentName: "", serviceId: "", serviceName: "",
+          services: [],
+          doctorId: "", doctorName: "", claimAmount: "", claimType: "Paid",
+          coPayPercent: "", coPayType: "Patient Pays", notes: "",
+          documentFiles: [], advanceStatus: "Full Pay", advanceAmount: 0,
+        });
+        fetchInsuranceClaims();
+      } else {
+        alert(data.message || "Failed to create insurance claim");
+      }
+    } catch (err) {
+      console.error("Claim submission error:", err);
+      alert("Failed to create insurance claim");
+    } finally {
+      setNewClaimSubmitting(false);
+    }
+  };
+
   // Commented out - not currently used in the UI
   /* const handleUploadBalance = async () => {
     if (!patientData?._id) return;
-    
+   
     setUploadLoading(true);
     setUploadError(null);
-    
+   
     try {
       const updatedBalance = await fetchPatientBalance(patientData._id);
       if (updatedBalance) {
@@ -2510,10 +3308,10 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
       // Step 1: Upload image to /api/upload
       const formData = new FormData();
       formData.append('file', file);
-      
+     
       const authHeaders = getAuthHeaders();
       if (!authHeaders) throw new Error('Not authenticated');
-      
+     
       const uploadResponse = await axios.post('/api/upload', formData, {
         headers: {
           ...authHeaders,
@@ -2557,12 +3355,12 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
 
   const filterAppointments = (appointmentsList: any[], filter: string) => {
     if (filter === 'all') return appointmentsList;
-    
+   
     // For 'upcoming' filter, use the already-fetched upcoming appointments
     if (filter === 'upcoming') {
       return upcomingAppointments;
     }
-    
+   
     return appointmentsList.filter((apt: any) => {
       const status = (apt.status || apt.appointmentStatus || '').toLowerCase();
       return status === filter.toLowerCase();
@@ -2597,7 +3395,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
     );
   };
 
-  const filteredAppointments = appointmentFilter === 'upcoming' 
+  const filteredAppointments = appointmentFilter === 'upcoming'
     ? filterAppointments(upcomingAppointments, appointmentFilter)
     : filterAppointments(appointments, appointmentFilter);
 
@@ -2622,7 +3420,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
 
       {/* Main Content */}
       <div className="w-full px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6">
-        
+       
         {/* Patient Profile Header Card */}
         <div className="bg-white rounded-xl shadow-md border border-gray-200 p-4 mb-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -2632,7 +3430,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
               <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-teal-400 to-cyan-500 flex items-center justify-center text-white text-xl font-bold shadow-lg flex-shrink-0">
                 {getInitials(patientData.firstName, patientData.lastName)}
               </div>
-              
+             
               {/* Patient Info */}
               <div className="flex-1 min-w-0">
                 <h2 className="text-base sm:text-xl font-bold text-gray-900 truncate">
@@ -2647,7 +3445,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                   <div className="flex items-center gap-1.5 min-w-0">
                     <Phone className="w-3 h-3 text-gray-400 flex-shrink-0" />
                     <span className="text-gray-500 font-medium flex-shrink-0">Mobile:</span>
-                    <span className="text-gray-800">{patientData.countryCode || '+91'} {patientData.mobileNumber || 'N/A'}</span>
+                    <span className="text-gray-800">{patientData.countryCode || ''} {patientData.mobileNumber || 'N/A'}</span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <User className="w-3 h-3 text-gray-400 flex-shrink-0" />
@@ -2678,11 +3476,11 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                     {getCurrencySymbol(currency)}{validCashback.amount.toFixed(2)}
                   </div>
                   <div className="text-[9px] text-green-600 font-semibold">
-                    Expires: {new Date(validCashback.expiryDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    Ends At: {new Date(validCashback.endsAt || validCashback.expiryDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                   </div>
-                  <div className="text-[9px] text-green-500 mt-0.5">
+                  {/* <div className="text-[9px] text-green-500 mt-0.5">
                     {validCashback.daysRemaining} days remaining
-                  </div>
+                  </div> */}
                 </div>
               )}
 
@@ -2712,7 +3510,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                 className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-gradient-to-r from-teal-500 to-cyan-600 text-white rounded-lg hover:from-teal-600 hover:to-cyan-700 transition-all shadow-md font-medium text-xs whitespace-nowrap"
               >
                 {/* <DollarSign className="w-3.5 h-3.5" /> */}
-                {getCurrencySymbol(currency)} Add Payment 
+                {getCurrencySymbol(currency)} Add Payment
               </button>
             </div>
           </div>
@@ -2788,7 +3586,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                     </button>
                   ))}
                 </div>
-            
+           
                 {/* Appointments Table Card */}
                 <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                   {loadingAppointments ? (
@@ -2961,7 +3759,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                             onClick={() => setShowAddMembershipDropdown(true)}
                             className="px-3 py-1.5 bg-indigo-600 text-white text-[10px] font-medium rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-1"
                           >
-                            <Plus className="w-3 h-3" /> Add Membership 
+                            <Plus className="w-3 h-3" /> Add Membership
                           </button>
                         ) : (
                           <div className="border border-indigo-200 rounded-lg p-2 bg-indigo-50 mb-2">
@@ -3028,10 +3826,10 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                             .map((m: any, originalIdx: number) => ({ m, originalIdx }))
                             .filter(({ m }: any) => !txOutMembershipIds.has(String(m.membershipId)));
                           if (visibleMemberships.length === 0) return null;
-                          
+                         
                           // Check if more than 3 memberships to enable scroll
                           const shouldScroll = visibleMemberships.length > 3;
-                          
+                         
                           return (
                             <div className="border border-gray-200 rounded p-2 mt-2">
                               <div className="text-[10px] font-semibold text-gray-900 mb-1">Added Memberships</div>
@@ -3041,7 +3839,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                   const k = `${m.membershipId}|${m.startDate}|${m.endDate}`;
                                   const usage = pmMembershipUsageMap[k];
                                   const isExpired = m.endDate && new Date(m.endDate) < new Date();
-                                  
+                                 
                                   return (
                                     <div key={`${m.membershipId}-${originalIdx}`} className={`p-2 rounded-lg border ${isExpired ? 'border-red-200 bg-red-50/30' : 'border-indigo-100 bg-indigo-50/30'} hover:bg-indigo-50/50 transition-colors mb-2 last:mb-0 relative overflow-hidden`}>
                                       {isExpired && (
@@ -3080,7 +3878,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                           <X className="w-3.5 h-3.5" />
                                         </button>
                                       </div>
-                                      
+                                     
                                       {usage && !usage.isExpired && (usage.totalFreeConsultations || 0) > 0 && (() => {
                                         const total = usage.totalFreeConsultations || 0;
                                         const used = usage.usedFreeConsultations || 0;
@@ -3092,9 +3890,9 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                               <span className="font-bold">{used} / {total}</span>
                                             </div>
                                             <div className="w-full h-1.5 rounded-full bg-gray-200 overflow-hidden">
-                                              <div 
-                                                className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-500" 
-                                                style={{ width: `${pct}%` }} 
+                                              <div
+                                                className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-500"
+                                                style={{ width: `${pct}%` }}
                                               />
                                             </div>
                                           </div>
@@ -3148,7 +3946,6 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                 setPkgError("");
                                 setPkgSuccess("");
                                 if (allServices.length === 0) fetchAllServices(); // Load clinic services
-                                if (pkgTreatments.length === 0) fetchPkgTreatments();
                               }}
                               className="px-3 py-1.5 border border-purple-300 bg-white text-purple-700 text-[10px] font-medium rounded-lg hover:bg-purple-50 transition-colors flex items-center gap-1"
                             >
@@ -3472,10 +4269,10 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                             .map((p: any, originalIdx: number) => ({ p, originalIdx }))
                             .filter(({ p }: any) => !txOutPackageIds.has(String(p.packageId)));
                           if (visiblePackages.length === 0) return null;
-                          
+                         
                           // Check if more than 3 packages to enable scroll
                           const shouldScroll = visiblePackages.length > 3;
-                          
+                         
                           return (
                             <div className="border border-gray-200 rounded p-2 mt-2">
                               <div className="text-[10px] font-semibold text-gray-900 mb-1">Added Packages</div>
@@ -3488,7 +4285,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                   const isExpired = endDate && new Date(endDate) < new Date();
                                   const paymentStatus = p.paymentStatus || 'Unpaid';
                                   const paymentMethod = p.paymentMethod || 'N/A';
-                                  
+                                 
                                   return (
                                     <div key={`${p.packageId}-${originalIdx}`} className={`flex flex-col text-[10px] border-b ${isExpired ? 'border-red-100 bg-red-50/20' : 'border-purple-100 bg-purple-50/20'} pb-2 last:border-b-0 mb-2 last:mb-0 p-2 rounded-lg relative overflow-hidden`}>
                                       {isExpired && (
@@ -3521,7 +4318,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                           </span>
                                         )}
                                       </div>
-                                      
+                                     
                                       {/* Validity & Dates */}
                                       {(validity || startDate || endDate) && (
                                         <div className={`mt-1.5 grid grid-cols-2 gap-2 p-1.5 rounded border ${isExpired ? 'bg-red-50/50 border-red-100' : 'bg-white/60 border-purple-100'}`}>
@@ -3540,7 +4337,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                                   const newPackages = [...(prev.packages || [])];
                                                   if (newPackages[originalIdx]) {
                                                     const pkgToUpdate = { ...newPackages[originalIdx], startDate: newDate };
-                                                    
+                                                   
                                                     // Auto-calculate end date based on validity
                                                     const currentValidity = Number(pkgToUpdate.validityInMonths) || Number(pkg?.validityInMonths) || 0;
                                                     if (currentValidity > 0 && newDate) {
@@ -3548,7 +4345,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                                       d.setMonth(d.getMonth() + currentValidity);
                                                       pkgToUpdate.endDate = formatPmDate(d);
                                                     }
-                                                    
+                                                   
                                                     newPackages[originalIdx] = pkgToUpdate;
                                                   }
                                                   return { ...prev, packages: newPackages };
@@ -3577,7 +4374,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                           </div>
                                         </div>
                                       )}
-                                      
+                                     
                                       <div className="text-gray-500 text-[9px] mt-1">Treatments: {pkg?.treatments?.length || 0} included</div>
                                     </div>
                                   );
@@ -3590,9 +4387,15 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                     </div>
 
                     {/* Package Payment Modal */}
-                    {showPackagePaymentModal && pkgPendingToAssign && (
+                    {showPackagePaymentModal && (pkgPendingToAssign || pkgPendingToCreate) && (
                       <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-                        <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-md" onClick={() => setShowPackagePaymentModal(false)} />
+                        <div
+                          className="absolute inset-0 bg-gray-900/60 backdrop-blur-md"
+                          onClick={() => {
+                            setShowPackagePaymentModal(false);
+                            setPkgPendingToCreate(null); // Clear pending create on backdrop click
+                          }}
+                        />
                         <div className="relative bg-white rounded-3xl shadow-2xl max-w-lg w-full max-h-[95vh] overflow-hidden animate-in fade-in zoom-in duration-300 flex flex-col">
                           <div className="bg-gradient-to-r from-purple-600 to-indigo-700 px-6 py-4 flex items-center justify-between flex-shrink-0">
                             <div className="flex items-center gap-3">
@@ -3601,15 +4404,40 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                               </div>
                               <div>
                                 <h3 className="text-lg font-bold text-white leading-tight">Pay for Package</h3>
-                                <p className="text-purple-100 text-[10px] font-medium opacity-80">{pkgPendingToAssign.name}</p>
+                                <p className="text-purple-100 text-[10px] font-medium opacity-80">{pkgPendingToCreate?.name || pkgPendingToAssign?.name}</p>
                               </div>
                             </div>
-                            <button onClick={() => setShowPackagePaymentModal(false)} className="p-2 hover:bg-white/10 rounded-xl text-white/80 hover:text-white transition-all">
+                            <button
+                              onClick={() => {
+                                setShowPackagePaymentModal(false);
+                                setPkgPendingToCreate(null); // Clear pending create on cancel
+                              }}
+                              className="p-2 hover:bg-white/10 rounded-xl text-white/80 hover:text-white transition-all"
+                            >
                               <X className="w-5 h-5" />
                             </button>
                           </div>
 
                           <div className="p-5 space-y-5 overflow-y-auto custom-scrollbar">
+                            {/* Loading State */}
+                            {pkgLoadingBalance ? (
+                              <div className="flex items-center justify-center py-8">
+                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+                                <span className="ml-3 text-sm text-gray-600">Loading balance information...</span>
+                              </div>
+                            ) : (
+                              <>
+                            {/* Auto-enable advance balance when modal loads and balance is available */}
+                            {(() => {
+                              if (!pkgLoadingBalance && pkgAvailableBalance.advanceBalance > 0 && !pkgUseAdvanceBalance) {
+                                // Auto-enable advance balance
+                                setPkgUseAdvanceBalance(true);
+                                // Recalculate based on entered amount
+                                calculatePkgAmountToPay(pkgEnteredAmount);
+                              }
+                              return null;
+                            })()}
+                            
                             <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl flex items-center justify-between shadow-sm">
                               <div className="flex items-center gap-3">
                                 <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center">
@@ -3625,7 +4453,12 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                             <div className="grid grid-cols-2 gap-3">
                               <button
                                 type="button"
-                                onClick={() => { setPkgPaymentType("Full"); setPkgPaidAmount(pkgTotalAmount); }}
+                                onClick={() => {
+                                  setPkgPaymentType("Full");
+                                  setPkgEnteredAmount(pkgTotalAmount);
+                                  // Recalculate amount to pay based on entered amount and balance usage
+                                  calculatePkgAmountToPay(pkgTotalAmount);
+                                }}
                                 className={`p-3 rounded-2xl border-2 transition-all flex flex-col items-center gap-1.5 ${pkgPaymentType === 'Full' ? 'border-purple-600 bg-purple-50 text-purple-700 shadow-md' : 'border-gray-100 bg-gray-50 text-gray-500 hover:border-purple-200'}`}
                               >
                                 <CheckCircle className={`w-5 h-5 ${pkgPaymentType === 'Full' ? 'text-purple-600' : 'text-gray-300'}`} />
@@ -3634,24 +4467,150 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                               </button>
                               <button
                                 type="button"
-                                onClick={() => { setPkgPaymentType("Partial"); setPkgPaidAmount(pkgTotalAmount / 2); }}
+                                onClick={() => {
+                                  setPkgPaymentType("Partial");
+                                  // Calculate 50% of total as the base amount for partial payment
+                                  const fiftyPercent = pkgTotalAmount / 2;
+                                  setPkgEnteredAmount(fiftyPercent);
+                                  // Recalculate amount to pay based on entered amount and balance usage
+                                  calculatePkgAmountToPay(fiftyPercent);
+                                }}
                                 className={`p-3 rounded-2xl border-2 transition-all flex flex-col items-center gap-1.5 ${pkgPaymentType === 'Partial' ? 'border-amber-600 bg-amber-50 text-amber-700 shadow-md' : 'border-gray-100 bg-gray-50 text-gray-500 hover:border-amber-200'}`}
                               >
                                 <Activity className={`w-5 h-5 ${pkgPaymentType === 'Partial' ? 'text-amber-600' : 'text-gray-300'}`} />
                                 <span className="font-bold text-[11px]">Partial Payment</span>
-                                <span className="text-[9px] opacity-70">Pay 50% ({getCurrencySymbol(currency)}{pkgTotalAmount / 2})</span>
+                                <span className="text-[9px] opacity-70">Pay {getCurrencySymbol(currency)}{(pkgTotalAmount / 2).toFixed(2)}</span>
                               </button>
                             </div>
 
+                            {/* Balance Usage Options */}
+                            {(pkgAvailableBalance.advanceBalance > 0 || pkgAvailableBalance.claimAmount > 0) && (
+                              <div className="space-y-3 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-2xl">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <Wallet className="w-4 h-4 text-blue-600" />
+                                  <span className="text-[11px] font-bold text-blue-800 uppercase tracking-wider">Use Available Balances</span>
+                                </div>
+                                
+                                {/* Advance Balance Option */}
+                                {pkgAvailableBalance.advanceBalance > 0 && (
+                                  <label className="flex items-center justify-between cursor-pointer p-3 bg-white rounded-xl border-2 border-emerald-200 hover:border-emerald-400 transition-all shadow-sm">
+                                    <div className="flex items-center gap-3">
+                                      <input
+                                        type="checkbox"
+                                        checked={pkgUseAdvanceBalance}
+                                        onChange={(e) => {
+                                          setPkgUseAdvanceBalance(e.target.checked);
+                                          // Recalculate amount to pay based on entered amount and whether advance is enabled
+                                          calculatePkgAmountToPay(pkgEnteredAmount);
+                                        }}
+                                        className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500 border-gray-300"
+                                      />
+                                      <div>
+                                        <div className="text-[10px] font-bold text-gray-700">Use Advance Balance</div>
+                                        <div className="text-[9px] text-gray-500">Available: {getCurrencySymbol(currency)}{pkgAvailableBalance.advanceBalance.toFixed(2)}</div>
+                                      </div>
+                                    </div>
+                                    <span className="text-[11px] font-bold text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full">
+                                      {getCurrencySymbol(currency)} {pkgAvailableBalance.advanceBalance.toFixed(2)}
+                                    </span>
+                                  </label>
+                                )}
+
+                                {/* Claim Balance Option */}
+                                {pkgAvailableBalance.claimAmount > 0 && (
+                                  <label className="flex items-center justify-between cursor-pointer p-3 bg-white rounded-xl border-2 border-blue-200 hover:border-blue-400 transition-all shadow-sm">
+                                    <div className="flex items-center gap-3">
+                                      <input
+                                        type="checkbox"
+                                        checked={pkgUseClaimBalance}
+                                        onChange={(e) => {
+                                          setPkgUseClaimBalance(e.target.checked);
+                                          // Recalculate amount to pay based on entered amount and whether claim is enabled
+                                          calculatePkgAmountToPay(pkgEnteredAmount);
+                                        }}
+                                        className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 border-gray-300"
+                                      />
+                                      <div>
+                                        <div className="text-[10px] font-bold text-gray-700">Use Insurance Claim</div>
+                                        <div className="text-[9px] text-gray-500">Available: {getCurrencySymbol(currency)}{pkgAvailableBalance.claimAmount.toFixed(2)}</div>
+                                      </div>
+                                    </div>
+                                    <span className="text-[11px] font-bold text-blue-700 bg-blue-100 px-3 py-1 rounded-full">
+                                      {getCurrencySymbol(currency)} {pkgAvailableBalance.claimAmount.toFixed(2)}
+                                    </span>
+                                  </label>
+                                )}
+
+                                {/* Summary of Balance Usage */}
+                                {(pkgAdvanceUsedAmount > 0 || pkgClaimUsedAmount > 0) && (
+                                  <div className="mt-3 p-3 bg-white rounded-xl border border-gray-200">
+                                    <div className="text-[9px] font-bold text-gray-600 uppercase mb-2">Payment Summary</div>
+                                    <div className="space-y-1.5 text-[10px]">
+                                      {pkgAdvanceUsedAmount > 0 && (
+                                        <div className="flex justify-between items-center">
+                                          <span className="text-gray-600">Advance Used:</span>
+                                          <span className="font-bold text-emerald-700">- {getCurrencySymbol(currency)}{pkgAdvanceUsedAmount.toFixed(2)}</span>
+                                        </div>
+                                      )}
+                                      {pkgClaimUsedAmount > 0 && (
+                                        <div className="flex justify-between items-center">
+                                          <span className="text-gray-600">Claim Used:</span>
+                                          <span className="font-bold text-blue-700">- {getCurrencySymbol(currency)}{pkgClaimUsedAmount.toFixed(2)}</span>
+                                        </div>
+                                      )}
+                                      <div className="border-t border-gray-200 pt-1.5 mt-1.5 flex justify-between items-center">
+                                        <span className="font-bold text-gray-800">Remaining Balance:</span>
+                                        <span className="font-bold text-lg text-purple-700">{getCurrencySymbol(currency)}{Math.max(0, pkgTotalAmount - pkgAdvanceUsedAmount - pkgClaimUsedAmount - pkgPaidAmount).toFixed(2)}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Enter Amount Input */}
+                            {pkgPaymentType && (
+                              <div className="space-y-1.5">
+                                <div className="flex justify-between items-center px-1">
+                                  <label className="text-[10px] font-bold text-gray-600 uppercase tracking-wider">Enter Amount</label>
+                                  <span className="text-[9px] text-amber-600 font-semibold">
+                                    {pkgPaymentType === 'Partial' ? `50% = ${getCurrencySymbol(currency)}${(pkgTotalAmount / 2).toFixed(2)}` : `Full = ${getCurrencySymbol(currency)}${pkgTotalAmount.toFixed(2)}`}
+                                  </span>
+                                </div>
+                                <div className="relative">
+                                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm">{getCurrencySymbol(currency)}</span>
+                                  <input
+                                    type="number"
+                                    value={pkgEnteredAmount}
+                                    onChange={(e) => {
+                                      const entered = Number(e.target.value);
+                                      setPkgEnteredAmount(entered);
+                                      setPkgPaymentType("Custom");
+                                      // Recalculate amount to pay based on entered amount and balance usage
+                                      calculatePkgAmountToPay(entered);
+                                    }}
+                                    className="w-full bg-amber-50 border-2 border-amber-200 rounded-2xl py-3 pl-8 pr-4 text-lg font-bold text-gray-900 focus:bg-white focus:border-amber-500 focus:outline-none transition-all shadow-sm"
+                                    placeholder="0.00"
+                                  />
+                                </div>
+                              </div>
+                            )}
+
                             <div className="space-y-1.5">
-                              <label className="text-[10px] font-bold text-gray-600 uppercase tracking-wider px-1">Amount to Pay</label>
+                              <div className="flex justify-between items-center px-1">
+                                <label className="text-[10px] font-bold text-gray-600 uppercase tracking-wider">Amount to Pay</label>
+                                <span className="text-[9px] text-purple-600 font-semibold">
+                                  {pkgPaymentType === 'Partial' ? 'Partial (50%=' : pkgPaymentType === 'Full' ? 'Full' : 'Custom'} {getCurrencySymbol(currency)}{(pkgPaymentType === 'Partial' ? pkgTotalAmount / 2 : pkgPaymentType === 'Full' ? pkgTotalAmount : pkgEnteredAmount).toFixed(2)}{pkgPaymentType === 'Partial' ? ')' : ''}
+                                </span>
+                              </div>
                               <div className="relative">
                                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm">{getCurrencySymbol(currency)}</span>
                                 <input
                                   type="number"
                                   value={pkgPaidAmount}
-                                  onChange={(e) => setPkgPaidAmount(Number(e.target.value))}
-                                  className="w-full bg-gray-50 border-2 border-gray-100 rounded-2xl py-3 pl-8 pr-4 text-lg font-bold text-gray-900 focus:bg-white focus:border-purple-500 focus:outline-none transition-all shadow-sm"
+                                  readOnly
+                                  className="w-full bg-gray-50 border-2 border-gray-100 rounded-2xl py-3 pl-8 pr-4 text-lg font-bold text-gray-900 cursor-not-allowed"
+                                  placeholder="0.00"
                                 />
                               </div>
                             </div>
@@ -3670,8 +4629,8 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                     type="button"
                                     onClick={() => setPkgPaymentMethod(method.id)}
                                     className={`flex flex-col items-center justify-center gap-1 p-2 rounded-xl border-2 transition-all ${
-                                      pkgPaymentMethod === method.id 
-                                        ? 'border-emerald-500 bg-emerald-50 ring-1 ring-emerald-500/10' 
+                                      pkgPaymentMethod === method.id
+                                        ? 'border-emerald-500 bg-emerald-50 ring-1 ring-emerald-500/10'
                                         : 'border-gray-100 bg-white text-gray-400 hover:border-gray-200'
                                     }`}
                                   >
@@ -3687,12 +4646,15 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                             <div className="flex flex-wrap gap-2 pt-2">
                               <button
                                 type="button"
-                                onClick={() => setShowPackagePaymentModal(false)}
+                                onClick={() => {
+                                  setShowPackagePaymentModal(false);
+                                  setPkgPendingToCreate(null); // Clear pending create on cancel
+                                }}
                                 className="flex-1 min-w-[80px] py-3 bg-gray-100 text-gray-600 text-xs font-bold rounded-2xl hover:bg-gray-200 transition-all"
                               >
                                 Cancel
                               </button>
-                              
+                             
                               {/* Skip button for clinic role only */}
                               {typeof window !== "undefined" && getUserRole() === 'clinic' && (
                                 <button
@@ -3707,7 +4669,10 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                               <button
                                 type="button"
                                 onClick={() => {
-                                  const status = pkgPaidAmount >= pkgTotalAmount ? "Full" : (pkgPaidAmount > 0 ? "Partial" : "Unpaid");
+                                  // Respect the user's payment type selection (Full or Partial)
+                                  // The pkgPaymentType state holds what user selected
+                                  const status = pkgPaymentType === 'Partial' ? 'Partial' : (pkgPaidAmount > 0 ? 'Full' : 'Unpaid');
+                                  
                                   finalizePmAddPackage(pkgPaidAmount, status, pkgPaymentMethod);
                                 }}
                                 className="flex-[2] min-w-[120px] py-3 bg-gradient-to-r from-purple-600 to-indigo-700 text-white text-xs font-bold rounded-2xl hover:shadow-lg hover:shadow-purple-200 transition-all"
@@ -3715,6 +4680,8 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                 Confirm & Add
                               </button>
                             </div>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -3730,7 +4697,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                             </div>
                             <h3 className="text-lg font-bold text-gray-900">Confirm Save Changes</h3>
                           </div>
-                          
+                         
                           <div className="mb-6">
                             <p className="text-sm text-gray-700 mb-2">
                               Are you sure you want to save the following changes?
@@ -3807,7 +4774,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                       <Package className="w-5 h-5 text-teal-600" />
                       Packages
                     </h3>
-                    
+                   
                     {loadingPackages ? (
                       <div className="flex items-center justify-center py-12">
                         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600"></div>
@@ -3825,13 +4792,13 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                       const assignedDate = pkg.assignedDate || pkg.createdAt || pkg.startDate;
                       const isUserPackage = pkg.approvalStatus === 'approved';
                       const isExpired = pkg.endDate && new Date(pkg.endDate) < new Date();
-                      
+                     
                       // Session calculations - use actual data from API
                       const totalSessions = pkg.totalSessions || 0;
                       const usedSessions = typeof pkg.usedSessions === 'number' ? pkg.usedSessions : (totalSessions - (pkg.remainingSessions || 0));
                       const remainingSessions = typeof pkg.remainingSessions === 'number' ? pkg.remainingSessions : Math.max(0, totalSessions - usedSessions);
                       const progressPercent = totalSessions > 0 ? Math.min(100, Math.round((usedSessions / totalSessions) * 100)) : 0;
-                      
+                     
                       // Price calculation
                       const price = pkg.price || pkg.totalPrice || 0;
                       const formattedPrice = typeof price === 'number' ? `${getCurrencySymbol(currency)}${price.toFixed(2)}` : `${getCurrencySymbol(currency)}${price || 0}`;
@@ -3853,7 +4820,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                 <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${isExpired ? 'from-red-100 to-rose-100' : (isUserPackage ? 'from-indigo-100 to-purple-100' : 'from-teal-100 to-cyan-100')} flex items-center justify-center flex-shrink-0 shadow-sm`}>
                                   <Package className={`w-7 h-7 ${isExpired ? 'text-red-600' : (isUserPackage ? 'text-indigo-600' : 'text-teal-600')}`} />
                                 </div>
-                                
+                               
                                 {/* Package Info */}
                                 <div className="flex-1">
                                   <div className="flex items-center gap-2 mb-1">
@@ -3866,7 +4833,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                   </div>
                                   <div className="flex flex-wrap items-center gap-3 text-sm">
                                     <span className={`font-bold ${isExpired ? 'text-red-700' : 'text-gray-900'}`}>{formattedPrice}</span>
-                                    
+                                   
                                     {/* Payment Status & Method Tags */}
                                     {pkg.paymentStatus === 'Full' && (
                                       <span className="px-2 py-0.5 rounded-lg bg-green-100 text-green-700 font-black uppercase text-[9px] shadow-sm flex items-center gap-1">
@@ -3911,7 +4878,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                               </div>
                               {/* Progress Bar */}
                               <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
-                                <div 
+                                <div
                                   className={`h-full bg-gradient-to-r ${isExpired ? 'from-red-400 to-rose-400' : (isUserPackage ? 'from-indigo-500 to-purple-500' : 'from-teal-500 to-cyan-500')} rounded-full transition-all duration-500 ease-out`}
                                   style={{ width: `${progressPercent}%` }}
                                 ></div>
@@ -3966,13 +4933,13 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                 <div className="text-2xl font-bold text-blue-700">{totalSessions}</div>
                                 <div className="text-xs text-blue-600 mt-1 font-medium">Total Sessions</div>
                               </div>
-                              
+                             
                               {/* Used Sessions */}
                               <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
                                 <div className="text-2xl font-bold text-green-700">{usedSessions}</div>
                                 <div className="text-xs text-green-600 mt-1 font-medium">Used Sessions</div>
                               </div>
-                              
+                             
                               {/* Remaining Sessions */}
                               <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-center">
                                 <div className="text-2xl font-bold text-orange-700">{remainingSessions}</div>
@@ -4010,7 +4977,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                 </div>
                               </div>
                             )}
-                            
+                           
                             {/* Treatment Breakdown */}
                             {pkg.treatments && pkg.treatments.length > 0 && (
                               <div className="bg-white rounded-lg border border-gray-200 p-3">
@@ -4025,7 +4992,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                     const percent = max > 0 ? Math.min(100, Math.round((used / max) * 100)) : 0;
                                     const remaining = max - used;
                                     const isComplete = used >= max;
-                                    
+                                   
                                     return (
                                       <div key={tIdx} className="bg-gray-50 rounded-lg px-3 py-2.5">
                                         <div className="flex items-center justify-between mb-1.5">
@@ -4042,7 +5009,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                         </div>
                                         {/* Progress Bar */}
                                         <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden mb-1">
-                                          <div 
+                                          <div
                                             className={`h-full rounded-full transition-all duration-500 ${
                                               isComplete ? 'bg-gradient-to-r from-green-500 to-emerald-500' :
                                               used > 0 ? 'bg-gradient-to-r from-blue-500 to-cyan-500' :
@@ -4056,7 +5023,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                           {treatment.sessionPrice > 0 && <span>{getCurrencySymbol(currency)}{treatment.sessionPrice.toFixed(2)} / session</span>}
                                           <span>{percent}% complete</span>
                                         </div>
-                                        
+                                       
                                         {/* Billing Records Table - per treatment */}
                                         {treatment.usageDetails && treatment.usageDetails.length > 0 && (
                                           <div className="mt-3 pt-3 border-t border-gray-200">
@@ -4094,7 +5061,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                                       </td>
                                                       <td className="py-2.5 px-2.5 text-left">
                                                         <span className="text-[10px] text-gray-700 font-medium">
-                                                          {detail.multiplePayments && detail.multiplePayments.length > 0 
+                                                          {detail.multiplePayments && detail.multiplePayments.length > 0
                                                             ? detail.multiplePayments.map((mp: any) => mp.paymentMethod).join(" + ")
                                                             : (detail.paymentMethod || "–")}
                                                         </span>
@@ -4105,7 +5072,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                                           const isAgentDiscount = detail.isAgentDiscountApplied;
                                                           const membershipDiscountAmount = detail.membershipDiscountApplied || 0;
                                                           const isMembershipDiscount = membershipDiscountAmount > 0;
-                                                          
+                                                         
                                                           const originalAmount = detail.originalAmount || 0;
                                                           const finalAmount = detail.amount || 0;
                                                           const totalDiscountAmount = originalAmount > finalAmount ? (originalAmount - finalAmount) : 0;
@@ -4184,7 +5151,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                 </div>
                               </div>
                             )}
-                            
+                           
                             {/* Transfer Information */}
                             {pkg.isTransferred && (
                               <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-3 mt-3">
@@ -4260,7 +5227,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                     <Shield className="w-5 h-5 text-purple-600" />
                     Memberships
                   </h3>
-                              
+                             
                   {memberships.length === 0 ? (
                     <div className="text-center py-12 bg-gray-50 rounded-lg border border-gray-200">
                       <Shield className="w-12 h-12 text-gray-300 mx-auto mb-3" />
@@ -4275,7 +5242,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                         const endDate = membership.endDate;
                         const isExpired = endDate && new Date(endDate) < new Date();
                         const plan: any = allAvailableMemberships.find((m: any) => m._id === membershipId);
-              
+             
                         return (
                           <div key={membership._id || membershipId || index} className={`bg-white rounded-xl border ${isExpired ? 'border-red-200 shadow-sm' : 'border-gray-200 shadow-sm'} p-5 hover:shadow-md transition-all relative overflow-hidden`}>
                             {isExpired && (
@@ -4314,7 +5281,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                 </div>
                               </div>
                             </div>
-              
+             
                             {/* Membership Details */}
                             <div className={`mb-4 space-y-3 ${isExpired ? 'opacity-60 grayscale-[0.5]' : ''}`}>
                               {/* Membership Info Card */}
@@ -4331,7 +5298,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                       </span>
                                     </div>
                                   </div>
-                                  
+                                 
                                   <div>
                                     <div className="text-[10px] text-gray-600 mb-0.5">Priority Booking</div>
                                     <div className="flex items-center gap-1">
@@ -4349,35 +5316,35 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                       </div>
                                     </div>
                                   )}
-                                  
+                                 
                                   <div>
                                     <div className="text-[10px] text-gray-600 mb-0.5">Start Date</div>
                                     <div className={`text-xs font-semibold ${isExpired ? 'text-red-800' : 'text-gray-800'}`}>{new Date(membership.startDate).toLocaleDateString()}</div>
                                   </div>
-                                  
+                                 
                                   <div>
                                     <div className="text-[10px] text-gray-600 mb-0.5">End Date</div>
                                     <div className={`text-xs font-semibold ${isExpired ? 'text-red-700' : 'text-gray-800'}`}>{new Date(membership.endDate).toLocaleDateString()}</div>
                                   </div>
-                                  
+                                 
                                   <div>
                                     <div className="text-[10px] text-gray-600 mb-0.5">Price</div>
                                     <div className={`text-xs font-bold ${isExpired ? 'text-red-700' : 'text-purple-700'}`}>{getCurrencySymbol(currency)}{plan?.price?.toLocaleString() || 0}</div>
                                   </div>
-                                  
+                                 
                                   <div>
                                     <div className="text-[10px] text-gray-600 mb-0.5">Duration</div>
                                     <div className={`text-xs font-semibold ${isExpired ? 'text-red-800' : 'text-gray-800'}`}>{plan?.durationMonths} months</div>
                                   </div>
                                 </div>
-                                
+                               
                                 {isExpired && (
                                   <div className="mt-3 text-[10px] text-red-600 font-bold flex items-center gap-1 bg-white/50 p-2 rounded border border-red-200">
                                     <AlertCircle className="w-3.5 h-3.5" />
                                     MEMBERSHIP EXPIRED: BENEFITS & DISCOUNTS ARE NO LONGER APPLICABLE.
                                   </div>
                                 )}
-                                
+                               
                                 {(membership as any).usageData?.isTransferred && (
                                   <div className="mt-3 pt-3 border-t-2 border-purple-300 bg-gradient-to-r from-purple-100 to-blue-50 rounded-lg p-3">
                                     <div className="flex items-center gap-2 mb-2">
@@ -4403,7 +5370,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                   </div>
                                 )}
                               </div>
-                              
+                             
                               {/* Membership Benefits Section */}
                               {plan?.benefits && (
                                 <div className="bg-white rounded-lg border border-gray-200 p-3">
@@ -4430,7 +5397,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                         {(membership as any).usageData && (membership as any).usageData.totalFreeConsultations > 0 && (
                                           <>
                                             <div className="w-full h-3 bg-blue-200 rounded-full overflow-hidden mb-2">
-                                              <div 
+                                              <div
                                                 className="h-full bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full transition-all duration-500"
                                                 style={{ width: `${Math.min(100, (((membership as any).usageData.usedFreeConsultations || 0) / (membership as any).usageData.totalFreeConsultations) * 100)}%` }}
                                               />
@@ -4447,7 +5414,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                         )}
                                       </div>
                                     )}
-                                    
+                                   
                                     {/* Discount Percentage */}
                                     {plan.benefits.discountPercentage > 0 && (
                                       <div className="bg-green-50 border border-green-200 rounded-lg p-2.5">
@@ -4462,7 +5429,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                         </div>
                                       </div>
                                     )}
-                                    
+                                   
                                     {/* Priority Booking */}
                                     {plan.benefits.priorityBooking && (
                                       <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5">
@@ -4478,7 +5445,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                   </div>
                                 </div>
                               )}
-                              
+                             
                               {/* Transfer Information */}
                               {(membership as any).usageData?.isTransferred && (
                                 <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-xl p-4">
@@ -4513,7 +5480,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                   </div>
                                 </div>
                               )}
-                              
+                             
                               {/* Usage History */}
                               {(membership as any).usageData?.freeConsultationDetails && (membership as any).usageData.freeConsultationDetails.length > 0 && (
                                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
@@ -4543,11 +5510,11 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                 </div>
                               )}
                             </div>
-              
+             
                             {/* Footer with Action Button */}
                             <div className="flex items-center justify-between pt-4 border-t border-gray-100">
                              
-                              
+                             
                             </div>
                           </div>
                         );
@@ -4578,7 +5545,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                 <span className="px-2 py-0.5 rounded-full bg-green-200 text-green-800 text-[10px] font-bold">
                                   Transferred In
                                 </span>
-                                
+                               
                                 {/* Payment Status & Method Tags for Transferred Packages */}
                                 {pkg.paymentStatus === 'Full' && (
                                   <span className="px-2 py-0.5 rounded-lg bg-green-100 text-green-700 font-black uppercase text-[9px] shadow-sm flex items-center gap-1">
@@ -4857,8 +5824,8 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                     <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
                       <div className="text-[10px] text-blue-600 font-bold uppercase tracking-wider mb-1">Total Billed</div>
                       <div className="text-lg font-bold text-blue-800">
-                        {formatAED((billingHistory || []).filter((b: any) => 
-                          (!b.isAdvanceOnly && b.treatment !== "Advance Payment" && b.treatment !== "Historical Advance Balance") || 
+                        {formatAED((billingHistory || []).filter((b: any) =>
+                          (!b.isAdvanceOnly && b.treatment !== "Advance Payment" && b.treatment !== "Historical Advance Balance") ||
                           b.treatment === "Pending Balance Payment"
                         ).reduce((acc: number, b: any) => acc + (Number(b.amount) || 0), 0))}
                       </div>
@@ -4920,190 +5887,714 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                       {/* Invoices Table - Full Width */}
                       <div className="lg:col-span-3 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                         <div className="px-5 py-4 border-b border-gray-100">
-                          <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                            <FileText className="w-5 h-5 text-teal-600" />
-                            Invoices
-                          </h3>
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                            <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                              <FileText className="w-5 h-5 text-teal-600" />
+                              Invoices
+                            </h3>
+                            {/* Search Section */}
+                            <div className="flex flex-col sm:flex-row gap-2">
+                              {/* Search Type Toggle */}
+                              <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+                                <button
+                                  onClick={() => setBillingSearchType('all')}
+                                  className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                                    billingSearchType === 'all'
+                                      ? 'bg-teal-600 text-white'
+                                      : 'bg-white text-gray-600 hover:bg-gray-50'
+                                  }`}
+                                >
+                                  All
+                                </button>
+                                <button
+                                  onClick={() => setBillingSearchType('invoice')}
+                                  className={`px-3 py-1.5 text-xs font-medium transition-colors border-l border-gray-200 ${
+                                    billingSearchType === 'invoice'
+                                      ? 'bg-teal-600 text-white'
+                                      : 'bg-white text-gray-600 hover:bg-gray-50'
+                                  }`}
+                                >
+                                  Invoice
+                                </button>
+                                <button
+                                  onClick={() => setBillingSearchType('treatment')}
+                                  className={`px-3 py-1.5 text-xs font-medium transition-colors border-l border-gray-200 ${
+                                    billingSearchType === 'treatment'
+                                      ? 'bg-teal-600 text-white'
+                                      : 'bg-white text-gray-600 hover:bg-gray-50'
+                                  }`}
+                                >
+                                  Treatment
+                                </button>
+                              </div>
+                              {/* Search Input */}
+                              <div className="relative">
+                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                <input
+                                  type="text"
+                                  placeholder={billingSearchType === 'invoice' ? 'Search by invoice...' : billingSearchType === 'treatment' ? 'Search by treatment...' : 'Search invoice or treatment...'}
+                                  value={billingSearchQuery}
+                                  onChange={(e) => setBillingSearchQuery(e.target.value)}
+                                  className="w-full sm:w-64 pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                                />
+                                {billingSearchQuery && (
+                                  <button
+                                    onClick={() => setBillingSearchQuery('')}
+                                    className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 hover:text-gray-600"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                        
+                       
                         <div className="overflow-x-auto">
-                          <table className="min-w-full divide-y divide-gray-100 hidden sm:table">
-                            <thead className="bg-gray-50">
-                              <tr>
-                                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Invoice</th>
-                                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Date</th>
-                                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Treatment</th>
-                                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Payment Method</th>
-                                <th className="px-5 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Discount</th>
-                                <th className="px-5 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Original Amount</th>
-                                <th className="px-5 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Total</th>
-                              </tr>
-                            </thead>
-                            <tbody className="bg-white divide-y divide-gray-100">
-                              {(billingHistory || [])
-                                .filter((b: any) => !b.isAdvanceOnly && b.treatment !== "Advance Payment" && b.treatment !== "Historical Advance Balance")
-                                .map((billing: any, index: number) => {
-                                // Determine payment method
-                                const paymentMethods = billing.multiplePayments && billing.multiplePayments.length > 0 
-                                  ? billing.multiplePayments.map((mp: any) => mp.paymentMethod).join(" + ")
-                                  : (billing.paymentMethod || "–");
-                                
-                                return (
-                                  <tr key={billing._id || index} className="hover:bg-gray-50 transition-colors">
-                                    <td className="px-5 py-4 whitespace-nowrap">
-                                      <div className="text-sm font-semibold text-gray-900">{billing.invoiceNumber || `INV-${String(index + 1).padStart(4, '0')}`}</div>
-                                      <div className="text-xs text-gray-500 mt-0.5">{billing.service || 'Treatment'}</div>
-                                    </td>
-                                    <td className="px-5 py-4 whitespace-nowrap">
-                                      <div className="text-sm text-gray-700">
-                                        {billing.invoicedDate ? new Date(billing.invoicedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}
-                                      </div>
-                                    </td>
-                                    <td className="px-5 py-4 whitespace-nowrap">
-                                      <div className="text-sm text-gray-700 max-w-xs truncate" title={billing.treatment}>
-                                        {billing.package ? (
-                                          <div className="flex flex-col">
-                                            <div className="font-semibold text-indigo-700 flex items-center gap-1">
-                                              <Package className="w-3 h-3" />
-                                              {billing.package}
-                                            </div>
-                                            <div className="text-xs text-gray-500 mt-0.5">
-                                              {Array.isArray(billing.selectedPackageTreatments) && billing.selectedPackageTreatments.length > 0
-                                                ? billing.selectedPackageTreatments.map((t: any) => t.treatmentName).join(', ')
-                                                : billing.treatment || '-'}
-                                            </div>
+                          <div className="min-w-full">
+                            {/* Desktop Table View */}
+                            <table className="min-w-full divide-y divide-gray-100 hidden lg:table">
+                              <thead className="bg-slate-50">
+                                <tr>
+                                  <th className="px-3 py-3 text-left text-[10px] font-bold text-gray-600 uppercase tracking-wider">Invoice</th>
+                                  <th className="px-3 py-3 text-left text-[10px] font-bold text-gray-600 uppercase tracking-wider">Date</th>
+                                  <th className="px-3 py-3 text-left text-[10px] font-bold text-gray-600 uppercase tracking-wider">Treatment / Package</th>
+                                  <th className="px-3 py-3 text-center text-[10px] font-bold text-gray-600 uppercase tracking-wider">Discount</th>
+                                  <th className="px-3 py-3 text-center text-[10px] font-bold text-gray-600 uppercase tracking-wider">Offer Applied</th>
+                                  <th className="px-3 py-3 text-center text-[10px] font-bold text-gray-600 uppercase tracking-wider">Free Sessions</th>
+                                  <th className="px-3 py-3 text-center text-[10px] font-bold text-gray-600 uppercase tracking-wider">Cashback</th>
+                                  <th className="px-3 py-3 text-right text-[10px] font-bold text-gray-600 uppercase tracking-wider">Original</th>
+                                  <th className="px-3 py-3 text-right text-[10px] font-bold text-gray-600 uppercase tracking-wider">Total</th>
+                                  <th className="px-3 py-3 text-right text-[10px] font-bold text-gray-600 uppercase tracking-wider">Paid</th>
+                                  <th className="px-3 py-3 text-right text-[10px] font-bold text-red-600 uppercase tracking-wider">Pending</th>
+                                  <th className="px-3 py-3 text-right text-[10px] font-bold text-gray-600 uppercase tracking-wider">Advance</th>
+                                  <th className="px-3 py-3 text-right text-[10px] font-bold text-gray-600 uppercase tracking-wider">Adv. Used</th>
+                                  <th className="px-3 py-3 text-right text-[10px] font-bold text-gray-600 uppercase tracking-wider">Claim Used</th>
+                                  <th className="px-3 py-3 text-right text-[10px] font-bold text-gray-600 uppercase tracking-wider">Pend. Used</th>
+                                  <th className="px-3 py-3 text-center text-[10px] font-bold text-gray-600 uppercase tracking-wider">Qty</th>
+                                  <th className="px-3 py-3 text-left text-[10px] font-bold text-gray-600 uppercase tracking-wider">Method</th>
+                                  <th className="px-3 py-3 text-left text-[10px] font-bold text-gray-600 uppercase tracking-wider">Refund</th>
+                                </tr>
+                              </thead>
+                              <tbody className="bg-white divide-y divide-gray-100">
+                                {(billingHistory || [])
+                                  .filter((b: any) => !b.isAdvanceOnly && b.treatment !== "Advance Payment" && b.treatment !== "Historical Advance Balance")
+                                  .filter((b: any) => {
+                                    if (!billingSearchQuery.trim()) return true;
+                                    const query = billingSearchQuery.toLowerCase();
+                                    const invoiceMatch = (b.invoiceNumber || '').toLowerCase().includes(query);
+                                    const treatmentMatch = (b.treatment || '').toLowerCase().includes(query);
+                                    if (billingSearchType === 'invoice') return invoiceMatch;
+                                    if (billingSearchType === 'treatment') return treatmentMatch;
+                                    return invoiceMatch || treatmentMatch;
+                                  })
+                                  .map((billing: any, index: number) => {
+                                    // Calculate discount
+                                    const originalAmt = billing.originalAmount || billing.amount || 0;
+                                    const totalDiscount = originalAmt > billing.amount ? (originalAmt - billing.amount) : 0;
+                                    const discountPercent = originalAmt > 0 ? (totalDiscount / originalAmt * 100) : 0;
+                                    const isDoctorDiscount = billing.isDoctorDiscountApplied;
+                                    const isAgentDiscount = billing.isAgentDiscountApplied;
+                                    const isMembershipDiscount = (billing.membershipDiscountApplied || 0) > 0;
+                                    const hasAnyDiscount = discountPercent > 0 || isDoctorDiscount || isAgentDiscount || isMembershipDiscount;
+                                    
+                                    // Refund info
+                                    const isRefunded = billing.isOfferRefunded || false;
+                                    const refundedOffers = billing.refundedOffers || [];
+                                    const refundedAt = billing.refundedAt;
+                                    // const refundedBy = billing.refundedBy;
+                                    // const refundedAmount = billing.refundedAmount || 0;
+                                    
+                                    // Payment methods
+                                    const paymentMethods = billing.multiplePayments && billing.multiplePayments.length > 0
+                                      ? billing.multiplePayments.map((mp: any) => mp.paymentMethod).join(" + ")
+                                      : (billing.paymentMethod || "–");
+                                    
+                                    // Offer type
+                                    const offerType = billing.offerType || null;
+                                    const offerName = billing.offerName || null;
+                                    
+                                    // Free sessions
+                                    const usedFreeSessionCount = billing.usedFreeSessionCount || 0;
+                                    const usedFreeSessionNames = billing.usedFreeSessions || [];
+                                    const earnedFreeSessions = billing.freeOfferSessionCount || 0;
+                                    const earnedFreeSessionNames = billing.offerFreeSession || [];
+                                    const freeConsultation = billing.isFreeConsultation || false;
+                                    const freeConsultCount = billing.freeConsultationCount || 0;
+                                    const isBundleOffer = billing.offerType === 'bundle';
+                                    
+                                    // Cashback
+                                    const cashbackEarnedAmt = billing.cashbackEarned || 0;
+                                    const cashbackEarnedFromOffer = billing.cashbackAmount || 0;
+                                    const cashbackUsedAmt = billing.cashbackWalletUsed || 0;
+                                    const isCashbackApplied = billing.isCashbackApplied || false;
+                                    const cashbackOfferName = billing.cashbackOfferName || '';
+                                    
+                                    // Pending and advance
+                                    const pendingAmt = billing.pending || 0;
+                                    const advanceAmt = billing.advance || 0;
+                                    const advanceUsed = billing.advanceUsed || 0;
+                                    const claimUsed = billing.claimAmountUsed || 0;
+                                    const pendingUsed = billing.pendingUsed || 0;
+                                    
+                                    return (
+                                      <tr key={billing._id || index} className={`transition-colors ${isRefunded ? 'bg-red-50 hover:bg-red-100 border-l-4 border-l-red-500' : `hover:bg-gray-50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}`}>
+                                        {/* Invoice */}
+                                        <td className="px-3 py-3 whitespace-nowrap">
+                                          <div className="text-xs font-bold text-gray-900">{billing.invoiceNumber || `INV-${String(index + 1).padStart(4, '0')}`}</div>
+                                          <div className="text-[9px] text-gray-400">{billing.service || 'Treatment'}</div>
+                                        </td>
+                                        {/* Date */}
+                                        <td className="px-3 py-3 whitespace-nowrap">
+                                          <div className="text-xs text-gray-700">
+                                            {billing.invoicedDate ? new Date(billing.invoicedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}
                                           </div>
-                                        ) : (
-                                          billing.treatment || '-'
-                                        )}
-                                     </div>
-                                    </td>
-                                    <td className="px-5 py-4 whitespace-nowrap">
-                                      <div className="text-sm text-gray-700">{paymentMethods}</div>
-                                    </td>
-                                    <td className="px-5 py-4 whitespace-nowrap text-center">
-                                      {(() => {
-                                        const isDoctorDiscount = billing.isDoctorDiscountApplied;
-                                        const isAgentDiscount = billing.isAgentDiscountApplied;
-                                        const membershipDiscountAmount = billing.membershipDiscountApplied || 0;
-                                        const isMembershipDiscount = membershipDiscountAmount > 0;
-                                        
-                                        const originalAmount = billing.originalAmount || 0;
-                                        const finalAmount = billing.amount || 0;
-                                        const totalDiscountAmount = originalAmount > finalAmount ? (originalAmount - finalAmount) : 0;
-                                        const totalPercent = totalDiscountAmount > 0 && originalAmount > 0 ? (totalDiscountAmount / originalAmount * 100) : 0;
-                                        const membershipPercent = isMembershipDiscount && originalAmount > 0 ? (membershipDiscountAmount / originalAmount * 100) : 0;
-
-                                        if (!isDoctorDiscount && !isAgentDiscount && !isMembershipDiscount && totalPercent <= 0) {
-                                          return <div className="text-xs text-gray-400">—</div>;
-                                        }
-
-                                        return (
-                                          <div className="flex flex-col items-center gap-1">
-                                            {totalPercent > 0 && (
-                                              <div className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700 border border-amber-200 shadow-sm">
-                                                {Number(totalPercent).toFixed(1)}% OFF
-                                              </div>
-                                            )}
-                                            <div className="flex flex-wrap justify-center gap-1 mt-0.5">
-                                              {isMembershipDiscount && (
-                                                <div className="text-[8px] uppercase tracking-wider text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded font-bold border border-emerald-100">
-                                                  Memb {membershipPercent > 0 ? `(${membershipPercent.toFixed(0)}%)` : 'Disc.'}
-                                                </div>
-                                              )}
-                                              {isDoctorDiscount && (
-                                                <div className="text-[8px] uppercase tracking-wider text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded font-bold border border-orange-100">
-                                                  Doctor Disc.
-                                                </div>
-                                              )}
-                                              {isAgentDiscount && (
-                                                <div className="text-[8px] uppercase tracking-wider text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded font-bold border border-blue-100">
-                                                  Agent Disc.
-                                                </div>
-                                              )}
-                                            </div>
-                                          </div>
-                                        );
-                                      })()}
-                                    </td>
-                                    <td className="px-5 py-4 whitespace-nowrap text-right">
-                                      <div className="text-sm font-medium text-gray-600">
-                                        {formatAED(billing.originalAmount || billing.amount || 0)}
-                                      </div>
-                                    </td>
-                                    <td className="px-5 py-4 whitespace-nowrap text-right">
-                                       <div className="text-sm font-bold text-gray-900">Paid: {formatAED(billing.paid || 0)}</div>
-                                        {/* <div className="text-[10px] text-gray-500">Total: {formatAED(billing.originalAmount || billing.amount || 0)}</div> */}
-                                      <div className="text-[10px] text-gray-900">Total: {formatAED(billing.amount || 0)}</div>
-                                       
-                                      <div className="flex flex-col items-end mt-1 space-y-0.5">
-                                        <div className="text-[10px] text-gray-400">Qty: {billing.quantity || 0}</div>
-                                      </div>
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-
-                          {/* Mobile List View */}
-                          <div className="sm:hidden divide-y divide-gray-100">
-                            {(billingHistory || [])
-                              .filter((b: any) => !b.isAdvanceOnly && b.treatment !== "Advance Payment" && b.treatment !== "Historical Advance Balance")
-                              .map((billing: any, index: number) => {
-                                const paymentMethods = billing.multiplePayments && billing.multiplePayments.length > 0 
-                                  ? billing.multiplePayments.map((mp: any) => mp.paymentMethod).join(" + ")
-                                  : (billing.paymentMethod || "–");
-                                return (
-                                  <div key={billing._id || index} className="p-4 hover:bg-gray-50">
-                                    {(() => {
-                                      const originalAmt = billing.originalAmount || billing.amount || 0;
-                                      const totalDisc = originalAmt > billing.amount ? (originalAmt - billing.amount) : 0;
-                                      const totalPct = originalAmt > 0 ? (totalDisc / originalAmt * 100) : 0;
-                                      
-                                      return (
-                                        <>
-                                          <div className="flex justify-between items-start mb-2">
-                                            <div>
-                                              <div className="text-sm font-bold text-gray-900">{billing.invoiceNumber || `INV-${String(index + 1).padStart(4, '0')}`}</div>
-                                              <div className="text-xs text-gray-500">{billing.service || 'Treatment'}</div>
-                                            </div>
-                                            <div className="text-right">
-                                              <div className="text-sm font-bold text-gray-900">{formatAED(billing.amount || 0)}</div>
-                                              <div className="text-[10px] text-gray-500">{billing.invoicedDate ? new Date(billing.invoicedDate).toLocaleDateString() : 'N/A'}</div>
-                                            </div>
-                                          </div>
-                                          <div className="text-sm text-gray-700 mb-2">
+                                        </td>
+                                        {/* Treatment / Package */}
+                                        <td className="px-3 py-3">
+                                          <div className="text-xs text-gray-700 max-w-[150px] truncate" title={billing.package || billing.treatment}>
                                             {billing.package ? (
-                                              <div className="flex items-center gap-1 font-semibold text-indigo-700">
-                                                <Package className="w-3 h-3" />
-                                                {billing.package}
+                                              <div className="flex flex-col">
+                                                <span className="font-semibold text-indigo-700 flex items-center gap-1">
+                                                  <Package className="w-3 h-3" />
+                                                  {billing.package}
+                                                </span>
+                                                <span className="text-[9px] text-gray-500 truncate">
+                                                  {Array.isArray(billing.selectedPackageTreatments) && billing.selectedPackageTreatments.length > 0
+                                                    ? billing.selectedPackageTreatments.map((t: any) => t.treatmentName).join(', ')
+                                                    : billing.treatment || '-'}
+                                                </span>
                                               </div>
                                             ) : (
                                               billing.treatment || '-'
                                             )}
                                           </div>
-                                          <div className="text-xs text-gray-600 mb-2">
-                                            <span className="font-medium">Payment: </span>{paymentMethods}
-                                          </div>
-                                          <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-gray-50">
-                                            <div className="text-[10px] text-gray-500">
-                                              <span className="block">Original: {formatAED(originalAmt)}</span>
-                                              <span className="block font-medium text-emerald-600">Paid: {formatAED(billing.paid || 0)}</span>
-                                            </div>
-                                            <div className="text-[10px] text-right">
-                                              {totalPct > 0 && (
-                                                <span className="block text-amber-600 font-bold">{totalPct.toFixed(1)}% OFF</span>
+                                        </td>
+                                        {/* Discount */}
+                                        <td className="px-3 py-3 text-center">
+                                          <div className="flex flex-col items-center gap-1">
+                                            {discountPercent > 0 && (
+                                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-700 border border-amber-200">
+                                                {discountPercent.toFixed(1)}% OFF
+                                              </span>
+                                            )}
+                                            <div className="flex flex-wrap justify-center gap-0.5">
+                                              {isMembershipDiscount && (
+                                                <span className="text-[8px] uppercase tracking-wider text-emerald-600 bg-emerald-50 px-1 py-0.5 rounded font-bold border border-emerald-100">
+                                                  Memb
+                                                </span>
                                               )}
-                                              <span className="block text-gray-400">Qty: {billing.quantity || 0}</span>
+                                              {isDoctorDiscount && (
+                                                <span className="text-[8px] uppercase tracking-wider text-orange-600 bg-orange-50 px-1 py-0.5 rounded font-bold border border-orange-100">
+                                                  Doctor
+                                                </span>
+                                              )}
+                                              {isAgentDiscount && (
+                                                <span className="text-[8px] uppercase tracking-wider text-blue-600 bg-blue-50 px-1 py-0.5 rounded font-bold border border-blue-100">
+                                                  Agent
+                                                </span>
+                                              )}
                                             </div>
+                                            {!hasAnyDiscount && <span className="text-gray-300">—</span>}
                                           </div>
-                                        </>
-                                      );
-                                    })()}
-                                  </div>
-                                );
-                              })}
+                                        </td>
+                                        {/* Offer Applied */}
+                                        <td className="px-3 py-3 text-center">
+                                          {offerType || cashbackOfferName ? (
+                                            <div className="flex flex-col items-center gap-0.5">
+                                              {/* Main Offer (Instant/Bonus/Bundle) */}
+                                              {offerType && (
+                                                <>
+                                                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                                                    offerType === 'instant_discount' ? 'bg-purple-100 text-purple-700 border border-purple-200' :
+                                                    offerType === 'cashback' ? 'bg-cyan-100 text-cyan-700 border border-cyan-200' :
+                                                    offerType === 'bundle' ? 'bg-pink-100 text-pink-700 border border-pink-200' :
+                                                    'bg-gray-100 text-gray-700 border border-gray-200'
+                                                  }`}>
+                                                    {offerType === 'instant_discount' ? 'Instant' :
+                                                     offerType === 'cashback' ? 'Cashback' :
+                                                     offerType === 'bundle' ? 'Bundle' : offerType}
+                                                  </span>
+                                                  {offerName && (
+                                                    <span className="text-[8px] text-gray-500 truncate max-w-[60px]" title={offerName}>
+                                                      {offerName}
+                                                    </span>
+                                                  )}
+                                                </>
+                                              )}
+                                              {/* Cashback Offer */}
+                                              {cashbackOfferName && isCashbackApplied && (
+                                                <>
+                                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-cyan-100 text-cyan-700 border border-cyan-200 mt-0.5">
+                                                    Cashback
+                                                  </span>
+                                                  <span className="text-[8px] text-cyan-600 truncate max-w-[60px]" title={cashbackOfferName}>
+                                                    {cashbackOfferName}
+                                                  </span>
+                                                </>
+                                              )}
+                                            </div>
+                                          ) : (
+                                            <span className="text-gray-300">—</span>
+                                          )}
+                                        </td>
+                                        {/* Free Sessions */}
+                                        <td className="px-3 py-3 text-center">
+                                          <div className="flex flex-col items-center gap-0.5 text-[9px]">
+                                            {/* Used Free Sessions (consumed from bundle) */}
+                                            {usedFreeSessionCount > 0 && (
+                                              <div className="flex flex-col items-center gap-0.5">
+                                                <span className="text-red-600 font-medium">Used: {usedFreeSessionCount}</span>
+                                                {usedFreeSessionNames.slice(0, 2).map((session: string, idx: number) => (
+                                                  <span key={idx} className="text-[8px] text-red-500 truncate max-w-[80px]" title={session}>{session}</span>
+                                                ))}
+                                                {usedFreeSessionNames.length > 2 && (
+                                                  <span className="text-[8px] text-red-400">+{usedFreeSessionNames.length - 2} more</span>
+                                                )}
+                                              </div>
+                                            )}
+                                            {/* Earned Free Sessions (from bundle offer) */}
+                                            {earnedFreeSessions > 0 && (
+                                              <div className="flex flex-col items-center gap-0.5">
+                                                <span className="text-green-600 font-medium">Earned: {earnedFreeSessions}</span>
+                                                {earnedFreeSessionNames.slice(0, 2).map((session: string, idx: number) => (
+                                                  <span key={idx} className="text-[8px] text-green-500 truncate max-w-[80px]" title={session}>{session}</span>
+                                                ))}
+                                                {earnedFreeSessionNames.length > 2 && (
+                                                  <span className="text-[8px] text-green-400">+{earnedFreeSessionNames.length - 2} more</span>
+                                                )}
+                                              </div>
+                                            )}
+                                            {freeConsultation && (
+                                              <span className="text-purple-600 font-medium">Free Consult ({freeConsultCount})</span>
+                                            )}
+                                            {/* Show earned free session names when bundle offer applied */}
+                                            {isBundleOffer && earnedFreeSessionNames.length > 0 && !usedFreeSessionCount && (
+                                              <div className="flex flex-col items-center gap-0.5 mt-1 p-1 bg-pink-50 rounded border border-pink-200 max-w-[80px]">
+                                                <span className="text-[8px] font-bold text-pink-600 uppercase">Bundle Free</span>
+                                                {earnedFreeSessionNames.slice(0, 2).map((session: string, idx: number) => (
+                                                  <span key={idx} className="text-[8px] text-pink-700 truncate max-w-full" title={session}>{session}</span>
+                                                ))}
+                                                {earnedFreeSessionNames.length > 2 && (
+                                                  <span className="text-[8px] text-pink-500">+{earnedFreeSessionNames.length - 2} more</span>
+                                                )}
+                                              </div>
+                                            )}
+                                            {usedFreeSessionCount === 0 && earnedFreeSessions === 0 && !freeConsultation && !isBundleOffer && (
+                                              <span className="text-gray-300">—</span>
+                                            )}
+                                          </div>
+                                        </td>
+                                        {/* Cashback */}
+                                        <td className="px-3 py-3 text-center">
+                                          <div className="flex flex-col items-center gap-0.5 text-[9px]">
+                                            {/* Cashback Offer Name */}
+                                            {cashbackOfferName && isCashbackApplied && (
+                                              <span className="text-[8px] font-bold text-cyan-700 bg-cyan-50 px-1.5 py-0.5 rounded border border-cyan-200">
+                                                {cashbackOfferName}
+                                              </span>
+                                            )}
+                                            {/* Cashback Earned */}
+                                            {(cashbackEarnedAmt > 0 || cashbackEarnedFromOffer > 0) && (
+                                              <div className="flex flex-col items-center">
+                                                <span className="text-cyan-600 font-medium">
+                                                  +{formatAED(cashbackEarnedAmt > 0 ? cashbackEarnedAmt : cashbackEarnedFromOffer)}
+                                                </span>
+                                                <span className="text-[8px] text-cyan-400">CB Earned</span>
+                                              </div>
+                                            )}
+                                            {/* Cashback Used */}
+                                            {cashbackUsedAmt > 0 && (
+                                              <div className="flex flex-col items-center gap-0.5 mt-0.5 p-1 bg-orange-50 rounded border border-orange-200">
+                                                <span className="text-[8px] font-bold text-orange-600 uppercase">CB Applied</span>
+                                                <span className="text-[9px] text-orange-700 font-semibold">-{formatAED(cashbackUsedAmt)}</span>
+                                              </div>
+                                            )}
+                                            {cashbackEarnedAmt === 0 && cashbackEarnedFromOffer === 0 && cashbackUsedAmt === 0 && !cashbackOfferName && (
+                                              <span className="text-gray-300">—</span>
+                                            )}
+                                          </div>
+                                        </td>
+                                        {/* Original Amount */}
+                                        <td className="px-3 py-3 text-right">
+                                          <span className="text-xs text-gray-500">{formatAED(originalAmt)}</span>
+                                        </td>
+                                        {/* Total */}
+                                        <td className="px-3 py-3 text-right">
+                                          <span className="text-xs font-bold text-gray-900">{formatAED(billing.amount || 0)}</span>
+                                        </td>
+                                        {/* Paid */}
+                                        <td className="px-3 py-3 text-right">
+                                          <span className="text-xs font-semibold text-green-600">{formatAED(billing.paid || 0)}</span>
+                                        </td>
+                                        {/* Pending */}
+                                        <td className="px-3 py-3 text-right">
+                                          <span className={`text-xs font-bold ${pendingAmt > 0 ? 'text-red-600' : 'text-gray-400'}`}>
+                                            {formatAED(pendingAmt)}
+                                          </span>
+                                        </td>
+                                        {/* Advance */}
+                                        <td className="px-3 py-3 text-right">
+                                          <span className={`text-xs ${advanceAmt > 0 ? 'text-teal-600 font-semibold' : 'text-gray-400'}`}>
+                                            {formatAED(advanceAmt)}
+                                          </span>
+                                        </td>
+                                        {/* Advance Used */}
+                                        <td className="px-3 py-3 text-right">
+                                          <span className={`text-xs ${advanceUsed > 0 ? 'text-indigo-600 font-medium' : 'text-gray-400'}`}>
+                                            {formatAED(advanceUsed)}
+                                          </span>
+                                        </td>
+                                        {/* Claim Amount Used */}
+                                        <td className="px-3 py-3 text-right">
+                                          <span className={`text-xs ${claimUsed > 0 ? 'text-blue-600 font-medium' : 'text-gray-400'}`}>
+                                            {formatAED(claimUsed)}
+                                          </span>
+                                        </td>
+                                        {/* Pending Used */}
+                                        <td className="px-3 py-3 text-right">
+                                          <span className={`text-xs ${pendingUsed > 0 ? 'text-orange-600 font-medium' : 'text-gray-400'}`}>
+                                            {formatAED(pendingUsed)}
+                                          </span>
+                                        </td>
+                                        {/* Qty */}
+                                        <td className="px-3 py-3 text-center">
+                                          <span className="text-xs text-gray-600">{billing.quantity || 1}</span>
+                                        </td>
+                                        {/* Payment Method */}
+                                        <td className="px-3 py-3 whitespace-nowrap">
+                                          <span className="text-xs text-gray-700">{paymentMethods}</span>
+                                        </td>
+                                        {/* Refund Details */}
+                                        <td className="px-3 py-3">
+                                          {isRefunded ? (
+                                            <div className="flex flex-col gap-1">
+                                              <div className="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-bold bg-red-100 text-red-700 border border-red-200 w-fit">
+                                                <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                                </svg>
+                                                REFUNDED
+                                              </div>
+                                              {refundedOffers.length > 0 && (
+                                                <div className="text-[8px] text-gray-600 space-y-0.5 max-w-[200px]">
+                                                  {refundedOffers.map((offer: any, idx: number) => (
+                                                    <div key={idx} className="flex items-start gap-1">
+                                                      <span className="text-red-500 mt-0.5">•</span>
+                                                      <div className="flex flex-col">
+                                                        <span className="font-medium">{offer.offerName || offer.offerType}</span>
+                                                        <span className="text-[7px] text-gray-500">
+                                                          {offer.offerType === 'bundle' && offer.freeSessionsRefunded?.length > 0 && (
+                                                            <span>Free: {offer.freeSessionsRefunded.join(', ')}</span>
+                                                          )}
+                                                          {offer.cashbackRefunded > 0 && (
+                                                            <span>CB: {formatAED(offer.cashbackRefunded)}</span>
+                                                          )}
+                                                          {offer.amount > 0 && offer.offerType !== 'cashback' && (
+                                                            <span>Amt: {formatAED(offer.amount)}</span>
+                                                          )}
+                                                        </span>
+                                                      </div>
+                                                    </div>
+                                                  ))}
+                                                </div>
+                                              )}
+                                              {refundedAt && (
+                                                <div className="text-[7px] text-gray-400">
+                                                  {new Date(refundedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                                </div>
+                                              )}
+                                            </div>
+                                          ) : (
+                                            <span className="text-xs text-gray-400">—</span>
+                                          )}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                              </tbody>
+                            </table>
+
+                            {/* Tablet Table View - Fewer columns */}
+                            <table className="min-w-full divide-y divide-gray-100 hidden md:table lg:hidden">
+                              <thead className="bg-slate-50">
+                                <tr>
+                                  <th className="px-3 py-3 text-left text-[10px] font-bold text-gray-600 uppercase">Invoice</th>
+                                  <th className="px-3 py-3 text-left text-[10px] font-bold text-gray-600 uppercase">Treatment</th>
+                                  <th className="px-3 py-3 text-center text-[10px] font-bold text-gray-600 uppercase">Disc.</th>
+                                  <th className="px-3 py-3 text-center text-[10px] font-bold text-gray-600 uppercase">Offer</th>
+                                  <th className="px-3 py-3 text-right text-[10px] font-bold text-gray-600 uppercase">Original</th>
+                                  <th className="px-3 py-3 text-right text-[10px] font-bold text-gray-600 uppercase">Total</th>
+                                  <th className="px-3 py-3 text-right text-[10px] font-bold text-gray-600 uppercase">Paid</th>
+                                  <th className="px-3 py-3 text-right text-[10px] font-bold text-gray-600 uppercase">Pending</th>
+                                  <th className="px-3 py-3 text-center text-[10px] font-bold text-gray-600 uppercase">Qty</th>
+                                </tr>
+                              </thead>
+                              <tbody className="bg-white divide-y divide-gray-100">
+                                {(billingHistory || [])
+                                  .filter((b: any) => !b.isAdvanceOnly && b.treatment !== "Advance Payment" && b.treatment !== "Historical Advance Balance")
+                                  .filter((b: any) => {
+                                    if (!billingSearchQuery.trim()) return true;
+                                    const query = billingSearchQuery.toLowerCase();
+                                    const invoiceMatch = (b.invoiceNumber || '').toLowerCase().includes(query);
+                                    const treatmentMatch = (b.treatment || '').toLowerCase().includes(query);
+                                    if (billingSearchType === 'invoice') return invoiceMatch;
+                                    if (billingSearchType === 'treatment') return treatmentMatch;
+                                    return invoiceMatch || treatmentMatch;
+                                  })
+                                  .map((billing: any, index: number) => {
+                                    const originalAmt = billing.originalAmount || billing.amount || 0;
+                                    const discountPct = originalAmt > 0 && billing.amount < originalAmt ? ((originalAmt - billing.amount) / originalAmt * 100) : 0;
+                                    const offerType = billing.offerType || null;
+                                    const earnedFreeSessionNames = billing.offerFreeSession || [];
+                                    const usedFreeSessionNames = billing.usedFreeSessions || [];
+                                    const usedFreeSessionCount = billing.usedFreeSessionCount || 0;
+                                    // const earnedFreeSessions = billing.freeOfferSessionCount || 0;
+                                    const isBundleOffer = billing.offerType === 'bundle';
+                                    // const cashbackEarnedAmt = billing.cashbackEarned || 0;
+                                    // const cashbackEarnedFromOffer = billing.cashbackAmount || 0;
+                                    // const cashbackUsedAmt = billing.cashbackWalletUsed || 0;
+                                    const isCashbackApplied = billing.isCashbackApplied || false;
+                                    const cashbackOfferName = billing.cashbackOfferName || '';
+                                    return (
+                                      <tr key={billing._id || index} className={`hover:bg-gray-50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
+                                        <td className="px-3 py-3 whitespace-nowrap">
+                                          <div className="text-xs font-bold text-gray-900">{billing.invoiceNumber || `INV-${String(index + 1).padStart(4, '0')}`}</div>
+                                          <div className="text-[9px] text-gray-400">{billing.invoicedDate ? new Date(billing.invoicedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}</div>
+                                        </td>
+                                        <td className="px-3 py-3">
+                                          <div className="text-xs text-gray-700 max-w-[120px] truncate" title={billing.treatment || billing.package}>
+                                            {billing.package ? (
+                                              <span className="font-semibold text-indigo-700">{billing.package}</span>
+                                            ) : (billing.treatment || '-')}
+                                          </div>
+                                          {isBundleOffer && earnedFreeSessionNames.length > 0 && (
+                                            <div className="text-[8px] text-pink-600 truncate mt-0.5" title={earnedFreeSessionNames.join(', ')}>
+                                              Free: {earnedFreeSessionNames.slice(0, 1).join(', ')}{earnedFreeSessionNames.length > 1 ? '...' : ''}
+                                            </div>
+                                          )}
+                                          {usedFreeSessionCount > 0 && (
+                                            <div className="text-[8px] text-red-600 truncate mt-0.5" title={usedFreeSessionNames.join(', ')}>
+                                              Used: {usedFreeSessionNames.slice(0, 1).join(', ')}{usedFreeSessionNames.length > 1 ? '...' : ''}
+                                            </div>
+                                          )}
+                                        </td>
+                                        <td className="px-3 py-3 text-center">
+                                          {discountPct > 0 ? (
+                                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-700">{discountPct.toFixed(1)}%</span>
+                                          ) : <span className="text-gray-300">—</span>}
+                                        </td>
+                                        <td className="px-3 py-3 text-center">
+                                          {offerType || cashbackOfferName ? (
+                                            <div className="flex flex-col items-center gap-0.5">
+                                              {offerType && (
+                                                <>
+                                                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                                                    offerType === 'instant_discount' ? 'bg-purple-100 text-purple-700' :
+                                                    offerType === 'cashback' ? 'bg-cyan-100 text-cyan-700' :
+                                                    offerType === 'bundle' ? 'bg-pink-100 text-pink-700' : 'bg-gray-100 text-gray-700'
+                                                  }`}>
+                                                    {offerType === 'instant_discount' ? 'Inst' : offerType === 'cashback' ? 'CB' : offerType === 'bundle' ? 'Bndl' : '—'}
+                                                  </span>
+                                                </>
+                                              )}
+                                              {cashbackOfferName && isCashbackApplied && (
+                                                <>
+                                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-cyan-100 text-cyan-700 mt-0.5">
+                                                    Cashback
+                                                  </span>
+                                                  <span className="text-[8px] text-cyan-600 truncate max-w-[80px]" title={cashbackOfferName}>
+                                                    {cashbackOfferName}
+                                                  </span>
+                                                </>
+                                              )}
+                                            </div>
+                                          ) : <span className="text-gray-300">—</span>}
+                                        </td>
+                                        <td className="px-3 py-3 text-right"><span className="text-xs text-gray-500">{formatAED(originalAmt)}</span></td>
+                                        <td className="px-3 py-3 text-right"><span className="text-xs font-bold text-gray-900">{formatAED(billing.amount || 0)}</span></td>
+                                        <td className="px-3 py-3 text-right"><span className="text-xs font-semibold text-green-600">{formatAED(billing.paid || 0)}</span></td>
+                                        <td className="px-3 py-3 text-right">
+                                          <span className={`text-xs font-bold ${(billing.pending || 0) > 0 ? 'text-red-600' : 'text-gray-400'}`}>{formatAED(billing.pending || 0)}</span>
+                                        </td>
+                                        <td className="px-3 py-3 text-center"><span className="text-xs text-gray-600">{billing.quantity || 1}</span></td>
+                                      </tr>
+                                    );
+                                  })}
+                              </tbody>
+                            </table>
+
+                            {/* Mobile List View */}
+                            <div className="md:hidden divide-y divide-gray-100">
+                              {(billingHistory || [])
+                                .filter((b: any) => !b.isAdvanceOnly && b.treatment !== "Advance Payment" && b.treatment !== "Historical Advance Balance")
+                                .filter((b: any) => {
+                                  if (!billingSearchQuery.trim()) return true;
+                                  const query = billingSearchQuery.toLowerCase();
+                                  const invoiceMatch = (b.invoiceNumber || '').toLowerCase().includes(query);
+                                  const treatmentMatch = (b.treatment || '').toLowerCase().includes(query);
+                                  if (billingSearchType === 'invoice') return invoiceMatch;
+                                  if (billingSearchType === 'treatment') return treatmentMatch;
+                                  return invoiceMatch || treatmentMatch;
+                                })
+                                .map((billing: any, index: number) => {
+                                  const originalAmt = billing.originalAmount || billing.amount || 0;
+                                  const discountPct = originalAmt > 0 && billing.amount < originalAmt ? ((originalAmt - billing.amount) / originalAmt * 100) : 0;
+                                  const paymentMethods = billing.multiplePayments && billing.multiplePayments.length > 0
+                                    ? billing.multiplePayments.map((mp: any) => mp.paymentMethod).join(" + ")
+                                    : (billing.paymentMethod || "–");
+                                  const offerType = billing.offerType || null;
+                                  const cashbackEarnedAmt = billing.cashbackEarned || 0;
+                                  const cashbackEarnedFromOffer = billing.cashbackAmount || 0;
+                                  const cashbackUsedAmt = billing.cashbackWalletUsed || 0;
+                                  const isCashbackApplied = billing.isCashbackApplied || false;
+                                  const cashbackOfferName = billing.cashbackOfferName || '';
+                                  const earnedFreeSessionNames = billing.offerFreeSession || [];
+                                  const usedFreeSessionNames = billing.usedFreeSessions || [];
+                                  const usedFreeSessionCount = billing.usedFreeSessionCount || 0;
+                                  // const earnedFreeSessions = billing.freeOfferSessionCount || 0;
+                                  const isBundleOffer = billing.offerType === 'bundle';
+                                  // const freeOfferSessionCount = billing.freeOfferSessionCount || 0;
+                                  const freeConsultation = billing.isFreeConsultation || false;
+                                  const freeConsultCount = billing.freeConsultationCount || 0;
+                                  
+                                  return (
+                                    <div key={billing._id || index} className={`p-4 hover:bg-gray-50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
+                                      <div className="flex justify-between items-start mb-3">
+                                        <div>
+                                          <div className="text-sm font-bold text-gray-900">{billing.invoiceNumber || `INV-${String(index + 1).padStart(4, '0')}`}</div>
+                                          <div className="text-[10px] text-gray-500">{billing.invoicedDate ? new Date(billing.invoicedDate).toLocaleDateString() : ''}</div>
+                                        </div>
+                                        <div className="text-right">
+                                          <div className="text-lg font-bold text-gray-900">{formatAED(billing.amount || 0)}</div>
+                                          <div className="text-[10px] text-gray-400">Qty: {billing.quantity || 1}</div>
+                                        </div>
+                                      </div>
+                                      
+                                      {/* Treatment */}
+                                      <div className="mb-3">
+                                        <div className="text-xs text-gray-700">
+                                          {billing.package ? (
+                                            <span className="font-semibold text-indigo-700 flex items-center gap-1">
+                                              <Package className="w-3 h-3" />{billing.package}
+                                            </span>
+                                          ) : (billing.treatment || '-')}
+                                        </div>
+                                        {billing.treatment && billing.package && (
+                                          <div className="text-[10px] text-gray-500 truncate">{billing.treatment}</div>
+                                        )}
+                                      </div>
+                                      
+                                      {/* Tags Row */}
+                                      <div className="flex flex-wrap gap-1 mb-3">
+                                        {discountPct > 0 && (
+                                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-700">{discountPct.toFixed(1)}% OFF</span>
+                                        )}
+                                        {billing.isMembershipDiscountApplied && (
+                                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-bold bg-emerald-100 text-emerald-700">Membership</span>
+                                        )}
+                                        {billing.isDoctorDiscountApplied && (
+                                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-bold bg-orange-100 text-orange-700">Doctor</span>
+                                        )}
+                                        {offerType && (
+                                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[9px] font-bold ${
+                                            offerType === 'instant_discount' ? 'bg-purple-100 text-purple-700' :
+                                            offerType === 'cashback' ? 'bg-cyan-100 text-cyan-700' :
+                                            offerType === 'bundle' ? 'bg-pink-100 text-pink-700' : 'bg-gray-100 text-gray-700'
+                                          }`}>
+                                            {offerType === 'instant_discount' ? 'Instant' : offerType === 'cashback' ? 'Cashback' : offerType === 'bundle' ? 'Bundle' : offerType}
+                                          </span>
+                                        )}
+                                        {/* Cashback Offer Name */}
+                                        {cashbackOfferName && isCashbackApplied && (
+                                          <div className="inline-flex flex-col items-start px-2 py-0.5 rounded text-[9px] font-bold bg-cyan-50 text-cyan-700 border border-cyan-200">
+                                            <span className="text-[8px] font-bold">Cashback</span>
+                                            <span className="font-normal text-[8px]">{cashbackOfferName}</span>
+                                          </div>
+                                        )}
+                                        {/* Earned Free Sessions from Bundle */}
+                                        {isBundleOffer && earnedFreeSessionNames.length > 0 && (
+                                          <div className="inline-flex flex-col items-start px-2 py-0.5 rounded text-[9px] font-bold bg-pink-50 text-pink-700 border border-pink-200">
+                                            <span>Bundle Free</span>
+                                            <span className="font-normal text-[8px]">{earnedFreeSessionNames.slice(0, 2).join(', ')}{earnedFreeSessionNames.length > 2 ? '...' : ''}</span>
+                                          </div>
+                                        )}
+                                        {/* Used Free Sessions */}
+                                        {usedFreeSessionCount > 0 && (
+                                          <div className="inline-flex flex-col items-start px-2 py-0.5 rounded text-[9px] font-bold bg-red-50 text-red-700 border border-red-200">
+                                            <span>Used Free ({usedFreeSessionCount})</span>
+                                            <span className="font-normal text-[8px]">{usedFreeSessionNames.slice(0, 2).join(', ')}{usedFreeSessionNames.length > 2 ? '...' : ''}</span>
+                                          </div>
+                                        )}
+                                        {/* Cashback Earned */}
+                                        {(cashbackEarnedAmt > 0 || cashbackEarnedFromOffer > 0) && (
+                                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-bold bg-cyan-100 text-cyan-700">
+                                            CB Earned: +{formatAED(cashbackEarnedAmt > 0 ? cashbackEarnedAmt : cashbackEarnedFromOffer)}
+                                          </span>
+                                        )}
+                                        {/* Cashback Used (Applied) */}
+                                        {cashbackUsedAmt > 0 && (
+                                          <div className="inline-flex flex-col items-start px-2 py-0.5 rounded text-[9px] font-bold bg-orange-50 text-orange-700 border border-orange-200">
+                                            <span className="text-[8px] font-bold">CB Applied</span>
+                                            <span className="font-normal text-[8px]">-{formatAED(cashbackUsedAmt)}</span>
+                                          </div>
+                                        )}
+                                        {freeConsultation && (
+                                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-bold bg-purple-100 text-purple-700">Free Consult ({freeConsultCount})</span>
+                                        )}
+                                      </div>
+                                      
+                                      {/* Financial Details */}
+                                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] mb-3 p-2 bg-gray-50 rounded-lg">
+                                        <div className="flex justify-between">
+                                          <span className="text-gray-500">Original:</span>
+                                          <span className="text-gray-700">{formatAED(originalAmt)}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                          <span className="text-gray-500">Paid:</span>
+                                          <span className="text-green-600 font-semibold">{formatAED(billing.paid || 0)}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                          <span className="text-gray-500">Pending:</span>
+                                          <span className={`font-semibold ${(billing.pending || 0) > 0 ? 'text-red-600' : 'text-gray-400'}`}>{formatAED(billing.pending || 0)}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                          <span className="text-gray-500">Advance:</span>
+                                          <span className="text-teal-600">{formatAED(billing.advance || 0)}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                          <span className="text-gray-500">Adv. Used:</span>
+                                          <span className="text-indigo-600">{formatAED(billing.advanceUsed || 0)}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                          <span className="text-gray-500">Claim Used:</span>
+                                          <span className="text-blue-600">{formatAED(billing.claimAmountUsed || 0)}</span>
+                                        </div>
+                                        {(cashbackEarnedAmt > 0 || cashbackEarnedFromOffer > 0 || cashbackUsedAmt > 0) && (
+                                          <>
+                                            {(cashbackEarnedAmt > 0 || cashbackEarnedFromOffer > 0) && (
+                                              <div className="flex justify-between">
+                                                <span className="text-gray-500">CB Earned:</span>
+                                                <span className="text-cyan-600">{formatAED(cashbackEarnedAmt > 0 ? cashbackEarnedAmt : cashbackEarnedFromOffer)}</span>
+                                              </div>
+                                            )}
+                                            {cashbackUsedAmt > 0 && (
+                                              <div className="flex justify-between">
+                                                <span className="text-gray-500">CB Used:</span>
+                                                <span className="text-orange-600">{formatAED(cashbackUsedAmt)}</span>
+                                              </div>
+                                            )}
+                                          </>
+                                        )}
+                                      </div>
+                                      
+                                      {/* Payment Method */}
+                                      <div className="text-[10px] text-gray-500">
+                                        <span className="font-medium">Payment:</span> {paymentMethods}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                            </div>
                           </div>
                         </div>
 
@@ -5115,8 +6606,8 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center">
                                 <div className="text-[10px] sm:text-xs text-blue-600 mb-1">Total Billed</div>
                                 <div className="text-lg sm:text-xl md:text-2xl font-bold text-blue-800">
-                                  {formatAED((billingHistory || []).filter((b: any) => 
-                                    (!b.isAdvanceOnly && b.treatment !== "Advance Payment" && b.treatment !== "Historical Advance Balance") || 
+                                  {formatAED((billingHistory || []).filter((b: any) =>
+                                    (!b.isAdvanceOnly && b.treatment !== "Advance Payment" && b.treatment !== "Historical Advance Balance") ||
                                     b.treatment === "Pending Balance Payment"
                                   ).reduce((acc: number, b: any) => acc + (Number(b.amount) || 0), 0))}
                                 </div>
@@ -5125,8 +6616,8 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                               <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
                                 <div className="text-[10px] sm:text-xs text-green-600 mb-1">Total Paid</div>
                                 <div className="text-lg sm:text-xl md:text-2xl font-bold text-green-800">
-                                  {formatAED((billingHistory || []).filter((b: any) => 
-                                    (!b.isAdvanceOnly && b.treatment !== "Advance Payment" && b.treatment !== "Historical Advance Balance") || 
+                                  {formatAED((billingHistory || []).filter((b: any) =>
+                                    (!b.isAdvanceOnly && b.treatment !== "Advance Payment" && b.treatment !== "Historical Advance Balance") ||
                                     b.treatment === "Pending Balance Payment"
                                   ).reduce((acc: number, b: any) => acc + (Number(b.paid) || 0), 0))}
                                 </div>
@@ -5152,57 +6643,584 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
 
                 {/* Insurance Details Card */}
                 <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                  {/* Card Header */}
                   <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
                     <div className="w-8 h-8 rounded-lg bg-teal-100 flex items-center justify-center">
                       <Shield className="w-4 h-4 text-teal-600" />
                     </div>
-                    <h3 className="text-base font-semibold text-gray-900">Insurance Details</h3>
-                    {patientData?.insurance === 'Yes' ? (
-                      <span className="ml-auto px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">Active</span>
+                    <h3 className="text-base font-semibold text-gray-900">Insurance & Claims</h3>
+                    {(patientData?.insurance === 'Yes' || insuranceClaims.length > 0) ? (
+                      <div className="flex items-center gap-1.5">
+                        <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">Active</span>
+                        {isRiskyPatient ? (
+                          <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-orange-100 text-orange-700 border border-orange-200 animate-pulse">Risky</span>
+                        ) : (
+                          <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">Loyal</span>
+                        )}
+                      </div>
                     ) : (
-                      <span className="ml-auto px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">Not Enrolled</span>
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">Not Enrolled</span>
                     )}
+                    <button
+                      onClick={() => {
+                        const opening = !showNewClaimForm;
+                        setShowNewClaimForm(opening);
+                        if (opening) {
+                          fetchNewClaimDropdowns();
+                          // Reset form to empty values - no prefilling
+                          setNewClaimData({
+                            insuranceProvider: "",
+                            policyNumber: "",
+                            expiryDate: "",
+                            insuranceCardFile: "",
+                            tableOfBenefitsFile: "",
+                            departmentId: "",
+                            departmentName: "",
+                            serviceId: "",
+                            serviceName: "",
+                            services: [],
+                            doctorId: "",
+                            doctorName: "",
+                            claimAmount: "",
+                            claimType: "Paid",
+                            coPayPercent: "",
+                            coPayType: "Patient Pays",
+                            notes: "",
+                            documentFiles: [],
+                            advanceStatus: "Full Pay",
+                            advanceAmount: 0,
+                          });
+                        }
+                      }}
+                      className="ml-auto flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-semibold transition-colors"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      New Claim
+                    </button>
                   </div>
 
-                  {patientData?.insurance === 'Yes' ? (
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-100">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Insurance Type</th>
-                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Advance Given</th>
-                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Co-Pay %</th>
-                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Need to Pay</th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white">
-                          <tr className="hover:bg-gray-50 transition-colors">
-                            <td className="px-6 py-5 whitespace-nowrap">
-                              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold bg-blue-100 text-blue-800">
-                                <FileText className="w-3.5 h-3.5" />
-                                {patientData?.insuranceType || '-'}
-                              </span>
-                            </td>
-                            <td className="px-6 py-5 whitespace-nowrap">
-                              <span className="text-base font-bold text-green-700">
-                                {patientData?.advanceGivenAmount != null ? `${getCurrencySymbol(patientData.currency)}${Number(patientData.advanceGivenAmount).toLocaleString()}` : '-'}
-                              </span>
-                            </td>
-                            <td className="px-6 py-5 whitespace-nowrap">
-                              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-semibold bg-purple-100 text-purple-800">
-                                <TrendingUp className="w-3.5 h-3.5" />
-                                {patientData?.coPayPercent != null ? `${patientData.coPayPercent}%` : '-'}
-                              </span>
-                            </td>
-                            <td className="px-6 py-5 whitespace-nowrap">
-                              <span className="text-base font-bold text-orange-700">
-                                {patientData?.needToPay != null ? `${getCurrencySymbol(patientData.currency)}${Number(patientData.needToPay).toLocaleString()}` : '-'}
-                              </span>
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
+                  {/* New Claim Form */}
+                  {showNewClaimForm && (
+                    <div className="border-b border-gray-200 bg-gray-50 p-4">
+                      <div className="text-sm font-semibold text-gray-900 mb-3">Create New Insurance Claim</div>
+
+                      {/* Section A: Insurance Details */}
+                      <div className="mb-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                        <div className="text-xs font-semibold text-blue-800 mb-2">Insurance Details (Required)</div>
+                        <div className="flex flex-wrap gap-2 items-end">
+                          <div className="flex-1 min-w-[140px]">
+                            <label className="block text-xs mb-0.5 font-medium text-gray-700">Insurance Provider <span className="text-red-500">*</span></label>
+                            <input type="text" name="insuranceProvider" value={newClaimData.insuranceProvider} onChange={handleNewClaimChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 text-gray-900" placeholder="Provider name" />
+                          </div>
+                          <div className="flex-1 min-w-[140px]">
+                            <label className="block text-xs mb-0.5 font-medium text-gray-700">Policy Number <span className="text-red-500">*</span></label>
+                            <input type="text" name="policyNumber" value={newClaimData.policyNumber} onChange={handleNewClaimChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 text-gray-900" placeholder="Policy number" />
+                          </div>
+                          <div className="flex-1 min-w-[130px]">
+                            <label className="block text-xs mb-0.5 font-medium text-gray-700">Expiry Date <span className="text-red-500">*</span></label>
+                            <input type="date" name="expiryDate" value={newClaimData.expiryDate} onChange={handleNewClaimChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 text-gray-900" />
+                          </div>
+                          <div className="flex-1 min-w-[140px]">
+                            <label className="block text-xs mb-0.5 font-medium text-gray-700">Insurance Card </label>
+                            <div className="relative group">
+                              <input
+                                id="insurance-card-upload"
+                                type="file"
+                                accept="image/*,.pdf"
+                                onChange={(e) => handleNewClaimFileUpload(e, 'insuranceCard')}
+                                className="hidden"
+                                disabled={newClaimUploadingFiles}
+                              />
+                              <label
+                                htmlFor="insurance-card-upload"
+                                className={`w-full flex items-center gap-2 px-2 py-1.5 text-[9px] border border-gray-300 rounded-md cursor-pointer transition-all ${newClaimData.insuranceCardFile ? 'bg-blue-50 border-blue-400 ring-1 ring-blue-400 shadow-sm' : 'bg-white hover:border-blue-400'}`}
+                              >
+                                <div className="flex-shrink-0 w-4 h-4 rounded bg-gray-50 border border-gray-200 flex items-center justify-center overflow-hidden">
+                                  {newClaimData.insuranceCardFile ? (
+                                    newClaimData.insuranceCardFile.toLowerCase().endsWith('.pdf') ? (
+                                      <FileText className="w-2.5 h-2.5 text-blue-600" />
+                                    ) : (
+                                      <img src={newClaimData.insuranceCardFile} alt="" className="w-full h-full object-cover" />
+                                    )
+                                  ) : (
+                                    <FileImage className="w-2.5 h-2.5 text-gray-400" />
+                                  )}
+                                </div>
+                                <span className={`truncate flex-1 ${newClaimData.insuranceCardFile ? 'text-blue-700 font-semibold' : 'text-gray-400'}`} onClick={() => newClaimData.insuranceCardFile && setDocViewerUrl(newClaimData.insuranceCardFile)}>
+                                  {newClaimData.insuranceCardFile ? (newClaimData.insuranceCardFile.split('/').pop()?.split('-').pop() || 'File selected') : 'No file chosen'}
+                                </span>
+                                {newClaimData.insuranceCardFile && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      setNewClaimData((prev: any) => ({ ...prev, insuranceCardFile: "" }));
+                                    }}
+                                    className="p-0.5 hover:bg-blue-100 rounded-full text-blue-600 transition-colors"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                )}
+                                {newClaimUploadingFiles && <Loader2 className="w-2.5 h-2.5 animate-spin text-blue-600" />}
+                              </label>
+                            </div>
+                          </div>
+                          <div className="flex-1 min-w-[140px]">
+                            <label className="block text-xs mb-0.5 font-medium text-gray-700">Table of Benefits</label>
+                            <div className="relative group">
+                              <input
+                                id="table-of-benefits-upload"
+                                type="file"
+                                accept="image/*,.pdf"
+                                onChange={(e) => handleNewClaimFileUpload(e, 'tableOfBenefits')}
+                                className="hidden"
+                                disabled={newClaimUploadingFiles}
+                              />
+                              <label
+                                htmlFor="table-of-benefits-upload"
+                                className={`w-full flex items-center gap-2 px-2 py-1.5 text-[9px] border border-gray-300 rounded-md cursor-pointer transition-all ${newClaimData.tableOfBenefitsFile ? 'bg-blue-50 border-blue-400 ring-1 ring-blue-400 shadow-sm' : 'bg-white hover:border-blue-400'}`}
+                              >
+                                <div className="flex-shrink-0 w-4 h-4 rounded bg-gray-50 border border-gray-200 flex items-center justify-center overflow-hidden">
+                                  {newClaimData.tableOfBenefitsFile ? (
+                                    newClaimData.tableOfBenefitsFile.toLowerCase().endsWith('.pdf') ? (
+                                      <FileText className="w-2.5 h-2.5 text-blue-600" />
+                                    ) : (
+                                      <img src={newClaimData.tableOfBenefitsFile} alt="" className="w-full h-full object-cover" />
+                                    )
+                                  ) : (
+                                    <FileImage className="w-2.5 h-2.5 text-gray-400" />
+                                  )}
+                                </div>
+                                <span className={`truncate flex-1 ${newClaimData.tableOfBenefitsFile ? 'text-blue-700 font-semibold' : 'text-gray-400'}`} onClick={() => newClaimData.tableOfBenefitsFile && setDocViewerUrl(newClaimData.tableOfBenefitsFile)}>
+                                  {newClaimData.tableOfBenefitsFile ? (newClaimData.tableOfBenefitsFile.split('/').pop()?.split('-').pop() || 'File selected') : 'No file chosen'}
+                                </span>
+                                {newClaimData.tableOfBenefitsFile && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      setNewClaimData((prev: any) => ({ ...prev, tableOfBenefitsFile: "" }));
+                                    }}
+                                    className="p-0.5 hover:bg-blue-100 rounded-full text-blue-600 transition-colors"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                )}
+                                {newClaimUploadingFiles && <Loader2 className="w-2.5 h-2.5 animate-spin text-blue-600" />}
+                              </label>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Section B: Claim Source */}
+                      <div className="mb-2 p-3 bg-green-50 rounded-lg border border-green-200">
+                        <div className="text-xs font-semibold text-green-800 mb-2">Claim Source</div>
+                        <div className="flex flex-wrap gap-3 items-stretch">
+                          <div className="flex-1 min-w-[140px] flex flex-col">
+                            <label className="block text-xs mb-1 font-semibold text-gray-700">Department</label>
+                            <div className="mt-auto">
+                              <select name="departmentId" value={newClaimData.departmentId} onChange={handleNewClaimDepartmentChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-green-500 text-gray-900 bg-white shadow-sm h-full min-h-[32px]">
+                                <option value="">Select Department</option>
+                                {newClaimDepartments.map((d: any) => (
+                                  <option key={d._id} value={d._id}>{d.name}</option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                         
+                          <div className="flex-1 min-w-[200px] flex flex-col">
+                            <label className="block text-xs mb-1 font-semibold text-gray-700">Services</label>
+                            <div className="mt-auto relative w-full flex items-center p-0.5 border border-gray-300 rounded-lg bg-white shadow-sm focus-within:ring-2 focus-within:ring-green-500 transition-all min-h-[32px] box-border">
+                              <div className="flex flex-wrap items-center gap-1 flex-1 px-1 py-0.5">
+                                {newClaimData.services.map((svc: any, idx: number) => (
+                                  <span
+                                    key={idx}
+                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-green-50 text-green-700 border border-green-200 text-[9px] font-bold whitespace-nowrap"
+                                  >
+                                    {svc.serviceName}
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const updatedServices = newClaimData.services.filter((_: any, i: number) => i !== idx);
+                                        setNewClaimData((prev: any) => ({
+                                          ...prev,
+                                          services: updatedServices,
+                                          serviceId: updatedServices.length > 0 ? updatedServices[updatedServices.length - 1].serviceId : "",
+                                          serviceName: updatedServices.length > 0 ? updatedServices[updatedServices.length - 1].serviceName : "",
+                                        }));
+                                      }}
+                                      className="hover:text-red-500 transition-colors"
+                                    >
+                                      <X className="w-2 h-2" />
+                                    </button>
+                                  </span>
+                                ))}
+                                <select
+                                  value=""
+                                  onChange={handleNewClaimServiceChange}
+                                  className="min-w-[100px] bg-transparent border-none outline-none text-[10px] text-gray-900 cursor-pointer h-full py-0.5 flex-1 appearance-none"
+                                >
+                                  <option value="" disabled>{newClaimData.services.length > 0 ? "Add More Services..." : "Select Services"}</option>
+                                  {newClaimServices
+                                    .filter((s: any) => !newClaimData.departmentId || String(s.departmentId) === String(newClaimData.departmentId))
+                                    .map((s: any) => (
+                                      <option key={s._id} value={s._id}>
+                                        {s.name}
+                                      </option>
+                                    ))}
+                                </select>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex-1 min-w-[140px] flex flex-col">
+                            <label className="block text-xs mb-1 font-semibold text-gray-700">Doctor <span className="text-red-500">*</span></label>
+                            <div className="mt-auto">
+                              <select name="doctorId" value={newClaimData.doctorId} onChange={handleNewClaimDoctorChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-green-500 text-gray-900 bg-white shadow-sm h-full min-h-[32px]">
+                                <option value="">Select Doctor</option>
+                                {newClaimDoctors.map((d: any) => (
+                                  <option key={d._id} value={d._id}>{d.name}</option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                         
+                          <div className="flex-1 min-w-[120px] flex flex-col">
+                            <label className="block text-xs mb-1 font-semibold text-gray-700">Amount <span className="text-red-500">*</span></label>
+                            <div className="mt-auto">
+                              <input type="number" name="claimAmount" value={newClaimData.claimAmount} onChange={handleNewClaimChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-green-500 text-gray-900 bg-white shadow-sm h-full min-h-[32px] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" placeholder="0" min="0" step="0.01" />
+                            </div>
+                          </div>
+                         
+                          <div className="flex-1 min-w-[120px] flex flex-col">
+                            <label className="block text-xs mb-1 font-semibold text-gray-700">Type <span className="text-red-500">*</span></label>
+                            <div className="mt-auto">
+                              <select name="claimType" value={newClaimData.claimType} onChange={handleNewClaimChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-green-500 text-gray-900 bg-white shadow-sm h-full min-h-[32px]">
+                                <option value="Paid">Paid</option>
+                                <option value="Advance">Advance</option>
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Section C: Claim Details */}
+                      <div className="mb-2 p-3 bg-purple-50 rounded-lg border border-purple-200">
+                        <div className="text-xs font-semibold text-purple-800 mb-2">Claim Details</div>
+                        <div className="flex flex-wrap gap-3 items-stretch">
+                          <div className="flex-1 min-w-[100px] flex flex-col">
+                            <label className="block text-xs mb-1 font-semibold text-gray-700">Co-Pay %</label>
+                            <div className="mt-auto">
+                              <input type="number" name="coPayPercent" value={newClaimData.coPayPercent} onChange={handleNewClaimChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-purple-500 text-gray-900 bg-white shadow-sm min-h-[32px] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" placeholder="0-100" min="0" max="100" />
+                            </div>
+                          </div>
+                          <div className="flex-1 min-w-[140px] flex flex-col">
+                            <label className="block text-xs mb-1 font-semibold text-gray-700">Co-Pay Type</label>
+                            <div className="mt-auto">
+                              <select name="coPayType" value={newClaimData.coPayType} onChange={handleNewClaimChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-purple-500 text-gray-900 bg-white shadow-sm min-h-[32px]">
+                                <option value="Patient Pays">Patient Pays</option>
+                                <option value="Deduct from Claim">Deduct from Claim</option>
+                                <option value="Clinic Adjusts">Clinic Adjusts</option>
+                              </select>
+                            </div>
+                          </div>
+                          <div className="flex-1 min-w-[160px] flex flex-col">
+                            <label className="block text-xs mb-1 font-semibold text-gray-700">Notes</label>
+                            <div className="mt-auto">
+                              <input type="text" name="notes" value={newClaimData.notes} onChange={handleNewClaimChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-purple-500 text-gray-900 bg-white shadow-sm min-h-[32px]" placeholder="Notes..." />
+                            </div>
+                          </div>
+                          <div className="flex-1 min-w-[160px] flex flex-col">
+                            <label className="block text-xs mb-1 font-semibold text-gray-700">Documents</label>
+                            <div className="mt-auto">
+                              <div className="relative group">
+                                <input
+                                  id="claim-documents-upload"
+                                  type="file"
+                                  multiple
+                                  accept="image/*,.pdf"
+                                  onChange={handleNewClaimDocumentsUpload}
+                                  className="hidden"
+                                  disabled={newClaimUploadingFiles}
+                                />
+                                <label
+                                  htmlFor="claim-documents-upload"
+                                  className={`w-full flex items-center gap-2 px-2 py-1.5 text-[10px] border border-gray-300 rounded-md cursor-pointer transition-all bg-white shadow-sm hover:border-purple-400 min-h-[32px]`}
+                                >
+                                  <Paperclip className="w-3 h-3 text-gray-400" />
+                                  <span className="truncate flex-1 text-gray-500">
+                                     {newClaimData.documentFiles.length > 0 ? `${newClaimData.documentFiles.length} files` : 'Upload...'}
+                                   </span>
+                                   {newClaimUploadingFiles && <Loader2 className="w-3 h-3 animate-spin text-purple-600" />}
+                                 </label>
+                               </div>
+                             </div>
+                             {newClaimData.documentFiles.length > 0 && (
+                               <div className="mt-1 flex flex-wrap gap-1">
+                                 {newClaimData.documentFiles.map((f: string, i: number) => (
+                                   <div key={i} className="flex items-center gap-1 px-1.5 py-0.5 bg-purple-50 border border-purple-100 rounded text-[8px] font-bold text-purple-700 shadow-sm">
+                                     <button type="button" onClick={() => setDocViewerUrl(f)} className="hover:underline">Doc {i + 1}</button>
+                                     <button
+                                       type="button"
+                                       onClick={() => setNewClaimData((prev: any) => ({ ...prev, documentFiles: prev.documentFiles.filter((_: any, idx: number) => idx !== i) }))}
+                                       className="ml-1 hover:text-red-500"
+                                     >
+                                       <X className="w-2 h-2" />
+                                     </button>
+                                   </div>
+                                 ))}
+                               </div>
+                             )}
+                           </div>
+                         </div>
+
+                        {/* Advance-specific fields */}
+                        {newClaimData.claimType === 'Advance' && (
+                          <div className="flex flex-wrap gap-3 items-stretch mt-2 pt-2 border-t border-purple-200">
+                            <div className="flex-1 min-w-[140px] flex flex-col">
+                              <label className="block text-xs mb-1 font-semibold text-gray-700">Advance Status</label>
+                              <div className="mt-auto">
+                                <select name="advanceStatus" value={newClaimData.advanceStatus} onChange={handleNewClaimChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-purple-500 text-gray-900 bg-white shadow-sm min-h-[32px]">
+                                  <option value="Full Pay">Full Pay</option>
+                                  <option value="Partial Pay">Partial Pay</option>
+                                </select>
+                              </div>
+                            </div>
+                            <div className="flex-1 min-w-[140px] flex flex-col">
+                              <label className="block text-xs mb-1 font-semibold text-gray-700">Advance Amount</label>
+                              <div className="mt-auto">
+                                <input
+                                  type="number"
+                                  name="advanceAmount"
+                                  value={newClaimData.advanceAmount}
+                                  onChange={handleNewClaimChange}
+                                  className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-purple-500 text-gray-900 font-semibold bg-white shadow-sm min-h-[32px] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  placeholder="0.00"
+                                  min="0"
+                                  step="0.01"
+                                />
+                              </div>
+                            </div>
+                            <div className="flex-1 min-w-[120px] flex flex-col">
+                              <label className="block text-xs mb-1 font-semibold text-gray-700">Status</label>
+                              <div className="mt-auto">
+                                <div className="px-2 py-1 text-xs bg-yellow-50 border border-yellow-300 rounded-md text-yellow-800 font-semibold min-h-[32px] flex items-center">Under Review</div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Paid claim type - show advance status and amount */}
+                        {newClaimData.claimType === 'Paid' && (
+                          <div className="flex flex-wrap gap-3 items-stretch mt-2 pt-2 border-t border-purple-200">
+                            <div className="flex-1 min-w-[140px] flex flex-col">
+                              <label className="block text-xs mb-1 font-semibold text-gray-700">Paid Status</label>
+                              <div className="mt-auto">
+                                <select name="advanceStatus" value={newClaimData.advanceStatus} onChange={handleNewClaimChange} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-purple-500 text-gray-900 bg-white shadow-sm min-h-[32px]">
+                                  <option value="Full Pay">Full Pay</option>
+                                  <option value="Partial Pay">Partial Pay</option>
+                                </select>
+                              </div>
+                            </div>
+                            <div className="flex-1 min-w-[140px] flex flex-col">
+                              <label className="block text-xs mb-1 font-semibold text-gray-700">Paid Amount</label>
+                              <div className="mt-auto">
+                                <input
+                                  type="number"
+                                  name="advanceAmount"
+                                  value={newClaimData.advanceAmount}
+                                  onChange={handleNewClaimChange}
+                                  className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-purple-500 text-gray-900 font-semibold bg-white shadow-sm min-h-[32px] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  placeholder="0.00"
+                                  min="0"
+                                  step="0.01"
+                                />
+                              </div>
+                            </div>
+                            <div className="flex-1 min-w-[120px] flex flex-col">
+                              <label className="block text-xs mb-1 font-semibold text-gray-700">Status</label>
+                              <div className="mt-auto">
+                                <div className="px-2 py-1 text-xs bg-yellow-50 border border-yellow-300 rounded-md text-yellow-800 font-semibold min-h-[32px] flex items-center">Under Review</div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Form action buttons */}
+                      <div className="flex items-center justify-end gap-3 pt-2">
+                        <button
+                          onClick={() => setShowNewClaimForm(false)}
+                          className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={submitNewClaim}
+                          disabled={newClaimSubmitting || newClaimUploadingFiles}
+                          className="px-6 py-2 text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 rounded-lg transition-colors disabled:opacity-50"
+                        >
+                          {newClaimSubmitting ? 'Submitting...' : 'Submit Claim'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {(patientData?.insurance === 'Yes' || insuranceClaims.length > 0) ? (
+                    <div className="p-6">
+                      {/* Insurance Info */}
+                      {insuranceClaims.length > 0 && (
+                        <div className="mb-6">
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+                            <div className="bg-blue-50 rounded-lg p-3">
+                              <p className="text-xs text-blue-600">Provider</p>
+                              <p className="text-sm font-semibold text-blue-900">{insuranceClaims[0]?.insuranceProvider || patientData?.insuranceType || '-'}</p>
+                            </div>
+                            <div className="bg-green-50 rounded-lg p-3">
+                              <p className="text-xs text-green-600">Policy #</p>
+                              <p className="text-sm font-semibold text-green-900">{insuranceClaims[0]?.policyNumber || '-'}</p>
+                            </div>
+                            <div className="bg-purple-50 rounded-lg p-3">
+                              <p className="text-xs text-purple-600">Expiry</p>
+                              <p className="text-sm font-semibold text-purple-900">{insuranceClaims[0]?.expiryDate ? new Date(insuranceClaims[0].expiryDate).toLocaleDateString() : '-'}</p>
+                            </div>
+                            <div className="bg-orange-50 rounded-lg p-3">
+                              <p className="text-xs text-orange-600">Total Claims</p>
+                              <p className="text-sm font-semibold text-orange-900">{insuranceClaims.length}</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Claims Table */}
+                      <div>
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="text-sm font-semibold text-gray-800">Claims</h4>
+                          {balance.pendingClaim > 0 && (
+                            <div className="px-3 py-1 bg-orange-50 border border-orange-200 rounded-lg">
+                              <span className="text-xs text-orange-700 font-medium">Pending from Claims: </span>
+                              <span className="text-xs text-orange-800 font-bold">{formatAED(balance.pendingClaim)}</span>
+                            </div>
+                          )}
+                        </div>
+                        {claimsLoading ? (
+                          <div className="flex justify-center py-8">
+                            <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-300 border-t-teal-600"></div>
+                          </div>
+                        ) : insuranceClaims.length === 0 ? (
+                          <div className="text-center py-8">
+                            <Shield className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                            <p className="text-gray-500 text-sm">No claims created yet</p>
+                          </div>
+                        ) : (
+                          <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-100">
+                              <thead className="bg-gray-50">
+                                <tr>
+                                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Claim Type</th>
+                                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Department</th>
+                                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Services</th>
+                                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Doctor</th>
+                                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Amount</th>
+                                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Paid Amount</th>
+                                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Pending Claim</th>
+                                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Co-Pay</th>
+                                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
+                                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Created</th>
+                                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
+                                </tr>
+                              </thead>
+                              <tbody className="bg-white divide-y divide-gray-100">
+                                {insuranceClaims.map((claim: any) => (
+                                  <tr key={claim._id} className="hover:bg-gray-50 transition-colors">
+                                    <td className="px-4 py-3 whitespace-nowrap">
+                                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${claim.claimType === 'Advance' ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'}`}>
+                                        {claim.claimType}
+                                      </span>
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">{claim.departmentName || '-'}</td>
+                                    <td className="px-4 py-3 text-sm text-gray-700">
+                                      {claim.services && claim.services.length > 0 ? (
+                                        <div className="flex flex-wrap gap-1">
+                                          {claim.services.map((svc: any, idx: number) => (
+                                            <span key={idx} className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                              {svc.serviceName || 'Service'}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      ) : (
+                                        <span className="text-gray-400">-</span>
+                                      )}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">{claim.doctorName || '-'}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-gray-900">
+                                      {getCurrencySymbol(currency)} {claim.claimAmount?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-green-700">
+                                      {claim.advanceAmount ? `${getCurrencySymbol(currency)} ${claim.advanceAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-orange-700">
+                                      {/* Show pending claim only if balance.pendingClaim > 0 (meaning there's still pending claim to collect) */}
+                                      {balance.pendingClaim > 0 && claim.pendingClaim > 0 ? `${getCurrencySymbol(currency)} ${claim.pendingClaim.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 font-medium">{claim.coPayPercent}%</td>
+                                    <td className="px-4 py-3 whitespace-nowrap">
+                                      <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
+                                        claim.status === 'Under Review' ? 'bg-yellow-100 text-yellow-800 border-yellow-300' :
+                                        claim.status === 'Approved' ? 'bg-green-100 text-green-800 border-green-300' :
+                                        claim.status === 'Rejected' ? 'bg-red-100 text-red-800 border-red-300' :
+                                        'bg-blue-100 text-blue-800 border-blue-300'
+                                      }`}>
+                                        {claim.status}
+                                      </span>
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-500">{new Date(claim.createdAt).toLocaleDateString()}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap">
+                                      <div className="flex items-center gap-1">
+                                        <button
+                                          onClick={() => setClaimViewModal(claim)}
+                                          className="p-1.5 text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
+                                          title="Review"
+                                        >
+                                          <Eye className="w-4 h-4" />
+                                        </button>
+                                        <button
+                                          onClick={() => setClaimTrackingModal(claim)}
+                                          className="p-1.5 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                                          title="Track Claim"
+                                        >
+                                          <Activity className="w-4 h-4" />
+                                        </button>
+                                        {['Under Review', 'Rejected'].includes(claim.status) && (
+                                          <button
+                                            onClick={() => openClaimEditModal(claim)}
+                                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                            title="Edit"
+                                          >
+                                            <Edit2 className="w-4 h-4" />
+                                          </button>
+                                        )}
+                                        {['Under Review', 'Rejected'].includes(claim.status) && (
+                                          <button
+                                            onClick={() => deleteClaim(claim._id)}
+                                            className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                            title="Delete"
+                                          >
+                                            <Trash2 className="w-4 h-4" />
+                                          </button>
+                                        )}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   ) : (
                     <div className="flex flex-col items-center justify-center py-14 text-center">
@@ -5214,6 +7232,729 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                     </div>
                   )}
                 </div>
+
+                {/* Claim View Modal */}
+                {claimViewModal && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-y-auto">
+                      <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
+                        <h2 className="text-lg font-bold text-gray-900">Claim Review</h2>
+                        <button onClick={() => setClaimViewModal(null)} className="p-2 hover:bg-gray-100 rounded-lg">
+                          <X className="w-5 h-5 text-gray-500" />
+                        </button>
+                      </div>
+                      <div className="p-6 space-y-5">
+                        {/* Section A: Insurance Details */}
+                        <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
+                          <h3 className="text-sm font-semibold text-blue-800 mb-3 flex items-center gap-2">
+                            <Shield className="w-4 h-4" />
+                            Insurance Details
+                          </h3>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div>
+                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Provider</p>
+                              <p className="text-sm font-semibold text-blue-900">{claimViewModal.insuranceProvider || '-'}</p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Policy Number</p>
+                              <p className="text-sm font-semibold text-blue-900">{claimViewModal.policyNumber || '-'}</p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Expiry Date</p>
+                              <p className="text-sm font-semibold text-blue-900">{claimViewModal.expiryDate ? new Date(claimViewModal.expiryDate).toLocaleDateString() : '-'}</p>
+                            </div>
+                            <div className="sm:col-span-1">
+                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Insurance Card</p>
+                              {claimViewModal.insuranceCardFile ? (
+                                <button
+                                  onClick={() => setDocViewerUrl(claimViewModal.insuranceCardFile)}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-blue-200 rounded-lg text-xs font-medium text-blue-700 hover:bg-blue-50 transition-colors"
+                                >
+                                  <Shield className="w-3.5 h-3.5" /> View Card
+                                </button>
+                              ) : (
+                                <span className="text-xs text-gray-400 italic">No card uploaded</span>
+                              )}
+                            </div>
+                            <div className="sm:col-span-1">
+                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Table of Benefits</p>
+                              {claimViewModal.tableOfBenefitsFile ? (
+                                <button
+                                  onClick={() => setDocViewerUrl(claimViewModal.tableOfBenefitsFile)}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-blue-200 rounded-lg text-xs font-medium text-blue-700 hover:bg-blue-50 transition-colors"
+                                >
+                                  <FileText className="w-3.5 h-3.5" /> View Benefits
+                                </button>
+                              ) : (
+                                <span className="text-xs text-gray-400 italic">No benefits file</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Section B: Claim Source & Type */}
+                        <div className="bg-green-50 rounded-xl p-4 border border-green-200">
+                          <h3 className="text-sm font-semibold text-green-800 mb-3 flex items-center gap-2">
+                            <Activity className="w-4 h-4" />
+                            Claim Source & Type
+                          </h3>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-6 gap-4">
+                            <div>
+                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Department</p>
+                              <p className="text-sm font-semibold text-green-900">{claimViewModal.departmentName || '-'}</p>
+                            </div>
+                            <div className="md:col-span-2">
+                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Services</p>
+                              <div className="flex flex-wrap gap-1.5">
+                                {claimViewModal.services && claimViewModal.services.length > 0 ? (
+                                  claimViewModal.services.map((svc: any, idx: number) => (
+                                    <span key={idx} className="inline-flex items-center px-1.5 py-0.5 rounded bg-green-50 text-green-700 border border-green-200 text-[9px] font-bold whitespace-nowrap shadow-sm">
+                                      {svc.serviceName || 'Service'}
+                                    </span>
+                                  ))
+                                ) : (
+                                  <p className="text-sm font-semibold text-green-900">-</p>
+                                )}
+                              </div>
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Doctor</p>
+                              <p className="text-sm font-semibold text-green-900">{claimViewModal.doctorName || '-'}</p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Claim Amount</p>
+                              <p className="text-sm font-bold text-green-900">
+                                {getCurrencySymbol(currency)} {claimViewModal.claimAmount?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Claim Type</p>
+                              <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-bold ${claimViewModal.claimType === 'Advance' ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'}`}>
+                                {claimViewModal.claimType}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Section C: Claim Details */}
+                        <div className="bg-purple-50 rounded-xl p-4 border border-purple-200">
+                          <h3 className="text-sm font-semibold text-purple-800 mb-3 flex items-center gap-2">
+                            <ClipboardList className="w-4 h-4" />
+                            Claim Details
+                          </h3>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                            <div>
+                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Co-Pay</p>
+                              <p className="text-sm font-semibold text-purple-900">{claimViewModal.coPayPercent}%</p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Status</p>
+                              <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-bold border ${
+                                claimViewModal.status === 'Under Review' ? 'bg-yellow-100 text-yellow-800 border-yellow-300' :
+                                claimViewModal.status === 'Approved' ? 'bg-green-100 text-green-800 border-green-300' :
+                                claimViewModal.status === 'Rejected' ? 'bg-red-100 text-red-800 border-red-300' :
+                                'bg-blue-100 text-blue-800 border-blue-300'
+                              }`}>{claimViewModal.status}</span>
+                            </div>
+                            {/* Show pending claim in modal only if balance.pendingClaim > 0 */}
+                            {balance.pendingClaim > 0 && claimViewModal.pendingClaim > 0 && (
+                              <div>
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Pending Claim</p>
+                                <p className="text-sm font-bold text-orange-700">
+                                  {getCurrencySymbol(currency)} {claimViewModal.pendingClaim?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </p>
+                              </div>
+                            )}
+                            {(claimViewModal.claimType === 'Advance' || claimViewModal.claimType === 'Paid') && (
+                              <>
+                                <div>
+                                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">{claimViewModal.claimType} Status</p>
+                                  <p className="text-sm font-semibold text-purple-900">{claimViewModal.advanceStatus || '-'}</p>
+                                </div>
+                                <div>
+                                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Paid Amount</p>
+                                  <p className="text-sm font-bold text-purple-900">
+                                    {claimViewModal.advanceAmount ? `${getCurrencySymbol(currency)} ${claimViewModal.advanceAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
+                                  </p>
+                                </div>
+                              </>
+                            )}
+                            <div className="md:col-span-2">
+                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Notes</p>
+                              <p className="text-sm text-purple-900 italic">{claimViewModal.notes || 'No notes added'}</p>
+                            </div>
+                            {claimViewModal.rejectionReason && (
+                              <div className="md:col-span-4 bg-red-100/50 p-3 rounded-lg border border-red-200">
+                                <p className="text-[10px] font-bold text-red-500 uppercase tracking-wider mb-1">Rejection Reason</p>
+                                <p className="text-sm text-red-700 font-medium">{claimViewModal.rejectionReason}</p>
+                              </div>
+                            )}
+                            <div className="md:col-span-4 mt-2">
+                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Support Documents ({claimViewModal.documentFiles?.length || 0})</p>
+                              <div className="flex flex-wrap gap-2">
+                                {claimViewModal.documentFiles && claimViewModal.documentFiles.length > 0 ? (
+                                  claimViewModal.documentFiles.map((f: string, i: number) => (
+                                    <button
+                                      key={i}
+                                      onClick={() => setDocViewerUrl(f)}
+                                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-purple-200 rounded-lg text-xs font-medium text-purple-700 hover:bg-purple-50 transition-colors"
+                                    >
+                                      <Paperclip className="w-3.5 h-3.5" /> Document {i + 1}
+                                    </button>
+                                  ))
+                                ) : (
+                                  <span className="text-xs text-gray-400 italic">No support documents uploaded</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        {/* Section D: Administrative Details */}
+                        <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+                          <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Administrative Details</h3>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-3 text-[10px]">
+                            <div className="flex justify-between border-b border-gray-200 pb-1">
+                              <span className="text-gray-500">Patient Name:</span>
+                              <span className="font-semibold text-gray-700">{claimViewModal.patientFirstName} {claimViewModal.patientLastName}</span>
+                            </div>
+                            <div className="flex justify-between border-b border-gray-200 pb-1">
+                              <span className="text-gray-500">Doctor Name:</span>
+                              <span className="font-semibold text-gray-700">{claimViewModal.doctorName || "-"}</span>
+                            </div>
+                            <div className="flex justify-between border-b border-gray-200 pb-1">
+                              <span className="text-gray-500">Insurance Provider:</span>
+                              <span className="font-semibold text-gray-700">{claimViewModal.insuranceProvider}</span>
+                            </div>
+                            <div className="flex justify-between border-b border-gray-200 pb-1">
+                              <span className="text-gray-500">Policy Number:</span>
+                              <span className="font-semibold text-gray-700">{claimViewModal.policyNumber}</span>
+                            </div>
+                            <div className="flex justify-between border-b border-gray-200 pb-1">
+                              <span className="text-gray-500">Claim Type:</span>
+                              <span className="font-semibold text-gray-700">{claimViewModal.claimType}</span>
+                            </div>
+                            <div className="flex justify-between border-b border-gray-200 pb-1">
+                              <span className="text-gray-500">Created At:</span>
+                              <span className="text-gray-700">{new Date(claimViewModal.createdAt).toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between border-b border-gray-200 pb-1">
+                              <span className="text-gray-500">Last Updated:</span>
+                              <span className="text-gray-700">{new Date(claimViewModal.updatedAt).toLocaleString()}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="text-xs text-gray-500 pt-2 border-t border-gray-100">
+                          ID: {claimViewModal.insuranceProvider}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Claim Tracking Modal */}
+                {claimTrackingModal && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                      <div className="sticky top-0 bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-4 flex items-center justify-between z-10">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+                            <Activity className="w-5 h-5 text-white" />
+                          </div>
+                          <div>
+                            <h2 className="text-lg font-bold text-white">Claim Tracking</h2>
+                            <p className="text-xs text-white/80">View claim approval & rejection history</p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => setClaimTrackingModal(null)}
+                          className="p-2 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-colors"
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
+                      </div>
+                     
+                      <div className="p-6">
+                        {/* Timeline Container */}
+                        <div className="relative">
+                          {/* Vertical Line */}
+                          <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-gradient-to-b from-purple-300 via-blue-300 to-green-300"></div>
+                         
+                          {/* Timeline Items */}
+                          <div className="space-y-6">
+                            {/* 1. Claim Created */}
+                            <div className="relative flex items-start gap-4">
+                              <div className="relative z-10 w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-lg">
+                                <FileText className="w-5 h-5 text-white" />
+                              </div>
+                              <div className="flex-1 bg-purple-50 border border-purple-200 rounded-xl p-4 ml-2">
+                                <div className="flex items-center justify-between mb-2">
+                                  <h3 className="text-sm font-bold text-purple-900">Claim Created</h3>
+                                  <span className="text-xs font-semibold text-purple-600 bg-purple-100 px-2 py-1 rounded-full">
+                                    {new Date(claimTrackingModal.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-purple-700">
+                                  Insurance claim created with amount <strong>{claimTrackingModal.claimAmount?.toLocaleString()}</strong>
+                                </p>
+                                <p className="text-xs text-purple-600 mt-1">
+                                  Type: <span className="font-semibold">{claimTrackingModal.claimType}</span>
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* 2. Pass Claims Review (if rejected from pass claims) */}
+                            {claimTrackingModal.rejectedFromPassClaims && (
+                              <div className="relative flex items-start gap-4">
+                                <div className="relative z-10 w-12 h-12 rounded-full bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center shadow-lg">
+                                  <XCircle className="w-5 h-5 text-white" />
+                                </div>
+                                <div className="flex-1 bg-red-50 border border-red-200 rounded-xl p-4 ml-2">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <h3 className="text-sm font-bold text-red-900">Rejected from Pass Claims</h3>
+                                    <span className="text-xs font-semibold text-red-600 bg-red-100 px-2 py-1 rounded-full">
+                                      {claimTrackingModal.rejectedFromPassClaimsAt ? new Date(claimTrackingModal.rejectedFromPassClaimsAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A'}
+                                    </span>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <p className="text-xs text-red-700">
+                                      <strong>Rejected By:</strong> {claimTrackingModal.rejectedFromPassClaimsByName || 'N/A'}
+                                    </p>
+                                    <p className="text-xs text-red-700">
+                                      <strong>Role:</strong> <span className="font-semibold capitalize">{claimTrackingModal.rejectedFromPassClaimsByRole || 'N/A'}</span>
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* 3. Approval (if approved) */}
+                            {claimTrackingModal.approvedBy && (
+                              <div className="relative flex items-start gap-4">
+                                <div className="relative z-10 w-12 h-12 rounded-full bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center shadow-lg">
+                                  <CheckCircle className="w-5 h-5 text-white" />
+                                </div>
+                                <div className="flex-1 bg-green-50 border border-green-200 rounded-xl p-4 ml-2">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <h3 className="text-sm font-bold text-green-900">Claim Approved</h3>
+                                    <span className="text-xs font-semibold text-green-600 bg-green-100 px-2 py-1 rounded-full">
+                                      {claimTrackingModal.approvedAt ? new Date(claimTrackingModal.approvedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A'}
+                                    </span>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <p className="text-xs text-green-700">
+                                      <strong>Approved By:</strong> {claimTrackingModal.approvedByName || 'N/A'}
+                                    </p>
+                                    <p className="text-xs text-green-700">
+                                      <strong>Role:</strong> <span className="font-semibold capitalize">{claimTrackingModal.approvedByRole || 'N/A'}</span>
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* 4. Rejection (if rejected) */}
+                            {claimTrackingModal.rejectedBy && (
+                              <div className="relative flex items-start gap-4">
+                                <div className="relative z-10 w-12 h-12 rounded-full bg-gradient-to-br from-red-500 to-rose-500 flex items-center justify-center shadow-lg">
+                                  <XCircle className="w-5 h-5 text-white" />
+                                </div>
+                                <div className="flex-1 bg-red-50 border border-red-200 rounded-xl p-4 ml-2">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <h3 className="text-sm font-bold text-red-900">Claim Rejected</h3>
+                                    <span className="text-xs font-semibold text-red-600 bg-red-100 px-2 py-1 rounded-full">
+                                      {claimTrackingModal.rejectedAt ? new Date(claimTrackingModal.rejectedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A'}
+                                    </span>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <p className="text-xs text-red-700">
+                                      <strong>Rejected By:</strong> {claimTrackingModal.rejectedByName || 'N/A'}
+                                    </p>
+                                    <p className="text-xs text-red-700">
+                                      <strong>Role:</strong> <span className="font-semibold capitalize">{claimTrackingModal.rejectedByRole || 'N/A'}</span>
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* 5. Release (if released) */}
+                            {claimTrackingModal.releasedBy && (
+                              <div className="relative flex items-start gap-4">
+                                <div className="relative z-10 w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shadow-lg">
+                                  <DollarSign className="w-5 h-5 text-white" />
+                                </div>
+                                <div className="flex-1 bg-blue-50 border border-blue-200 rounded-xl p-4 ml-2">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <h3 className="text-sm font-bold text-blue-900">Claim Released</h3>
+                                    <span className="text-xs font-semibold text-blue-600 bg-blue-100 px-2 py-1 rounded-full">
+                                      {claimTrackingModal.releasedAt ? new Date(claimTrackingModal.releasedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A'}
+                                    </span>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <p className="text-xs text-blue-700">
+                                      <strong>Released By:</strong> {claimTrackingModal.releasedByName || 'N/A'}
+                                    </p>
+                                    <p className="text-xs text-blue-700">
+                                      <strong>Role:</strong> <span className="font-semibold capitalize">{claimTrackingModal.releasedByRole || 'N/A'}</span>
+                                    </p>
+                                    <p className="text-xs text-blue-700 mt-2 pt-2 border-t border-blue-200">
+                                      <strong>Advance Amount:</strong> {claimTrackingModal.advanceAmount?.toLocaleString() || 'N/A'}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Current Status Badge */}
+                            <div className="relative flex items-start gap-4">
+                              <div className="relative z-10 w-12 h-12 rounded-full bg-gradient-to-br from-gray-500 to-gray-600 flex items-center justify-center shadow-lg">
+                                <AlertCircle className="w-5 h-5 text-white" />
+                              </div>
+                              <div className="flex-1 bg-gray-50 border border-gray-200 rounded-xl p-4 ml-2">
+                                <h3 className="text-sm font-bold text-gray-900 mb-2">Current Status</h3>
+                                <span className={`inline-flex px-3 py-1.5 rounded-full text-xs font-bold border ${
+                                  claimTrackingModal.status === 'Under Review' ? 'bg-yellow-100 text-yellow-800 border-yellow-300' :
+                                  claimTrackingModal.status === 'Approved' ? 'bg-green-100 text-green-800 border-green-300' :
+                                  claimTrackingModal.status === 'Rejected' ? 'bg-red-100 text-red-800 border-red-300' :
+                                  'bg-blue-100 text-blue-800 border-blue-300'
+                                }`}>
+                                  {claimTrackingModal.status}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Footer */}
+                      <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4 flex justify-end">
+                        <button
+                          onClick={() => setClaimTrackingModal(null)}
+                          className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-medium"
+                        >
+                          Close
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Claim Edit Modal */}
+                {claimEditModal && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto">
+                      <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
+                        <h2 className="text-lg font-bold text-gray-900">Edit Claim</h2>
+                        <button onClick={() => setClaimEditModal(null)} className="p-2 hover:bg-gray-100 rounded-lg">
+                          <X className="w-5 h-5 text-gray-500" />
+                        </button>
+                      </div>
+                      <div className="p-6 space-y-4">
+                        {/* Insurance Details */}
+                        <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                          <h3 className="text-sm font-semibold text-blue-800 mb-3">Insurance Details</h3>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">Insurance Provider <span className="text-red-500">*</span></label>
+                              <input type="text" value={claimEditData.insuranceProvider || ''} onChange={(e) => setClaimEditData((prev: any) => ({ ...prev, insuranceProvider: e.target.value }))} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">Policy Number <span className="text-red-500">*</span></label>
+                              <input type="text" value={claimEditData.policyNumber || ''} onChange={(e) => setClaimEditData((prev: any) => ({ ...prev, policyNumber: e.target.value }))} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">Expiry Date <span className="text-red-500">*</span></label>
+                              <input type="date" value={claimEditData.expiryDate || ''} onChange={(e) => setClaimEditData((prev: any) => ({ ...prev, expiryDate: e.target.value }))} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">Insurance Card </label>
+                              <div className="relative group">
+                                <input
+                                  id="edit-insurance-card-upload"
+                                  type="file"
+                                  accept="image/*,.pdf"
+                                  onChange={(e) => handleClaimEditFileUpload(e, 'insuranceCard')}
+                                  className="hidden"
+                                  disabled={claimEditUploadingFiles}
+                                />
+                                <div className={`w-full flex items-center gap-2 px-3 py-2 text-[10px] border border-gray-300 rounded-lg transition-all ${claimEditData.insuranceCardFile ? 'bg-blue-50 border-blue-400 ring-1 ring-blue-400 shadow-sm' : 'bg-white hover:border-blue-400'} min-h-[38px]`}>
+                                  <label
+                                    htmlFor="edit-insurance-card-upload"
+                                    className="flex-1 flex items-center gap-2 cursor-pointer truncate"
+                                  >
+                                    <Shield className={`w-3.5 h-3.5 flex-shrink-0 ${claimEditData.insuranceCardFile ? 'text-blue-600' : 'text-gray-400'}`} />
+                                    <span className={`truncate ${claimEditData.insuranceCardFile ? 'text-blue-700 font-semibold' : 'text-gray-400'}`}>
+                                       {claimEditData.insuranceCardFile ? (claimEditData.insuranceCardFile.split('/').pop()?.split('-').pop() || 'Card Attached') : 'No file chosen'}
+                                     </span>
+                                  </label>
+                                  {claimEditData.insuranceCardFile && (
+                                    <button
+                                      onClick={() => setDocViewerUrl(claimEditData.insuranceCardFile)}
+                                      className="flex-shrink-0 p-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
+                                      title="View Card"
+                                    >
+                                      <Eye className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                  {claimEditUploadingFiles && <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600 flex-shrink-0" />}
+                                </div>
+                               </div>
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">Table of Benefits</label>
+                              <div className="relative group">
+                                <input
+                                  id="edit-benefits-upload"
+                                  type="file"
+                                  accept="image/*,.pdf"
+                                  onChange={(e) => handleClaimEditFileUpload(e, 'tableOfBenefits')}
+                                  className="hidden"
+                                  disabled={claimEditUploadingFiles}
+                                />
+                                <div className={`w-full flex items-center gap-2 px-3 py-2 text-[10px] border border-gray-300 rounded-lg transition-all ${claimEditData.tableOfBenefitsFile ? 'bg-blue-50 border-blue-400 ring-1 ring-blue-400 shadow-sm' : 'bg-white hover:border-blue-400'} min-h-[38px]`}>
+                                  <label
+                                    htmlFor="edit-benefits-upload"
+                                    className="flex-1 flex items-center gap-2 cursor-pointer truncate"
+                                  >
+                                    <FileText className={`w-3.5 h-3.5 flex-shrink-0 ${claimEditData.tableOfBenefitsFile ? 'text-blue-600' : 'text-gray-400'}`} />
+                                    <span className={`truncate ${claimEditData.tableOfBenefitsFile ? 'text-blue-700 font-semibold' : 'text-gray-400'}`}>
+                                       {claimEditData.tableOfBenefitsFile ? (claimEditData.tableOfBenefitsFile.split('/').pop()?.split('-').pop() || 'Benefits Attached') : 'No file chosen'}
+                                     </span>
+                                  </label>
+                                  {claimEditData.tableOfBenefitsFile && (
+                                    <button
+                                      onClick={() => setDocViewerUrl(claimEditData.tableOfBenefitsFile)}
+                                      className="flex-shrink-0 p-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
+                                      title="View Benefits"
+                                    >
+                                      <Eye className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                  {claimEditUploadingFiles && <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600 flex-shrink-0" />}
+                                </div>
+                               </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Claim Source & Type */}
+                        <div className="bg-green-50 rounded-lg p-4 border border-green-200">
+                          <h3 className="text-sm font-semibold text-green-800 mb-3">Claim Source & Type</h3>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 items-start">
+                            <div className="flex flex-col">
+                              <label className="block text-xs font-medium text-gray-700 mb-1">
+                                Department
+                              </label>
+                              <select value={claimEditData.departmentId || ''} onChange={(e) => {
+                                const dept = claimDepartments.find((d: any) => d._id === e.target.value);
+                                setClaimEditData((prev: any) => ({
+                                  ...prev,
+                                  departmentId: e.target.value,
+                                  departmentName: dept?.name || '',
+                                  serviceId: '',
+                                  serviceName: '',
+                                  services: [] // Clear services when department changes
+                                }));
+                              }} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 h-[38px]">
+                                <option value="">Select Department</option>
+                                {claimDepartments.map((d: any) => <option key={d._id} value={d._id}>{d.name}</option>)}
+                              </select>
+                            </div>
+                            <div className="flex flex-col">
+                              <label className="block text-xs font-medium text-gray-700 mb-1">
+                                Services {claimEditData.services && claimEditData.services.length > 0 && (
+                                  <span className="text-blue-600 font-semibold ml-1">
+                                    ({claimEditData.services.length})
+                                  </span>
+                                )}
+                              </label>
+                              <div className="relative w-full flex items-center p-0.5 border border-gray-300 rounded-lg bg-white shadow-sm focus-within:ring-2 focus-within:ring-green-500 transition-all min-h-[38px] box-border">
+                                <div className="flex flex-wrap items-center gap-1 flex-1 px-1 py-0.5">
+                                  {(claimEditData.services || []).map((svc: any, idx: number) => (
+                                    <span
+                                      key={idx}
+                                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-green-50 text-green-700 border border-green-200 text-[9px] font-bold whitespace-nowrap"
+                                    >
+                                      {svc.serviceName}
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const updatedServices = claimEditData.services.filter((_: any, i: number) => i !== idx);
+                                          setClaimEditData((prev: any) => ({
+                                            ...prev,
+                                            services: updatedServices,
+                                            serviceId: updatedServices.length > 0 ? updatedServices[updatedServices.length - 1].serviceId : "",
+                                            serviceName: updatedServices.length > 0 ? updatedServices[updatedServices.length - 1].serviceName : "",
+                                          }));
+                                        }}
+                                        className="hover:text-red-500 transition-colors"
+                                      >
+                                        <X className="w-2 h-2" />
+                                      </button>
+                                    </span>
+                                  ))}
+                                  <select
+                                    value=""
+                                    onChange={(e) => {
+                                      const selectedId = e.target.value;
+                                      if (!selectedId) return;
+                                      const svc = claimServices.find((s: any) => s._id === selectedId);
+                                      if (svc) {
+                                        const alreadySelected = (claimEditData.services || []).some((s: any) => s.serviceId === selectedId);
+                                        if (!alreadySelected) {
+                                          const updatedServices = [...(claimEditData.services || []), { serviceId: svc._id, serviceName: svc.name }];
+                                          setClaimEditData((prev: any) => ({
+                                            ...prev,
+                                            services: updatedServices,
+                                            serviceId: svc._id,
+                                            serviceName: svc.name
+                                          }));
+                                        }
+                                      }
+                                    }}
+                                    className="min-w-[100px] bg-transparent border-none outline-none text-[10px] text-gray-900 cursor-pointer h-full py-0.5 flex-1 appearance-none"
+                                  >
+                                    <option value="" disabled>{(claimEditData.services || []).length > 0 ? "Add More Services..." : "Select Services"}</option>
+                                    {claimServices
+                                      .filter((s: any) => !claimEditData.departmentId || String(s.departmentId) === String(claimEditData.departmentId))
+                                      .map((s: any) => (
+                                        <option key={s._id} value={s._id} className="py-2 px-3">
+                                          {s.name}
+                                        </option>
+                                      ))}
+                                  </select>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex flex-col">
+                              <label className="block text-xs font-medium text-gray-700 mb-1">Doctor <span className="text-red-500">*</span></label>
+                              <select value={claimEditData.doctorId || ''} onChange={(e) => {
+                                const doc = claimDoctors.find((d: any) => d._id === e.target.value);
+                                setClaimEditData((prev: any) => ({ ...prev, doctorId: e.target.value, doctorName: doc?.name || '' }));
+                              }} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 h-[38px]">
+                                <option value="">Select Doctor</option>
+                                {claimDoctors.map((d: any) => <option key={d._id} value={d._id}>{d.name}</option>)}
+                              </select>
+                            </div>
+                            <div className="flex flex-col">
+                              <label className="block text-xs font-medium text-gray-700 mb-1">Claim Amount <span className="text-red-500">*</span></label>
+                              <input type="number" value={claimEditData.claimAmount ?? ''} onChange={(e) => {
+                                const amt = parseFloat(e.target.value) || 0;
+                                setClaimEditData((prev: any) => ({
+                                  ...prev,
+                                  claimAmount: amt,
+                                  advanceAmount: prev.claimType === 'Advance' ? (prev.advanceStatus === 'Full Pay' ? amt : amt * 0.5) : 0,
+                                }));
+                              }} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 h-[38px] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" min="0" step="0.01" />
+                            </div>
+                            <div className="flex flex-col">
+                              <label className="block text-xs font-medium text-gray-700 mb-1">Claim Type <span className="text-red-500">*</span></label>
+                              <select value={claimEditData.claimType || 'Paid'} onChange={(e) => setClaimEditData((prev: any) => ({ ...prev, claimType: e.target.value, advanceStatus: e.target.value === 'Advance' ? 'Full Pay' : null, advanceAmount: 0 }))} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 h-[38px]">
+                                <option value="Paid">Paid</option>
+                                <option value="Advance">Advance</option>
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Claim Details */}
+                        <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
+                          <h3 className="text-sm font-semibold text-purple-800 mb-3">Claim Details</h3>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 items-start">
+                            <div className="flex flex-col">
+                              <label className="block text-xs font-medium text-gray-700 mb-1">Co-Pay %</label>
+                              <input type="number" value={claimEditData.coPayPercent ?? ''} onChange={(e) => setClaimEditData((prev: any) => ({ ...prev, coPayPercent: e.target.value }))} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 h-[38px] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" min="0" max="100" />
+                            </div>
+                            <div className="flex flex-col">
+                              <label className="block text-xs font-medium text-gray-700 mb-1">Co-Pay Type</label>
+                              <select value={claimEditData.coPayType || 'Patient Pays'} onChange={(e) => setClaimEditData((prev: any) => ({ ...prev, coPayType: e.target.value }))} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 h-[38px]">
+                                <option value="Patient Pays">Patient Pays</option>
+                                <option value="Deduct from Claim">Deduct from Claim</option>
+                                <option value="Clinic Adjusts">Clinic Adjusts</option>
+                              </select>
+                            </div>
+                            <div className="md:col-span-1 lg:col-span-1 flex flex-col">
+                              <label className="block text-xs font-medium text-gray-700 mb-1">Notes</label>
+                              <input type="text" value={claimEditData.notes || ''} onChange={(e) => setClaimEditData((prev: any) => ({ ...prev, notes: e.target.value }))} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 h-[38px]" />
+                            </div>
+                            <div className="md:col-span-1 lg:col-span-1 flex flex-col">
+                              <label className="block text-xs font-medium text-gray-700 mb-1">Support Documents</label>
+                              <div className="relative group">
+                                <input
+                                  id="edit-support-docs-upload"
+                                  type="file"
+                                  multiple
+                                  accept="image/*,.pdf"
+                                  onChange={handleClaimEditDocumentsUpload}
+                                  className="hidden"
+                                  disabled={claimEditUploadingFiles}
+                                />
+                                <div className={`w-full flex items-center gap-2 px-3 py-2 text-[10px] border border-gray-300 rounded-lg transition-all ${claimEditData.documentFiles?.length > 0 ? 'bg-purple-50 border-purple-400 ring-1 ring-purple-400 shadow-sm' : 'bg-white hover:border-purple-400'} min-h-[38px]`}>
+                                  <label
+                                    htmlFor="edit-support-docs-upload"
+                                    className="flex-1 flex items-center gap-2 cursor-pointer truncate"
+                                  >
+                                    <Paperclip className={`w-3.5 h-3.5 flex-shrink-0 ${claimEditData.documentFiles?.length > 0 ? 'text-purple-600' : 'text-gray-400'}`} />
+                                    <span className={`truncate ${claimEditData.documentFiles?.length > 0 ? 'text-purple-700 font-semibold' : 'text-gray-400'}`}>
+                                       {claimEditData.documentFiles?.length > 0 ? `${claimEditData.documentFiles.length} files attached` : 'No files chosen'}
+                                     </span>
+                                  </label>
+                                  {claimEditData.documentFiles?.length > 0 && (
+                                    <div className="flex items-center gap-1 flex-shrink-0">
+                                      {claimEditData.documentFiles.map((f: string, i: number) => (
+                                        <button
+                                          key={i}
+                                          onClick={() => setDocViewerUrl(f)}
+                                          className="p-1 bg-purple-100 text-purple-700 rounded hover:bg-purple-200 transition-colors"
+                                          title={`View Doc ${i + 1}`}
+                                        >
+                                          <Eye className="w-3 h-3" />
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
+                                  {claimEditUploadingFiles && <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-600 flex-shrink-0" />}
+                                </div>
+                               </div>
+                            </div>
+                            {(claimEditData.claimType === 'Advance' || claimEditData.claimType === 'Paid') && (
+                              <div className="grid grid-cols-2 gap-2 lg:col-span-1">
+                                <div className="flex flex-col">
+                                  <label className="block text-[10px] font-medium text-gray-700 mb-1 truncate">{claimEditData.claimType} Status</label>
+                                  <select value={claimEditData.advanceStatus || 'Full Pay'} onChange={(e) => {
+                                    const amt = parseFloat(claimEditData.claimAmount) || 0;
+                                    setClaimEditData((prev: any) => ({
+                                      ...prev,
+                                      advanceStatus: e.target.value,
+                                      advanceAmount: e.target.value === 'Full Pay' ? amt : amt * 0.5,
+                                    }));
+                                  }} className="w-full px-2 py-2 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 h-[38px]">
+                                    <option value="Full Pay">Full</option>
+                                    <option value="Partial Pay">Partial</option>
+                                  </select>
+                                </div>
+                                <div className="flex flex-col">
+                                  <label className="block text-[10px] font-medium text-gray-700 mb-1 truncate">Amount</label>
+                                  <input type="number" value={claimEditData.advanceAmount ?? ''} onChange={(e) => setClaimEditData((prev: any) => ({ ...prev, advanceAmount: parseFloat(e.target.value) || 0 }))} className="w-full px-2 py-2 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 font-semibold h-[38px] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" placeholder="0" min="0" step="0.01" />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Save/Cancel buttons */}
+                        <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
+                          <button onClick={() => setClaimEditModal(null)} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">Cancel</button>
+                          <button onClick={handleClaimEditSave} disabled={claimEditLoading} className="px-6 py-2 text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 rounded-lg transition-colors disabled:opacity-50">
+                            {claimEditLoading ? 'Saving...' : 'Save Changes'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
               </div>
             ) : activeTab === 'media' ? (
@@ -5254,7 +7995,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                       <Camera className="w-4 h-4" />
                       Payment Proofs
                     </span>
-                    
+                   
                   </button>
                 </div>
 
@@ -5469,51 +8210,57 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                 // Debug: Log data sources
                 console.log('Billing History:', billingHistory);
                 console.log('Appointments Data:', allAppointmentsData);
-                
-                // Build treatment items from appointments (for Ongoing and All sections)
+               
+                // Define status categories for appointments
+                const ONGOING_STATUSES = ['booked', 'enquiry', 'consultation', 'approved', 'rescheduled', 'waiting', 'arrived'];
+                const CANCELLED_STATUSES = ['cancelled', 'rejected'];
+                const COMPLETED_STATUSES = ['completed', 'discharge'];
+
+                // Build treatment items from appointments (for Ongoing, Cancelled, and All sections)
                 const appointmentTreatments = (allAppointmentsData || [])
-                  .filter((apt: any) => {
-                    // Filter out appointments without valid treatment names
-                    const treatmentName = apt.treatmentName || apt.serviceName || '';
-                    const hasValidTreatmentName = treatmentName && 
-                                                  treatmentName.trim() !== '' && 
-                                                  treatmentName.toLowerCase() !== 'appointment';
-                    return hasValidTreatmentName;
-                  })
                   .map((apt: any) => {
                     const status = (apt.status || apt.appointmentStatus || '').toLowerCase();
-                    const isCompleted = status === 'completed' || status === 'discharge';
-                    
-                    // Get treatment name
-                    const treatmentName = apt.treatmentName || apt.serviceName || '';
-                    
-                    // Get doctor name
+                    const isOngoing = ONGOING_STATUSES.includes(status);
+                    const isCancelled = CANCELLED_STATUSES.includes(status);
+                    const isCompleted = COMPLETED_STATUSES.includes(status);
+                    const treatmentName = apt.treatmentName || apt.serviceName || apt.treatment || '';
                     const doctorName = apt.doctorName || '';
-                    
-                    // Get date
-                    const date = apt.appointmentDate 
+                    const date = apt.appointmentDate
                       ? new Date(apt.appointmentDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                      : (apt.createdAt 
+                      : (apt.createdAt
                         ? new Date(apt.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
                         : 'N/A');
-                    
-                    // Get time
                     const time = apt.fromTime || '';
-                    
-                    // Get invoice number if available
                     const invoiceNumber = apt.invoiceNumber || apt.invoiceNo || apt._id?.slice(-8).toUpperCase() || '';
-                    
+                    const hasInvoice = (billingHistory || []).some((b: any) =>
+                      b.appointmentId?.toString() === apt._id?.toString() ||
+                      b.treatment === treatmentName ||
+                      b.invoiceNumber === invoiceNumber
+                    );
+                    let treatmentStatus = 'ongoing';
+                    if (isOngoing) {
+                      treatmentStatus = 'ongoing';
+                    } else if (isCancelled) {
+                      treatmentStatus = 'cancelled';
+                    } else if (isCompleted) {
+                      treatmentStatus = hasInvoice ? 'invoice' : 'completed-no-invoice';
+                    }
                     return {
                       source: 'appointment',
                       data: apt,
-                      treatmentName,
+                      treatmentName: treatmentName || 'General Appointment',
                       doctorName,
                       date: time ? `${date} at ${time}` : date,
-                      treatmentStatus: isCompleted ? 'completed' : 'ongoing',
+                      originalDate: apt.appointmentDate || apt.createdAt,
+                      treatmentStatus,
+                      appointmentStatus: status,
                       amount: apt.amount || apt.totalAmount || 0,
                       paid: apt.paidAmount || 0,
-                      isFullyPaid: isCompleted,
-                      invoiceNumber
+                      hasInvoice,
+                      invoiceNumber,
+                      isOngoing,
+                      isCancelled,
+                      isCompleted
                     };
                   });
 
@@ -5521,10 +8268,10 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                 const billingTreatments = (billingHistory || [])
                   .filter((b: any) => {
                     // Filter out advance payments and balance adjustments
-                    const isAdvance = b.isAdvanceOnly || 
-                                     b.treatment === "Advance Payment" || 
+                    const isAdvance = b.isAdvanceOnly ||
+                                     b.treatment === "Advance Payment" ||
                                      b.treatment === "Historical Advance Balance";
-                    
+                   
                     // Include all billing records except advance payments
                     // Show even if treatment/package name is empty (will display as '-')
                     return !isAdvance;
@@ -5535,14 +8282,14 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                     const paid = parseFloat(billing.paid || billing.paidAmount || 0) || 0;
                     const pending = parseFloat(billing.pending || 0) || 0;
                     const pendingUsed = parseFloat(billing.pendingUsed || 0) || 0;
-                    
+                   
                     // Get invoice number early (needed for manuallyPaidInvoices check)
                     const invoiceNumber = billing.invoiceNumber || billing.invoiceNo || billing._id?.slice(-8).toUpperCase() || '';
                     const billingDate = billing.createdAt ? new Date(billing.createdAt).getTime() : 0;
-                    
+                   
                     // Calculate pending amount based on original amount
-                    const pendingAmount = originalAmount - paid;
-                    
+                    // const pendingAmount = originalAmount - paid;
+                   
                     // Check if this invoice's pending was cleared by a newer invoice
                     // Look for any newer invoice that has pendingUsed > 0
                     const hasNewerInvoiceWithPendingUsed = (billingHistory || []).some((otherBilling: any) => {
@@ -5551,21 +8298,20 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                       // Check if this is a newer invoice (created after current billing) with pendingUsed > 0
                       return otherDate > billingDate && otherPendingUsed > 0;
                     });
-                    
+                   
                     // Check if pending was cleared separately (pendingUsed > 0 means THIS invoice cleared previous pending)
                     const pendingClearedSeparately = pendingUsed > 0;
-                    
-                    // Check if fully paid:
-                    // PRIMARY CHECK: Use the pending field from backend
-                    // - If pending > 0 AND no newer invoice cleared it → NOT fully paid (show in pending section)
-                    // - If pending > 0 BUT newer invoice cleared it (hasNewerInvoiceWithPendingUsed) → completed
-                    // - If pending = 0 AND (paid >= amount OR pendingClearedSeparately) → fully paid
-                    // - Special case: manuallyPaidInvoices for invoices paid but billing not updated yet
+                   
+                    // Check if fully paid based on ACTUAL pending field from backend
+                    // If billing.pending = 0, it's completed. If billing.pending > 0, it's pending.
+                    // Use billing.pending field as the authoritative source
                     const hasPendingAmount = pending > 0;
-                    const isFullyPaid = (!hasPendingAmount && (paid >= amount || pendingClearedSeparately)) ||
-                                       (hasPendingAmount && hasNewerInvoiceWithPendingUsed) || // Pending was cleared by newer invoice
-                                       manuallyPaidInvoices.has(invoiceNumber);
+                    const isFullyPaid = !hasPendingAmount;
                     
+                    // Status based on ACTUAL pending field from billing model
+                    // If billing.pending > 0 -> pending, otherwise -> completed
+                    const treatmentStatus = hasPendingAmount ? 'pending' : 'completed';
+                   
                     // Debug logging for invoice status calculation
                     console.log('📊 Invoice Status Calculation:', {
                       invoiceNumber,
@@ -5586,21 +8332,18 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                               pendingClearedSeparately ? 'pendingClearedSeparately' :
                               paid >= amount ? 'paid_equals_or_exceeds_amount' : 'NOT_FULLY_PAID'
                     });
-                    
-                    // Status based on actual payment status
-                    const treatmentStatus = isFullyPaid ? 'completed' : 'pending';
-                    
+                   
                     // Get treatment/package name from billing record
-                    const treatmentName = (billing.treatment && billing.treatment.trim() !== '' ? billing.treatment : 
+                    const treatmentName = (billing.treatment && billing.treatment.trim() !== '' ? billing.treatment :
                                           (billing.package && billing.package.trim() !== '' ? billing.package : '-'));
-                    
+                   
                     // Get doctor name if available
-                    const doctorName = billing.doctorName || 
+                    const doctorName = billing.doctorName ||
                                       (billing.doctorId && typeof billing.doctorId === 'object' ? billing.doctorId.name : null) ||
                                       '';
-                    
+                   
                     // Get date from billing record
-                    const date = billing.createdAt 
+                    const date = billing.createdAt
                       ? new Date(billing.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
                       : 'N/A';
 
@@ -5613,9 +8356,10 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                       treatmentStatus,
                       amount,
                       paid,
-                      pendingAmount,
+                      pendingAmount: pending,
                       isFullyPaid,
-                      invoiceNumber
+                      invoiceNumber,
+                      hasInvoice: true
                     };
                   });
 
@@ -5623,52 +8367,81 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                 console.log('Billing treatments:', billingTreatments);
                 console.log('Treatment filter:', treatmentFilter);
 
-                // Filter based on treatmentFilter
+                // Filter based on treatmentFilter with advanced filtering support
                 let filtered: any[] = [];
-                
+
+                // Apply date range filter if set
+                const applyDateFilter = (item: any) => {
+                  if (!treatmentDateRange.from && !treatmentDateRange.to) return true;
+                  const itemDate = new Date(item.originalDate || item.date).getTime();
+                  const fromDate = treatmentDateRange.from ? new Date(treatmentDateRange.from).getTime() : 0;
+                  const toDate = treatmentDateRange.to ? new Date(treatmentDateRange.to).getTime() : Infinity;
+                  return itemDate >= fromDate && itemDate <= toDate;
+                };
+
+                // Apply doctor filter if set
+                const applyDoctorFilter = (item: any) => {
+                  if (!treatmentDoctorFilter) return true;
+                  return item.doctorName?.toLowerCase().includes(treatmentDoctorFilter.toLowerCase());
+                };
+
+                // Apply search filter if set
+                const applySearchFilter = (item: any) => {
+                  if (!treatmentSearch) return true;
+                  const searchLower = treatmentSearch.toLowerCase();
+                  return item.treatmentName?.toLowerCase().includes(searchLower) ||
+                         item.invoiceNumber?.toLowerCase().includes(searchLower) ||
+                         item.doctorName?.toLowerCase().includes(searchLower);
+                };
+
+                // Apply all filters
+                const applyAllFilters = (item: any) => {
+                  return applyDateFilter(item) && applyDoctorFilter(item) && applySearchFilter(item);
+                };
+
                 if (treatmentFilter === 'completed') {
-                  // Completed section: Use billing history (fully paid treatments with ZERO pending amount)
-                  filtered = billingTreatments.filter((t: any) => {
-                    // Only show treatments where status is completed (fully paid)
-                    return t.treatmentStatus === 'completed';
-                  });
+                  // Completed section: All completed treatments from appointments AND billing
+                  // Include appointments with completed status (with or without invoice) and billing completed records
+                  const completedFromAppointments = appointmentTreatments.filter((t: any) => 
+                    t.treatmentStatus === 'invoice' || t.treatmentStatus === 'completed-no-invoice'
+                  );
+                  const completedFromBilling = billingTreatments.filter((t: any) => 
+                    t.treatmentStatus === 'completed'
+                  );
+                  filtered = [...completedFromAppointments, ...completedFromBilling].filter(applyAllFilters);
                 } else if (treatmentFilter === 'pending') {
-                  // Pending section: Show billing treatments with pending status badge
+                  // Pending section: Billing treatments with pending amount
                   filtered = billingTreatments.filter((t: any) => {
                     return t.treatmentStatus === 'pending';
-                  });
-                } else if (treatmentFilter === 'ongoing') {
-                  // Ongoing section: Use appointments (non-completed status) - FILTER OUT empty treatment names
+                  }).filter(applyAllFilters);
+                } else if (treatmentFilter === 'invoice') {
+                  // Invoice section: Billing invoices + appointments with invoices (exclude ongoing treatments)
+                  const invoicedFromBilling = billingTreatments.filter((t: any) => 
+                    t.treatmentStatus !== 'ongoing' // Exclude ongoing treatments from invoice section
+                  ).map((t: any) => ({ ...t, invoiceSource: 'billing' }));
+                  const invoicedFromAppointments = appointmentTreatments.filter((t: any) => 
+                    (t.invoiceNumber || t.treatmentStatus === 'invoice' || t.hasInvoice) &&
+                    t.treatmentStatus !== 'ongoing' // Exclude ongoing treatments from invoice section
+                  ).map((t: any) => ({ ...t, invoiceSource: 'appointment' }));
+                  filtered = [...invoicedFromBilling, ...invoicedFromAppointments].filter(applyAllFilters);
+                } else if (treatmentFilter === 'cancelled') {
+                  // Cancelled section: Appointments with cancelled/rejected status
                   filtered = appointmentTreatments.filter((t: any) => {
-                    // Filter out appointments without treatment names (like generic "Appointment" entries)
-                    const hasValidTreatmentName = t.treatmentName && 
-                                                  t.treatmentName.trim() !== '' && 
-                                                  t.treatmentName.toLowerCase() !== 'appointment';
-                    return t.treatmentStatus === 'ongoing' && hasValidTreatmentName;
-                  });
+                    return t.treatmentStatus === 'cancelled';
+                  }).filter(applyAllFilters);
+                } else if (treatmentFilter === 'ongoing') {
+                  // Ongoing section: Appointments with ongoing status
+                  filtered = appointmentTreatments.filter((t: any) => {
+                    return t.treatmentStatus === 'ongoing';
+                  }).filter(applyAllFilters);
                 } else {
-                  // All section: Combine ONLY filtered data from Ongoing, Pending, and Completed sections
-                  // Get completed treatments (billing with completed status)
-                  const completedTreatments = billingTreatments.filter((t: any) => {
-                    return t.treatmentStatus === 'completed';
-                  });
-                  
-                  // Get pending treatments (billing with pending status)
-                  const pendingTreatments = billingTreatments.filter((t: any) => {
-                    return t.treatmentStatus === 'pending';
-                  });
-                  
-                  // Get ongoing treatments (appointments with valid treatment names)
-                  const ongoingTreatments = appointmentTreatments.filter((t: any) => {
-                    const hasValidTreatmentName = t.treatmentName && 
-                                                  t.treatmentName.trim() !== '' && 
-                                                  t.treatmentName.toLowerCase() !== 'appointment';
-                    return t.treatmentStatus === 'ongoing' && hasValidTreatmentName;
-                  });
-                  
-                  // Combine ONLY valid records from all three sections
-                  filtered = [...completedTreatments, ...pendingTreatments, ...ongoingTreatments];
-                  
+                  // All section: Combine ALL treatments from billing + appointments
+                  // Include all billing treatments + all appointment treatments
+                  const allBillingTreatments = billingTreatments;
+                  const allAppointmentTreatments = appointmentTreatments;
+                 
+                  filtered = [...allBillingTreatments, ...allAppointmentTreatments].filter(applyAllFilters);
+                 
                   // Remove duplicates by checking if treatment names and IDs match
                   const seen = new Set();
                   filtered = filtered.filter((item: any) => {
@@ -5685,24 +8458,177 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
 
                 return (
                   <div className="space-y-4">
-                    {/* Filter Chips */}
+                    {/* Filter Chips with counts */}
                     <div className="flex items-center gap-2 flex-wrap">
-                      {(['all', 'ongoing', 'pending', 'completed'] as const).map((f) => (
-                        <button
-                          key={f}
-                          onClick={() => setTreatmentFilter(f)}
-                          className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors capitalize ${
-                            treatmentFilter === f
-                              ? 'bg-teal-600 text-white'
-                              : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
-                          }`}
-                        >
-                          {f.charAt(0).toUpperCase() + f.slice(1)}
-                        </button>
-                      ))}
+                      {(['all', 'ongoing', 'pending', 'invoice', 'completed', 'cancelled'] as const).map((f) => {
+                        // Calculate counts for each filter - sum all individual category counts for 'all'
+                        let count = 0;
+                        if (f === 'all') {
+                          count = 0
+                            + appointmentTreatments.filter((t: any) => t.treatmentStatus === 'ongoing').length
+                            + billingTreatments.filter((t: any) => t.treatmentStatus === 'pending').length
+                            + billingTreatments.filter((t: any) => t.treatmentStatus !== 'ongoing').length  // Exclude ongoing from billing count
+                            + appointmentTreatments.filter((t: any) => 
+                              (t.invoiceNumber || t.treatmentStatus === 'invoice' || t.hasInvoice) &&
+                              t.treatmentStatus !== 'ongoing'  // Exclude ongoing from invoice count
+                            ).length
+                            + (appointmentTreatments.filter((t: any) => 
+                              t.treatmentStatus === 'invoice' || t.treatmentStatus === 'completed-no-invoice'
+                            ).length + billingTreatments.filter((t: any) => t.treatmentStatus === 'completed').length)
+                            + appointmentTreatments.filter((t: any) => t.treatmentStatus === 'cancelled').length;
+                        } else if (f === 'ongoing') {
+                          count = appointmentTreatments.filter((t: any) => t.treatmentStatus === 'ongoing').length;
+                        } else if (f === 'pending') {
+                          count = billingTreatments.filter((t: any) => t.treatmentStatus === 'pending').length;
+                        } else if (f === 'invoice') {
+                          // Invoice count: Only count treatments with invoices, exclude ongoing treatments
+                          count = billingTreatments.filter((t: any) => t.treatmentStatus !== 'ongoing').length 
+                            + appointmentTreatments.filter((t: any) => 
+                              (t.invoiceNumber || t.treatmentStatus === 'invoice' || t.hasInvoice) &&
+                              t.treatmentStatus !== 'ongoing'
+                            ).length;
+                        } else if (f === 'completed') {
+                          // Completed count: Appointments with invoice or completed-no-invoice + billing completed
+                          count = appointmentTreatments.filter((t: any) => 
+                            t.treatmentStatus === 'invoice' || t.treatmentStatus === 'completed-no-invoice'
+                          ).length + billingTreatments.filter((t: any) => t.treatmentStatus === 'completed').length;
+                        } else if (f === 'cancelled') {
+                          count = appointmentTreatments.filter((t: any) => t.treatmentStatus === 'cancelled').length;
+                        }
+                        return (
+                          <button
+                            key={f}
+                            onClick={() => setTreatmentFilter(f)}
+                            className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors capitalize flex items-center gap-2 ${
+                              treatmentFilter === f
+                                ? 'bg-teal-600 text-white'
+                                : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
+                            }`}
+                          >
+                            {f.charAt(0).toUpperCase() + f.slice(1)}
+                            <span className={`px-2 py-0.5 rounded-full text-xs ${
+                              treatmentFilter === f ? 'bg-white/20' : 'bg-gray-100'
+                            }`}>{count}</span>
+                          </button>
+                        );
+                      })}
+                      {/* Advanced Filters Toggle */}
+                      <button
+                        onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                        className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors flex items-center gap-2 ${
+                          showAdvancedFilters || treatmentDateRange.from || treatmentDoctorFilter || treatmentSearch
+                            ? 'bg-indigo-600 text-white'
+                            : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
+                        }`}
+                      >
+                        <Filter className="w-4 h-4" />
+                        Advanced
+                      </button>
                     </div>
 
-                    {/* Loading state */}
+                    {/* Advanced Filters Panel */}
+                    {showAdvancedFilters && (
+                      <div className="bg-gradient-to-r from-gray-50 to-slate-50 rounded-xl border border-gray-200 p-4 space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          {/* Search */}
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-600 mb-1">Search Treatment</label>
+                            <div className="relative">
+                              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                              <input
+                                type="text"
+                                value={treatmentSearch}
+                                onChange={(e) => setTreatmentSearch(e.target.value)}
+                                placeholder="Search by name, invoice..."
+                                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                              />
+                            </div>
+                          </div>
+                          
+                          {/* Doctor Filter */}
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-600 mb-1">Filter by Doctor</label>
+                            <div className="relative">
+                              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                              <input
+                                type="text"
+                                value={treatmentDoctorFilter}
+                                onChange={(e) => setTreatmentDoctorFilter(e.target.value)}
+                                placeholder="Doctor name..."
+                                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                              />
+                            </div>
+                          </div>
+                          
+                          {/* Date Range */}
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-600 mb-1">From Date</label>
+                            <input
+                              type="date"
+                              value={treatmentDateRange.from}
+                              onChange={(e) => setTreatmentDateRange({ ...treatmentDateRange, from: e.target.value })}
+                              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                            />
+                          </div>
+                          
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-600 mb-1">To Date</label>
+                            <input
+                              type="date"
+                              value={treatmentDateRange.to}
+                              onChange={(e) => setTreatmentDateRange({ ...treatmentDateRange, to: e.target.value })}
+                              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                            />
+                          </div>
+                          
+                          {/* Sort By */}
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-600 mb-1">Sort By</label>
+                            <select
+                              value={treatmentSortBy}
+                              onChange={(e) => setTreatmentSortBy(e.target.value as any)}
+                              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                            >
+                              <option value="date">Date</option>
+                              <option value="name">Name</option>
+                              <option value="amount">Amount</option>
+                              <option value="status">Status</option>
+                            </select>
+                          </div>
+                          
+                          {/* Sort Order */}
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-600 mb-1">Order</label>
+                            <select
+                              value={treatmentSortOrder}
+                              onChange={(e) => setTreatmentSortOrder(e.target.value as any)}
+                              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                            >
+                              <option value="desc">Descending</option>
+                              <option value="asc">Ascending</option>
+                            </select>
+                          </div>
+                        </div>
+                        
+                        {/* Clear Filters */}
+                        <div className="flex justify-end">
+                          <button
+                            onClick={() => {
+                              setTreatmentDateRange({ from: '', to: '' });
+                              setTreatmentDoctorFilter('');
+                              setTreatmentSearch('');
+                              setTreatmentSortBy('date');
+                              setTreatmentSortOrder('desc');
+                            }}
+                            className="px-4 py-2 text-sm font-semibold text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                          >
+                            Clear All Filters
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    
                     {isLoading ? (
                       <div className="flex items-center justify-center py-16">
                         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600"></div>
@@ -5725,14 +8651,35 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                         {filtered.map((item: any, index: number) => {
                           const isCompleted = item.treatmentStatus === 'completed';
                           const isPending = item.treatmentStatus === 'pending';
-                          const pendingAmount = item.pendingAmount || (item.amount - item.paid);
+                          const isCancelled = item.treatmentStatus === 'cancelled';
+                          const isInvoice = item.treatmentStatus === 'invoice';
+                          const isCompletedNoInvoice = item.treatmentStatus === 'completed-no-invoice';
                           const isFromBilling = item.source === 'billing';
-                          const hasPendingAmount = pendingAmount > 0;
-                          
+                          // Use actual pending from billing model - don't calculate fallback
+                          // For billing items, use item.pendingAmount (actual pending field from backend)
+                          // For appointment items, no pending field exists
+                          const actualPending = isFromBilling ? item.pendingAmount : null;
+                          const pendingAmount = isFromBilling ? actualPending : (item.amount - item.paid);
+                          const hasPendingAmount = isFromBilling ? (actualPending > 0) : false;
+                         
+                          // Get status display text and color
+                          const getStatusDisplay = () => {
+                            if (isPending) return { text: 'Pending', color: 'bg-red-50 text-red-700 border-red-200', icon: <AlertCircle className="w-3.5 h-3.5" /> };
+                            if (isCancelled) return { text: 'Cancelled', color: 'bg-gray-100 text-gray-700 border-gray-300', icon: <XCircle className="w-3.5 h-3.5" /> };
+                            if (isInvoice) return { text: 'Invoiced', color: 'bg-blue-50 text-blue-700 border-blue-200', icon: <FileText className="w-3.5 h-3.5" /> };
+                            if (isCompletedNoInvoice) return { text: 'Completed (No Invoice)', color: 'bg-green-50 text-green-700 border-green-200', icon: <CheckCircle className="w-3.5 h-3.5" /> };
+                            if (isCompleted) return { text: 'Completed', color: 'bg-green-50 text-green-700 border-green-200', icon: <CheckCircle className="w-3.5 h-3.5" /> };
+                            return { text: 'Ongoing', color: 'bg-amber-50 text-amber-700 border-amber-200', icon: <Clock className="w-3.5 h-3.5" /> };
+                          };
+                         
+                          const statusDisplay = getStatusDisplay();
+                         
                           return (
                             <div
                               key={item.data._id || index}
-                              className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 hover:shadow-md transition-shadow"
+                              className={`bg-white rounded-xl border shadow-sm p-5 hover:shadow-md transition-shadow ${
+                                isCancelled ? 'border-gray-300 opacity-75' : 'border-gray-200'
+                              }`}
                             >
                               {/* Header */}
                               <div className="flex items-start justify-between mb-3">
@@ -5741,31 +8688,38 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                   {item.doctorName && (
                                     <p className="text-sm text-gray-500 mt-0.5">{item.doctorName}</p>
                                   )}
-                                  {/* Invoice Number - Show for all items with invoice number */}
-                                  {item.invoiceNumber && (
-                                    <p className="text-xs text-gray-400 mt-1">Invoice Number : {item.invoiceNumber}</p>
+                                  {/* Invoice Number - Show only for billing model items (not for appointments) */}
+                                  {item.invoiceNumber && isFromBilling && (
+                                    <p className="text-xs text-blue-600 mt-1 font-medium">Invoice : {item.invoiceNumber}</p>
+                                  )}
+                                  {/* Show "Invoice Not Generated" tag for completed treatments without invoice */}
+                                  {isCompletedNoInvoice && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-50 text-orange-700 border border-orange-200 mt-1">
+                                      <AlertTriangle className="w-3 h-3" />
+                                      Invoice Not Generated
+                                    </span>
+                                  )}
+                                  {/* Source badge */}
+                                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium mt-1 ${
+                                    isFromBilling ? 'bg-purple-50 text-purple-700' : 'bg-teal-50 text-teal-700'
+                                  }`}>
+                                    {isFromBilling ? 'Billing' : 'Appointment'}
+                                  </span>
+                                  {/* Appointment Status Tag - Only for appointment items */}
+                                  {!isFromBilling && item.appointmentStatus && (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium mt-1 bg-amber-50 text-amber-700 border border-amber-200 capitalize">
+                                      {item.appointmentStatus}
+                                    </span>
                                   )}
                                 </div>
-                                <span className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
-                                  isPending
-                                    ? 'bg-red-50 text-red-700 border border-red-200'
-                                    : isCompleted
-                                    ? 'bg-green-50 text-green-700 border border-green-200'
-                                    : 'bg-amber-50 text-amber-700 border border-amber-200'
-                                }`}>
-                                  {isPending ? (
-                                    <AlertCircle className="w-3.5 h-3.5" />
-                                  ) : isCompleted ? (
-                                    <CheckCircle className="w-3.5 h-3.5" />
-                                  ) : (
-                                    <Clock className="w-3.5 h-3.5" />
-                                  )}
-                                  {isPending ? 'Pending' : isCompleted ? 'Completed' : 'Ongoing'}
+                                <span className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${statusDisplay.color}`}>
+                                  {statusDisplay.icon}
+                                  {statusDisplay.text}
                                 </span>
                               </div>
 
-                              {/* Payment Info - Only show for Ongoing filter if amount > 0 */}
-                              {treatmentFilter === 'ongoing' && item.amount > 0 && (
+                              {/* Payment Info - Show for Ongoing, Invoice, and Pending filters */}
+                              {(treatmentFilter === 'ongoing' || treatmentFilter === 'invoice' || treatmentFilter === 'pending') && item.amount > 0 && (
                                 <div className="space-y-2 mb-3">
                                   <div className="flex items-center justify-between text-sm">
                                     <span className="text-gray-500">Total Amount:</span>
@@ -5773,7 +8727,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                   </div>
                                   <div className="flex items-center justify-between text-sm">
                                     <span className="text-gray-500">Paid:</span>
-                                    <span className="font-semibold text-green-600">{getCurrencySymbol(currency)} {item.paid.toFixed(2)}</span>
+                                    <span className="font-semibold text-green-600">{getCurrencySymbol(currency)} {(item.paid || 0).toFixed(2)}</span>
                                   </div>
                                   {hasPendingAmount && (
                                     <div className="flex items-center justify-between text-sm pt-2 border-t border-gray-100">
@@ -5784,13 +8738,11 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                 </div>
                               )}
 
-                              {/* Date - Only show for Ongoing filter if amount > 0 */}
-                              {treatmentFilter === 'ongoing' && item.amount > 0 && (
-                                <div className="flex items-center gap-1.5 text-xs text-gray-500 pt-2 border-t border-gray-100">
-                                  <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
-                                  <span>{isFromBilling ? 'Billed' : 'Date'}: {item.date}</span>
-                                </div>
-                              )}
+                              {/* Date */}
+                              <div className="flex items-center gap-1.5 text-xs text-gray-500 pt-2 border-t border-gray-100">
+                                <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
+                                <span>{isFromBilling ? 'Billed' : 'Date'}: {item.date}</span>
+                              </div>
                             </div>
                           );
                         })}
@@ -5845,7 +8797,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                         <p className="text-xs text-gray-500">Send a digital consent form to sign</p>
                       </div>
                     </div>
-                    
+                   
                     <div className="flex items-center gap-3 w-full sm:w-auto">
                       <select
                         value={selectedConsentId}
@@ -5860,7 +8812,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                           </option>
                         ))}
                       </select>
-                      
+                     
                       <button
                         onClick={handleSendConsentMsgOnWhatsapp}
                         disabled={!selectedConsentId || sendingConsent || consentSent}
@@ -6253,7 +9205,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                       <div className="flex flex-wrap gap-3">
                         {/* Pending */}
                         <div className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200">
-                        
+                       
                           <span className="text-xs font-bold text-amber-700">Pending: {formatAED(balance.pendingBalance)}</span>
                         </div>
                         {/* Advance */}
@@ -6261,6 +9213,18 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                          
                           <span className="text-xs font-bold text-emerald-700">Advance: {formatAED(balance.advanceBalance)}</span>
                         </div>
+                        {/* Pending Claim */}
+                        {balance.pendingClaim > 0 && (
+                          <div className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-orange-50 border border-orange-200">
+                            <span className="text-xs font-bold text-orange-700">Pending Claim: {formatAED(balance.pendingClaim)}</span>
+                          </div>
+                        )}
+                        {/* Insurance Claim Balance */}
+                        {balance.claimAmount > 0 && (
+                          <div className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-50 border border-blue-200">
+                            <span className="text-xs font-bold text-blue-700">Insurance Claim: {formatAED(balance.claimAmount)}</span>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -6288,7 +9252,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
             ) : (
               /* Default Overview Tab - Compact Professional Dashboard */
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                              
+                             
                 {/* Left Column - Activity Timeline (Compact) - Reduced Width */}
                 <div className="lg:col-span-1">
                   <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-3 h-full">
@@ -6296,7 +9260,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                       <Activity className="w-4 h-4 text-teal-600 flex-shrink-0" />
                       <span className="truncate">Activity Timeline</span>
                     </h3>
-                                    
+                                   
                     <div className={`space-y-2 ${timelineItems.length > 4 ? 'max-h-[280px] overflow-y-auto custom-scrollbar pr-2' : ''}`}>
                       {timelineItems.map((item, index) => (
                         <div key={index} className="relative flex gap-2 pb-3 last:pb-0">
@@ -6304,12 +9268,12 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                           {index < timelineItems.length - 1 && (
                             <div className="absolute left-2.5 top-6 bottom-0 w-px bg-gray-200" />
                           )}
-                                              
+                                             
                           {/* Icon - Smaller */}
                           <div className={`relative w-5 h-5 rounded-full {getCurrencySymbol(item.currency)}${item.color} flex items-center justify-center flex-shrink-0 shadow-sm z-10`}>
                             <item.icon className="w-2.5 h-2.5 text-white flex-shrink-0" />
                           </div>
-                                              
+                                             
                           {/* Content - More Compact */}
                           <div className="flex-1 min-w-0 bg-gray-50 rounded-md p-2 border border-gray-100">
                             <h4 className="font-medium text-gray-900 text-sm truncate">{item.title}</h4>
@@ -6321,17 +9285,17 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                     </div>
                   </div>
                 </div>
-              
+             
                 {/* Right Column - Stacked Cards (Compact) - Increased Width */}
                 <div className="lg:col-span-1 space-y-3">
-                                
+                               
                   {/* Financial Snapshot - Compact Row Layout */}
                   <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-3">
                     <h3 className="text-sm font-semibold text-gray-900 mb-2.5 flex items-center gap-2">
                       {/* <DollarSign className="w-4 h-4 text-green-600 flex-shrink-0" /> */}
                       Financial Snapshot
                     </h3>
-                                        
+                                       
                     <div className="space-y-2">
                       {/* Total Spent */}
                       <div className="flex items-center justify-between p-2 bg-green-50 border border-green-100 rounded-md">
@@ -6346,6 +9310,29 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                         </div>
                       </div>
 
+                      {/* Pending Claim */}
+                      {balance.pendingClaim > 0 && (
+                        <div className="flex items-center justify-between p-2 bg-orange-50 border border-orange-100 rounded-md">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-orange-100 flex items-center justify-center">
+                              <svg className="w-3.5 h-3.5 text-orange-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                              </svg>
+                            </div>
+                            <div>
+                              <div className="text-xs text-gray-600 font-medium">Pending Claim</div>
+                              <div className="text-lg font-bold text-orange-700">{formatAED(balance.pendingClaim)}</div>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => setShowPayPendingClaimModal(true)}
+                            className="px-3 py-1 bg-orange-600 hover:bg-orange-700 text-white text-[10px] font-bold rounded shadow-sm transition-all active:scale-95 flex items-center gap-1"
+                          >
+                            Pay
+                          </button>
+                        </div>
+                      )}
+
                   {/* Bundle Offers - Earned Free Sessions */}
                   {!loadingBilling && billingHistory && (
                     <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-3">
@@ -6355,7 +9342,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                         </svg>
                         Bundle Offers & Free Sessions
                       </h3>
-                      
+                     
                       <div className="space-y-2">
                         {(() => {
                           // Extract unique bundle offers from billing history
@@ -6411,7 +9398,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                       </div>
                     </div>
                   )}
-                                          
+                                         
                       {/* Pending Payment */}
                       <div className="flex items-center justify-between p-2 bg-red-50 border border-red-100 rounded-md">
                         <div className="flex items-center gap-2">
@@ -6433,7 +9420,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                               <Camera className="w-3 h-3" />
                               Upload
                             </button>
-                            
+                           
                             <button
                               onClick={() => setShowPayPendingModal(true)}
                               className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-[10px] font-bold rounded shadow-sm transition-all active:scale-95 flex items-center gap-1"
@@ -6448,7 +9435,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                           </div>
                         )}
                       </div>
-                                          
+                                         
                       {/* Advance Balance */}
                       <div className="flex items-center justify-between p-2 bg-teal-50 border border-teal-100 rounded-md">
                         <div className="flex items-center gap-2">
@@ -6461,16 +9448,33 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                           </div>
                         </div>
                       </div>
+
+                      {/* Claim Amount */}
+                      {balance.claimAmount > 0 && (
+                        <div className="flex items-center justify-between p-2 bg-blue-50 border border-blue-100 rounded-md">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center">
+                              <svg className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                              </svg>
+                            </div>
+                            <div>
+                              <div className="text-xs text-gray-700 font-medium">Insurance Claim Balance</div>
+                              <div className="text-lg font-bold text-blue-600">{formatAED(balance.claimAmount)}</div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
-              
+             
                   {/* Alerts - Compact Card Style */}
                   {/* <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-3">
                     <h3 className="text-sm font-semibold text-gray-900 mb-2.5 flex items-center gap-2">
                       <AlertCircle className="w-4 h-4 text-yellow-600 flex-shrink-0" />
                       Alerts
                     </h3>
-                                        
+                                       
                     <div className="space-y-1.5">
                       {alerts.map((alert, index) => (
                         <div key={index} className={`p-2 rounded-md border-l-2 ${
@@ -6499,14 +9503,14 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                       ))}
                     </div>
                   </div> */}
-              
+             
                   {/* Patient Behavior - Compact with Right-Aligned Values */}
                   <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-3">
                     <h3 className="text-sm font-semibold text-gray-900 mb-2.5 flex items-center gap-2">
                       <TrendingUp className="w-4 h-4 text-blue-600 flex-shrink-0" />
                       Patient Behavior
                     </h3>
-                                        
+                                       
                     <div className="space-y-2">
                       {behaviorMetrics.map((metric: any, index: number) => (
                         <div key={index}>
@@ -6528,7 +9532,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                       ))}
                     </div>
                   </div>
-              
+             
                 </div>
               </div>
             )}
@@ -6536,11 +9540,11 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
 
         {/* Before/After Modal */}
         {showBeforeAfterModal && (
-          <div 
+          <div
             className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
             onClick={() => setShowBeforeAfterModal(false)}
           >
-            <div 
+            <div
               className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             >
@@ -6554,7 +9558,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                   <X className="w-6 h-6 text-gray-600" />
                 </button>
               </div>
-              
+             
               {/* Modal Content - Images */}
               <div className="p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -6568,7 +9572,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                       </div>
                     </div>
                   </div>
-                  
+                 
                   {/* After Image */}
                   <div>
                     <h3 className="text-lg font-semibold text-gray-700 mb-3 text-center">After</h3>
@@ -6581,7 +9585,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                   </div>
                 </div>
               </div>
-              
+             
               {/* Modal Footer - Close Button */}
               <div className="p-6 border-t border-gray-200">
                 <button
@@ -6651,32 +9655,32 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
           onSuccess={async (_paymentData: any) => {
             // Store the previous pending balance before update
             const prevBalance = balance.pendingBalance;
-            
+           
             const updated = await fetchPatientBalance(patientData._id);
             if (updated) {
               const newPendingBalance = Number(updated.pendingBalance || 0);
               setBalance(updated as typeof balance);
-              
+             
               // If pending balance decreased, it means payment was successful
               if (newPendingBalance < prevBalance) {
                 // CRITICAL: Refresh billing history FIRST to get the latest data
                 const refreshedBillings = await fetchBillingHistory();
-                
+               
                 // Use the refreshed billing history (or fallback to current state)
                 const billingsToCheck = refreshedBillings || billingHistory || [];
-                
+               
                 // Get all invoice numbers from billing history that have pending amount
                 const pendingInvoices = billingsToCheck
                   .filter((b: any) => {
                     const amount = parseFloat(b.amount) || 0;
                     const paid = parseFloat(b.paid || b.paidAmount || 0) || 0;
-                    const isAdvance = b.isAdvanceOnly || 
-                                     b.treatment === "Advance Payment" || 
+                    const isAdvance = b.isAdvanceOnly ||
+                                     b.treatment === "Advance Payment" ||
                                      b.treatment === "Historical Advance Balance";
                     return !isAdvance && (amount - paid) > 0;
                   })
                   .map((b: any) => b.invoiceNumber || b.invoiceNo || b._id?.slice(-8).toUpperCase() || '');
-                
+               
                 // Add these invoices to manually paid set
                 if (pendingInvoices.length > 0) {
                   setManuallyPaidInvoices(prev => {
@@ -6692,6 +9696,100 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
             }
           }}
         />
+
+        {/* Pay Pending Claim Modal */}
+        {showPayPendingClaimModal && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-md" onClick={() => { if (!payingPendingClaim) { setShowPayPendingClaimModal(false); setPendingClaimPayAmount(""); setPendingClaimPayMethod("Cash"); }}} />
+            <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full">
+              {/* Header */}
+              <div className="bg-gradient-to-r from-orange-500 to-orange-600 px-6 py-4 flex items-center justify-between rounded-t-2xl">
+                <div>
+                  <h3 className="text-lg font-bold text-white">Pay Pending Claim</h3>
+                  <p className="text-orange-100 text-xs mt-0.5">Total pending: {formatAED(balance.pendingClaim)}</p>
+                </div>
+                <button onClick={() => { setShowPayPendingClaimModal(false); setPendingClaimPayAmount(""); setPendingClaimPayMethod("Cash"); }} className="text-white/80 hover:text-white">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+              <div className="p-6 space-y-4">
+                {/* Quick Select */}
+                <div className="flex gap-2">
+                  <button onClick={() => setPendingClaimPayAmount((balance.pendingClaim / 2).toFixed(2))} className="flex-1 py-1.5 text-xs font-semibold border border-orange-300 text-orange-700 rounded-lg hover:bg-orange-50">Half</button>
+                  <button onClick={() => setPendingClaimPayAmount(balance.pendingClaim.toFixed(2))} className="flex-1 py-1.5 text-xs font-semibold bg-orange-100 border border-orange-300 text-orange-700 rounded-lg hover:bg-orange-200">Full Amount</button>
+                </div>
+                {/* Amount */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
+                  <input
+                    type="number"
+                    value={pendingClaimPayAmount}
+                    onChange={(e) => setPendingClaimPayAmount(e.target.value)}
+                    placeholder={`Max: ${balance.pendingClaim}`}
+                    min="0"
+                    max={balance.pendingClaim}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  />
+                </div>
+                {/* Payment Method */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Payment Method</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {["Cash", "Card", "BT"].map((m) => (
+                      <button key={m} onClick={() => setPendingClaimPayMethod(m)} className={`py-1.5 text-xs font-semibold rounded-lg border transition-all ${ pendingClaimPayMethod === m ? "bg-orange-600 text-white border-orange-600" : "bg-white text-gray-600 border-gray-300 hover:border-orange-400" }`}>{m}</button>
+                    ))}
+                  </div>
+                </div>
+                {/* Submit */}
+                <button
+                  disabled={payingPendingClaim || !pendingClaimPayAmount || Number(pendingClaimPayAmount) <= 0 || Number(pendingClaimPayAmount) > balance.pendingClaim}
+                  onClick={async () => {
+                    const payAmt = Number(pendingClaimPayAmount);
+                    if (!payAmt || payAmt <= 0 || payAmt > balance.pendingClaim) return;
+                    setPayingPendingClaim(true);
+                    try {
+                      const headers = getAuthHeaders();
+                      // Fetch insurance claims fresh (may not be loaded if not on insurance tab)
+                      let claimsToSearch = insuranceClaims;
+                      if (!claimsToSearch || claimsToSearch.length === 0) {
+                        const claimsRes = await axios.get(`/api/clinic/insurance-claims?patientId=${patientData._id}`, { headers });
+                        claimsToSearch = claimsRes.data.success ? (claimsRes.data.data || []) : [];
+                      }
+                      // Find the claim with highest pendingClaim to pay against
+                      const claimToPay = [...claimsToSearch]
+                        .filter((c: any) => (c.pendingClaim || 0) > 0)
+                        .sort((a: any, b: any) => b.pendingClaim - a.pendingClaim)[0];
+                      if (!claimToPay) { alert("No pending claim found"); setPayingPendingClaim(false); return; }
+                      const res = await axios.post("/api/clinic/insurance-claims/pay-pending-claim", {
+                        claimId: claimToPay._id,
+                        amount: payAmt,
+                        paymentMethod: pendingClaimPayMethod,
+                      }, { headers });
+                      if (res.data.success) {
+                        setShowPayPendingClaimModal(false);
+                        setPendingClaimPayAmount("");
+                        setPendingClaimPayMethod("Cash");
+                        // Refresh balance and insurance claims
+                        const updatedBalance = await fetchPatientBalance(patientData._id);
+                        if (updatedBalance) setBalance(updatedBalance as typeof balance);
+                        await fetchInsuranceClaims();
+                      } else {
+                        alert(res.data.message || "Payment failed");
+                      }
+                    } catch (err: any) {
+                      alert(err.response?.data?.message || "Payment failed");
+                    } finally {
+                      setPayingPendingClaim(false);
+                    }
+                  }}
+                  className="w-full py-2.5 bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white font-bold rounded-lg transition-all"
+                >
+                  {payingPendingClaim ? "Processing..." : "Confirm Payment"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Upload Image Modal */}
         {showUploadImageModal && (
@@ -6718,7 +9816,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Select Image
                   </label>
-                  
+                 
                   {/* Image Preview or Upload Box */}
                   {previewUrl ? (
                     <div className="relative rounded-xl overflow-hidden border-2 border-purple-300 bg-gray-50">
@@ -6752,7 +9850,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                       </div>
                     </div>
                   ) : (
-                    <div 
+                    <div
                       className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-purple-500 transition-colors cursor-pointer"
                       onClick={() => document.getElementById('payment-image-input')?.click()}
                     >
@@ -6761,7 +9859,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                       <p className="text-xs text-gray-500 mt-1">PNG, JPG up to 5MB</p>
                     </div>
                   )}
-                  
+                 
                   <input
                     id="payment-image-input"
                     type="file"
@@ -6818,7 +9916,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                     <button
                       onClick={async () => {
                         if (!selectedFile) return;
-                        
+                       
                         setUploadLoading(true);
                         setUploadError(null);
 
@@ -6859,15 +9957,49 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
           </div>
         )}
 
+        {/* Document Viewer Modal */}
+        {docViewerUrl && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-gray-900/90 backdrop-blur-md">
+            <div className="absolute top-4 right-4 flex items-center gap-3 z-20">
+              <button
+                onClick={() => setDocViewerUrl(null)}
+                className="p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-all"
+                title="Close"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="w-full max-w-5xl h-[85vh] flex items-center justify-center">
+              {docViewerUrl.toLowerCase().endsWith('.pdf') ? (
+                <iframe
+                  src={docViewerUrl}
+                  className="w-full h-full rounded-lg shadow-2xl bg-white"
+                  title="Document Preview"
+                />
+              ) : (
+                <img
+                  src={docViewerUrl}
+                  alt="Document Preview"
+                  className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+                />
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Image Viewer Modal */}
         {showImageViewer && balance.pendingBalanceImages && balance.pendingBalanceImages.length > 0 && (
           <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-gray-900/90 backdrop-blur-md">
-            <button
-              onClick={() => setShowImageViewer(false)}
-              className="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-all z-10"
-            >
-              <X className="w-6 h-6" />
-            </button>
+            <div className="absolute top-4 right-4 flex items-center gap-3 z-20">
+              <button
+                onClick={() => setShowImageViewer(false)}
+                className="p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-all"
+                title="Close"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
 
             {/* Previous button */}
             {selectedImageIndex > 0 && (
@@ -6989,8 +10121,8 @@ function PatientProfileView() {
   }
 
   return (
-    <PatientProfileDashboard 
-      patientData={patient} 
+    <PatientProfileDashboard
+      patientData={patient}
       onClose={handleClose}
       onPatientUpdated={(updatedData) => {
         setPatient(updatedData);

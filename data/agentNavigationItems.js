@@ -72,11 +72,20 @@ export const agentNavigationItems = [
     permissionKey: "patient_registration:manage",
   },
   {
+    label: "All Claims",
+    path: "/staff/all-claims",
+    icon: "📋",
+    description: "Review Insurance Claims",
+    moduleKey: "agent_all_claims",
+    order: 9,
+    permissionKey: "all_claims:view",
+  },
+  {
     label: "Staff Management",
     icon: "👥",
     description: "Manage Staff",
     moduleKey: "staff_management",
-    order: 9,
+    order: 10,
     children: [
       {
         label: "Patient Information",

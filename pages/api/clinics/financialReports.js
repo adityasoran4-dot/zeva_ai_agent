@@ -7,6 +7,10 @@ import DoctorProfile from '../../../models/DoctorProfile';
 import Service from '../../../models/Service';
 import { getUserFromReq } from '../lead-ms/auth';
 import { getClinicIdFromUser } from '../lead-ms/permissions-helper';
+import { isNewClinicInMockPeriod } from '../../../lib/mockDataGenerator';
+
+// Helper function for random integers
+const randomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 
 export default async function handler(req, res) {
   await dbConnect();
@@ -51,7 +55,67 @@ export default async function handler(req, res) {
     const currentYear = new Date().getFullYear();
     startOfYear = new Date(currentYear, 0, 1);
     endOfYear = new Date(currentYear, 11, 31, 23, 59, 59, 999);
-    console.log(`📅 Using year range: ${currentYear}`);
+
+    // Check if clinic is within 2-day mock data period
+    const isInMockPeriod = isNewClinicInMockPeriod(clinic.registeredAt);
+    
+    // If in mock period, check if they have any real billing data
+    let hasRealData = false;
+    if (isInMockPeriod) {
+      const billingCount = await Billing.countDocuments({
+        clinicId: clinic._id,
+        createdAt: { $gte: startOfYear, $lte: endOfYear }
+      });
+      
+      hasRealData = billingCount > 0;
+    }
+    
+    // If in mock period AND no real data, return mock data
+    if (isInMockPeriod && !hasRealData) {
+      console.log('📊 Returning mock financial reports for new clinic:', clinic._id);
+      
+      // Mock Revenue Trend (12 months)
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const revenueTrendData = months.map(month => ({
+        name: month,
+        revenue: randomInt(5000, 20000),
+        target: randomInt(15000, 30000)
+      }));
+      
+      // Mock Payment Methods
+      const paymentMethodsData = [
+        { name: 'Card Payment', value: randomInt(25, 45) },
+        { name: 'Cash', value: randomInt(20, 40) },
+        { name: 'Online Transfer', value: randomInt(15, 35) },
+        { name: 'Insurance', value: randomInt(10, 25) },
+      ];
+      
+      // Mock Doctor Revenue
+      const doctors = ['Dr. Smith', 'Dr. Johnson', 'Dr. Williams', 'Dr. Brown', 'Dr. Davis'];
+      const doctorRevenueData = doctors.slice(0, randomInt(3, 5)).map(doctor => ({
+        name: doctor,
+        revenue: randomInt(5000, 25000),
+        sessions: randomInt(15, 60)
+      })).sort((a, b) => b.revenue - a.revenue);
+      
+      // Mock Top Services
+      const services = ['General Consultation', 'Dental Checkup', 'Eye Examination', 'Physical Therapy', 'Lab Tests', 'X-Ray', 'Blood Test'];
+      const topServicesData = services.slice(0, 5).map(service => ({
+        name: service,
+        sessions: randomInt(10, 50),
+        revenue: randomInt(3000, 15000)
+      }));
+      
+      return res.status(200).json({ 
+        success: true, 
+        revenueTrendData,
+        paymentMethodsData,
+        doctorRevenueData,
+        topServicesData,
+        isMockData: true,
+        message: 'Showing sample financial data for new clinic!'
+      });
+    }
 
     try {
       // Only use custom dates if both are provided and valid

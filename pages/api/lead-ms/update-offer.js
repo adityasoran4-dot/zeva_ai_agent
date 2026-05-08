@@ -103,7 +103,11 @@ export default async function handler(req, res) {
       // ✅ Resolve serviceIds from direct selection
       let serviceIds = [];
 
-      if (Array.isArray(data.serviceIds) && data.serviceIds.length > 0) {
+      // When applyOnAllServices is true, fetch all services for the clinic
+      if (data.applyOnAllServices === true) {
+        const allServices = await Service.find({ clinicId: clinic._id }).select('_id');
+        serviceIds = allServices.map(s => s._id);
+      } else if (Array.isArray(data.serviceIds) && data.serviceIds.length > 0) {
         for (const item of data.serviceIds) {
           if (mongoose.Types.ObjectId.isValid(item)) {
             // If it's already a valid ObjectId, we trust it and add it
@@ -205,8 +209,6 @@ export default async function handler(req, res) {
       offer.startsAt = data.startsAt ? new Date(data.startsAt) : offer.startsAt;
       offer.endsAt = data.endsAt ? new Date(data.endsAt) : offer.endsAt;
       offer.timezone = data.timezone ?? offer.timezone;
-      offer.maxUses = data.maxUses !== undefined ? (data.maxUses ? Number(data.maxUses) : null) : offer.maxUses;
-      offer.perUserLimit = data.perUserLimit !== undefined ? Number(data.perUserLimit) : offer.perUserLimit;
       offer.status = data.status ?? offer.status;
       offer.enabled = data.enabled !== undefined ? Boolean(data.enabled) : offer.enabled;
 

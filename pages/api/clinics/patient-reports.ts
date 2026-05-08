@@ -3,8 +3,10 @@ import dbConnect from '../../../lib/database';
 import PatientRegistration from '../../../models/PatientRegistration';
 import Billing from '../../../models/Billing';
 import Appointment from '../../../models/Appointment';
+import Clinic from '../../../models/Clinic';
 import { getUserFromReq } from '../lead-ms/auth';
 import { getClinicIdFromUser } from '../lead-ms/permissions-helper';
+import { isNewClinicInMockPeriod, generateMockPatientDemographics } from '../../../lib/mockDataGenerator';
 
 export default async function handler(
   req: NextApiRequest,
@@ -39,6 +41,32 @@ export default async function handler(
     }
 
     console.log('🏥 Using clinicId:', clinicId);
+
+    // Get clinic to check registeredAt
+    let clinic = null;
+    if (authUser.role === 'clinic') {
+      clinic = await Clinic.findOne({ owner: authUser._id });
+    } else if (clinicId) {
+      clinic = await Clinic.findById(clinicId);
+    }
+
+    // Check if clinic is within 2-day mock data period
+    if (clinic && isNewClinicInMockPeriod(clinic.registeredAt)) {
+      // Check if they have any real patient data
+      const patientCount = await PatientRegistration.countDocuments({ clinicId });
+      
+      if (patientCount === 0) {
+        console.log('📊 Returning mock patient reports for new clinic:', clinic._id);
+        const mockData = generateMockPatientDemographics();
+        
+        return res.status(200).json({
+          success: true,
+          data: mockData,
+          isMockData: true,
+          message: 'Showing sample patient data for new clinic!',
+        });
+      }
+    }
 
     // Get date filter params from query
     const { startDate, endDate, date, filter } = req.query;

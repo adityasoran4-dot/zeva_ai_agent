@@ -6,6 +6,7 @@ import User from "../../../models/Users";
 import { getUserFromReq } from "../lead-ms/auth";
 import { getClinicIdFromUser, checkClinicPermission } from "../lead-ms/permissions-helper";
 import dayjs from"dayjs";
+import { isNewClinicInMockPeriod, generateMockRoomUtilization } from "../../../lib/mockDataGenerator";
 
 export default async function handler(req, res) {
   await dbConnect();
@@ -37,6 +38,64 @@ export default async function handler(req, res) {
   // GET: Fetch room utilization data
   if (req.method === "GET") {
     try {
+      // Get clinic to check registeredAt
+      const clinic = await Clinic.findById(clinicId);
+      
+      // Check if clinic is within 2-day mock data period
+      const isInMockPeriod = isNewClinicInMockPeriod(clinic?.registeredAt);
+      
+      // If in mock period, check if they have any real appointment data
+      let hasRealData = false;
+      if (isInMockPeriod && clinic) {
+        const { filter, date, startDate, endDate } = req.query;
+        let queryStartDate;
+        let queryEndDate;
+
+        if (filter === 'today') {
+          const baseDate = date ? dayjs(date) : dayjs();
+          queryStartDate = baseDate.startOf('day').toDate();
+          queryEndDate = baseDate.endOf('day').toDate();
+        } else if (filter === 'week') {
+          const baseDate = date ? dayjs(date) : dayjs();
+          queryStartDate = baseDate.subtract(1, 'week').startOf('day').toDate();
+          queryEndDate = baseDate.endOf('day').toDate();
+        } else if (filter === 'month') {
+          const baseDate = date ? dayjs(date) : dayjs();
+          queryStartDate = baseDate.subtract(1, 'month').startOf('day').toDate();
+          queryEndDate = baseDate.endOf('day').toDate();
+        } else {
+          queryStartDate = dayjs().subtract(1, 'month').startOf('day').toDate();
+          queryEndDate = dayjs().endOf('day').toDate();
+        }
+
+        if (startDate && endDate) {
+          queryStartDate = dayjs(startDate).startOf('day').toDate();
+          queryEndDate = dayjs(endDate).endOf('day').toDate();
+        }
+
+        const appointmentCount = await Appointment.countDocuments({
+          clinicId,
+          startDate: { $gte: queryStartDate, $lte: queryEndDate }
+        });
+        
+        hasRealData = appointmentCount > 0;
+      }
+      
+      // If in mock period AND no real data, return mock data
+      if (isInMockPeriod && !hasRealData) {
+        console.log('📊 Returning mock room utilization for new clinic:', clinicId);
+        const mockData = generateMockRoomUtilization();
+        
+        return res.status(200).json({
+          success: true,
+          utilizationData: mockData.utilizationData,
+          averageUtilization: mockData.averageUtilization,
+          totalRooms: mockData.totalRooms,
+          isMockData: true,
+          message: 'Showing sample room utilization data for new clinic!',
+        });
+      }
+
       // Check read permission
      const { hasPermission, error: permError } = await checkClinicPermission(
         clinicId,

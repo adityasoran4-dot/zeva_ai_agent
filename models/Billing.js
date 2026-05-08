@@ -127,8 +127,20 @@ const billingSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+    // Amount of insurance claim used for this invoice
+    claimAmountUsed: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
     // Amount of previous pending cleared in this invoice
     pendingUsed: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    // Amount of pending claim cleared in this invoice
+    pendingClaimUsed: {
       type: Number,
       default: 0,
       min: 0,
@@ -308,12 +320,6 @@ offerOverrideUsed: {
 
 offerOverrideReason: String,
 
-offerAppliedBy: {
-  type: mongoose.Schema.Types.ObjectId,
-  ref: "User"
-},
-
-// Bundle offer tracking fields
 offerFreeSession: {
   type: [String],
   default: []
@@ -323,7 +329,80 @@ freeOfferSessionCount: {
   type: Number,
   default: 0,
   min: 0
-}
+},
+
+// Free sessions consumed in this billing (redemptions from previous bundle offers)
+usedFreeSessions: {
+  type: [String],
+  default: []
+},
+
+usedFreeSessionCount: {
+  type: Number,
+  default: 0,
+  min: 0
+},
+
+// Offer refund tracking fields
+isOfferRefunded: {
+  type: Boolean,
+  default: false
+},
+
+refundedAt: {
+  type: Date,
+  default: null
+},
+
+refundedBy: {
+  type: String,
+  trim: true,
+  default: null
+},
+
+refundedAmount: {
+  type: Number,
+  default: 0,
+  min: 0
+},
+
+// Track what offers were refunded
+refundedOffers: [{
+  offerType: {
+    type: String,
+    enum: ['instant_discount', 'cashback', 'bundle'],
+    required: true
+  },
+  offerId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Offer',
+    default: null
+  },
+  offerName: {
+    type: String,
+    default: null
+  },
+  amount: {
+    type: Number,
+    default: 0
+  },
+  freeSessionsRefunded: {
+    type: [String],
+    default: []
+  },
+  freeSessionsRestored: {
+    type: [String],
+    default: []
+  },
+  cashbackRefunded: {
+    type: Number,
+    default: 0
+  },
+  cashbackWalletUsageReversed: {
+    type: Number,
+    default: 0
+  }
+}]
   },
   { timestamps: true },
 );
@@ -333,10 +412,12 @@ billingSchema.pre("save", function (next) {
   this.amount = Number(this.amount ?? 0);
   this.paid = Number(this.paid ?? 0);
   this.advanceUsed = Number(this.advanceUsed ?? 0);
+  this.claimAmountUsed = Number(this.claimAmountUsed ?? 0);
   this.pendingUsed = Number(this.pendingUsed ?? 0);
   this.advance = Number(this.advance ?? 0);
 
   if (this.advanceUsed < 0) this.advanceUsed = 0;
+  if (this.claimAmountUsed < 0) this.claimAmountUsed = 0;
   if (this.pendingUsed < 0) this.pendingUsed = 0;
 
   // If multiplePayments are present, sum them as total paid
@@ -347,8 +428,9 @@ billingSchema.pre("save", function (next) {
     );
   }
 
-  // Effective due after applying previous advance to this invoice
-  const effectiveDue = Math.max(0, this.amount - this.advanceUsed);
+  // Effective due after applying previous advance AND insurance claim to this invoice
+  const totalCreditsUsed = this.advanceUsed + this.claimAmountUsed;
+  const effectiveDue = Math.max(0, this.amount - totalCreditsUsed);
   // Pending is any remaining due after today's payment
   this.pending = Math.max(0, effectiveDue - this.paid);
   // New advance generated if paid exceeds effective due
@@ -361,6 +443,11 @@ billingSchema.pre("save", function (next) {
 // Indexes for faster queries
 billingSchema.index({ patientId: 1 });
 billingSchema.index({ invoiceNumber: 1 });
+
+// Prevent duplicate model compilation error
+if (mongoose.models.Billing) {
+  delete mongoose.models.Billing;
+}
 
 export default mongoose.models.Billing ||
   mongoose.model("Billing", billingSchema);

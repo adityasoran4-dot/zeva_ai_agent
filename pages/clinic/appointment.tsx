@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { ChromePicker } from 'react-color';
 import { ModalPortal } from "../../lib/modalPortal";
@@ -422,7 +422,7 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("appointmentSelectedDate");
       const today = getLocalTodayDate();
-      
+     
       if (saved) {
         try {
           // Validate the saved date format
@@ -1002,7 +1002,7 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
           console.log("Agent Permissions API Response:", data);
          
           if (!isMounted) return;
-          
+         
           // Default to true if module not found in permissions (matches backend logic)
           if (!data?.permissions && data?.error?.includes("not found in agent permissions")) {
             console.log("Module not found in permissions, granting full access by default");
@@ -1017,16 +1017,16 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
 
           const actions = data?.permissions?.actions || data?.data?.moduleActions || {};
           const isTrue = (val: any) => val === true || val === "true" || String(val || "").toLowerCase() === "true";
-          
+         
           const canAll = isTrue(actions.all);
-          
+         
           const newPerms = {
             canRead: canAll || isTrue(actions.read),
             canCreate: canAll || isTrue(actions.create),
             canUpdate: canAll || isTrue(actions.update),
             canDelete: canAll || isTrue(actions.delete),
           };
-          
+         
           console.log("Final Agent/Staff Permissions:", newPerms);
           setPermissions(newPerms);
         } catch (err: any) {
@@ -1459,7 +1459,7 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
       const errorMsg = err.response?.data?.message || "Failed to load appointments";
       if (status === 403) {
         setAppointments([]);
-        toast.error("Session expired. Please login again.", { 
+        toast.error("Session expired. Please login again.", {
           duration: 4000,
           style: {
             background: '#fef2f2',
@@ -1556,7 +1556,7 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
       // Handle 403 authentication error
       const status = err.response?.status;
       if (status === 403) {
-        toast.error("Session expired. Please login again.", { 
+        toast.error("Session expired. Please login again.", {
           duration: 4000,
           style: {
             background: '#fef2f2',
@@ -3104,7 +3104,7 @@ useEffect(() => {
                 style={{ maxHeight: 'calc(75vh - 1px)' }}
               >
                 {/* Grid wrapper with CSS Grid for perfect alignment */}
-                <div 
+                <div
                   className="grid"
                   style={{
                     gridTemplateColumns: `64px repeat(${orderedColumns.length}, minmax(160px, 1fr))`,
@@ -3119,14 +3119,14 @@ useEffect(() => {
                       <span>Time</span>
                     </div>
                   </div>
-                  
+                 
                   {/* Column headers (doctors/rooms) */}
                   {orderedColumns.map((column, index) => {
                     const columnKey = column.type === "doctor" ? `doctor:${column.data._id}` : `room:${column.data._id}`;
                     const isDragged = draggedColumnId === columnKey;
                     const isLast = index === orderedColumns.length - 1;
                     const gridColumn = index + 2;
-                    
+                   
                     if (column.type === "doctor") {
                       const doctor = column.data;
                       return (
@@ -3245,12 +3245,12 @@ useEffect(() => {
                       );
                     }
                   })}
-                  
+                 
                   {/* Time slots and data cells */}
                   {timeSlots.map((slot, rowIndex) => {
                     const rowStartMinutes = timeStringToMinutes(slot.time);
                     const gridRow = rowIndex + 2; // Row 1 is header
-                    
+                   
                     return (
                       <React.Fragment key={slot.time}>
                         {/* Time label cell */}
@@ -3261,12 +3261,12 @@ useEffect(() => {
                           <p className="text-[8px] sm:text-[9px] font-semibold text-gray-900 dark:text-gray-900">{slot.displayTime}</p>
                           <div className="absolute left-0 right-0 top-1/2 border-t border-gray-200 dark:border-gray-300 pointer-events-none" />
                         </div>
-                        
+                       
                         {/* Data cells for each column */}
                         {orderedColumns.map((column, colIndex) => {
                           const isLastColumn = colIndex === orderedColumns.length - 1;
                           const gridColumn = colIndex + 2;
-                          
+                         
                           if (column.type === "doctor") {
                             const doctor = column.data;
                             const rowAppointments = getAppointmentsForRow(doctor._id, slot.time);
@@ -3375,6 +3375,14 @@ useEffect(() => {
                                             showErrorToast("You do not have permission to book appointments");
                                             return;
                                           }
+                                          if (!canBookSlot) {
+                                             const limitTime = lastBookableMinutes !== null ? minutesToDisplay(lastBookableMinutes + SLOT_INTERVAL_MINUTES) : "";
+                                             const msg = !slotWithinClosing 
+                                               ? `Booking is not allowed after ${limitTime}. Slots are available only until ${limitTime}.` 
+                                               : "This slot cannot be booked. Check date/time or availability.";
+                                             showErrorToast(msg);
+                                             return;
+                                          }
                                           if (canBookSlot && !timeDragSelection.isDragging && !draggedAppointmentId) {
                                             setBookingModal({
                                               isOpen: true,
@@ -3387,8 +3395,6 @@ useEffect(() => {
                                               selectedDate,
                                               bookedFrom: "doctor",
                                             });
-                                          } else if (!canBookSlot) {
-                                             showErrorToast("This slot cannot be booked. Check date/time or availability.");
                                           }
                                         }}
                                       />
@@ -3651,6 +3657,14 @@ useEffect(() => {
                                             showErrorToast("You do not have permission to book appointments");
                                             return;
                                           }
+                                          if (!canBookSlot) {
+                                             const limitTime = lastBookableMinutes !== null ? minutesToDisplay(lastBookableMinutes + SLOT_INTERVAL_MINUTES) : "";
+                                             const msg = !slotWithinClosing 
+                                               ? `Booking is not allowed after ${limitTime}. Slots are available only until ${limitTime}.` 
+                                               : "This slot cannot be booked. Check date/time or availability.";
+                                             showErrorToast(msg);
+                                             return;
+                                          }
                                           if (canBookSlot && !roomDragSelection.isDragging && !draggedAppointmentId) {
                                             setBookingModal({
                                               isOpen: true,
@@ -3663,8 +3677,6 @@ useEffect(() => {
                                               selectedDate,
                                               bookedFrom: "room",
                                             });
-                                          } else if (!canBookSlot) {
-                                             showErrorToast("This slot cannot be booked. Check date/time or availability.");
                                           }
                                         }}
                                       />
@@ -3946,13 +3958,13 @@ useEffect(() => {
                           const slots = generateTimeSlots(customStartTime, customEndTime);
                           setTimeSlots(slots);
                           setClosingMinutes(endMinutes);
-                          
+                         
                           // Show success pop-up with time details
                           toast.success(
                             `Custom time slots applied: ${formatTime(customStartTime)} - ${formatTime(customEndTime)}`,
                             { duration: 3000 }
                           );
-                          
+                         
                           setCustomTimeSlotModalOpen(false);
                         } catch (err: any) {
                           console.error("Error saving custom time slots:", err);
@@ -3993,10 +4005,10 @@ useEffect(() => {
                             setClosingMinutes(timeStringToMinutes(parsed.endTime));
                           }
                         }
-                        
+                       
                         // Show success pop-up with duration
                         toast.success("Reverted to clinic timings", { duration: 3000 });
-                        
+                       
                         setCustomTimeSlotModalOpen(false);
                       } catch (err: any) {
                         console.error("Error saving custom time slots:", err);
@@ -4299,10 +4311,13 @@ useEffect(() => {
         </div>
       )}
     </div>
-    
+   
     {/* Toast Notification Container */}
     <Toaster
       position="top-right"
+      containerStyle={{
+        zIndex: 10000,
+      }}
       toastOptions={{
         duration: 3000,
         success: {

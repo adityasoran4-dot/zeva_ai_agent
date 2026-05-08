@@ -26,7 +26,14 @@ interface Clinic {
   name: string;
   address: string;
   pricing: string;
-  timings: string;
+  timings: string | {
+    isOpen?: boolean;
+    openingTime?: string;
+    closingTime?: string;
+    breakStart?: string;
+    breakEnd?: string;
+    [key: string]: any;
+  };
   treatments: Array<{
     mainTreatment: string;
     mainTreatmentSlug: string;
@@ -928,13 +935,15 @@ function AdminClinicApproval() {
               <div className="flex items-start gap-3 text-sm">
                 <MapPinIcon className="w-4 h-4 text-emerald-600 mt-0.5 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-slate-700">{detailClinic.address}</p>
-                  <button
-                    onClick={() => handleAddressClick(detailClinic.address)}
-                    className="text-xs text-blue-600 hover:text-blue-800 font-medium mt-1"
-                  >
-                    View on map →
-                  </button>
+                  <p className="text-slate-700">{detailClinic.address || 'N/A'}</p>
+                  {detailClinic.address && (
+                    <button
+                      onClick={() => handleAddressClick(detailClinic.address)}
+                      className="text-xs text-blue-600 hover:text-blue-800 font-medium mt-1"
+                    >
+                      View on map →
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -946,13 +955,24 @@ function AdminClinicApproval() {
                   </svg>
                   <div className="flex items-center gap-1">
                     <span className="text-base font-semibold text-slate-900">د.إ</span>
-                    <span className="font-semibold text-slate-900">{detailClinic.pricing}</span>
+                    <span className="font-semibold text-slate-900">{detailClinic.pricing || 'N/A'}</span>
                     <span className="text-xs text-slate-500">AED</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <ClockIcon className="w-4 h-4 text-purple-600 flex-shrink-0" />
-                  <span className="text-slate-700">{detailClinic.timings}</span>
+                  <span className="text-slate-700">
+                    {(() => {
+                      if (!detailClinic.timings) return 'N/A';
+                      if (typeof detailClinic.timings === 'string') return detailClinic.timings;
+                      // It's an object
+                      const t = detailClinic.timings as any;
+                      if (t.openingTime && t.closingTime) {
+                        return `${t.openingTime} - ${t.closingTime}`;
+                      }
+                      return 'N/A';
+                    })()}
+                  </span>
                 </div>
               </div>
 
@@ -960,16 +980,16 @@ function AdminClinicApproval() {
               <div className="flex items-start gap-3 text-sm">
                 <BeakerIcon className="w-4 h-4 text-indigo-600 mt-0.5 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <div className="text-xs text-slate-500 mb-1.5">Treatments ({detailClinic.treatments.length})</div>
+                  <div className="text-xs text-slate-500 mb-1.5">Treatments ({detailClinic.treatments?.length || 0})</div>
                   <div className="flex flex-wrap gap-1.5">
-                    {detailClinic.treatments.length > 0 ? (
-                      detailClinic.treatments.map((treat) => (
+                    {detailClinic.treatments && detailClinic.treatments.length > 0 ? (
+                      detailClinic.treatments.map((treat, idx) => (
                         <span
-                          key={treat.mainTreatmentSlug}
+                          key={treat.mainTreatmentSlug || idx}
                           className="inline-flex items-center gap-1 rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-700"
                         >
                           <BeakerIcon className="w-3 h-3 text-indigo-500" />
-                          {treat.mainTreatment}
+                          {treat.mainTreatment || 'Unknown'}
                         </span>
                       ))
                     ) : (

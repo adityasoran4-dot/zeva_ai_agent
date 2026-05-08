@@ -157,9 +157,11 @@ export default async function handler(req, res) {
         pending,
         advance,
         advanceUsed,
+        claimAmountUsed,
         pastAdvance,
         pastAdvanceUsed,
         applyPastAdvance,
+        pendingClaimUsed, // Track pending claim amount being paid
         pastAdvanceUsed50Percent,
         pastAdvanceUsed54Percent,
         pastAdvanceUsed159Flat,
@@ -443,6 +445,8 @@ export default async function handler(req, res) {
     const amountNum = parseFloat(amount) || 0;
     const advanceUsedNum =
       advanceUsed !== undefined ? Math.max(0, parseFloat(advanceUsed) || 0) : 0;
+    const claimAmountUsedNum =
+      claimAmountUsed !== undefined ? Math.max(0, parseFloat(claimAmountUsed) || 0) : 0;
     const pastAdvanceUsedNum =
       pastAdvanceUsed !== undefined
         ? Math.max(0, parseFloat(pastAdvanceUsed) || 0)
@@ -466,6 +470,8 @@ export default async function handler(req, res) {
       pastAdvanceUsed159FlatNum;
     const pendingUsedNum =
       pendingUsed !== undefined ? Math.max(0, parseFloat(pendingUsed) || 0) : 0;
+    const pendingClaimUsedNum =
+      pendingClaimUsed !== undefined ? Math.max(0, parseFloat(pendingClaimUsed) || 0) : 0;
     const pendingNum = pending !== undefined ? parseFloat(pending) || 0 : 0;
     const advanceNum = advance !== undefined ? parseFloat(advance) || 0 : 0;
     const pastAdvanceNum =
@@ -499,9 +505,9 @@ export default async function handler(req, res) {
 
     const netDue = Math.max(
       0,
-      amountNum - advanceUsedNum - totalPastAdvanceUsed,
+      amountNum - advanceUsedNum - claimAmountUsedNum - totalPastAdvanceUsed,
     );
-    console.log({ netDue, paidNum, advanceUsedNum, pastAdvanceUsedNum });
+    console.log({ netDue, paidNum, advanceUsedNum, claimAmountUsedNum, pastAdvanceUsedNum });
 
     if (paidNum > netDue) {
       finalAdvance = paidNum - netDue;
@@ -526,14 +532,19 @@ export default async function handler(req, res) {
       const cashbackExpiryDays = cashbackOffer?.cashbackExpiryDays || 365; // Default to 1 year if not set
       
       cashbackStartDate = new Date(invoicedDate);
+      cashbackStartDate.setHours(0, 0, 0, 0); // Normalize to start of day
+      
       cashbackEndDate = new Date(invoicedDate);
+      cashbackEndDate.setHours(23, 59, 59, 999); // Normalize to end of day
+      // Strictly X days from the purchase date
       cashbackEndDate.setDate(cashbackEndDate.getDate() + cashbackExpiryDays);
       
       console.log('[CashbackAPI] Cashback validity period:', {
         invoicedDate,
-        cashbackStartDate,
+        cashbackStartDate: cashbackStartDate.toISOString(),
         cashbackExpiryDays,
-        cashbackEndDate
+        cashbackEndDate: cashbackEndDate.toISOString(),
+        calculation: `Start Date + ${cashbackExpiryDays} days = End Date`
       });
     }
 
@@ -561,7 +572,9 @@ export default async function handler(req, res) {
       amount: amountNum,
       paid: paidNum, // ONLY store actual money received today (not credits)
       advanceUsed: advanceUsedNum, // Use the parsed number
+      claimAmountUsed: claimAmountUsedNum, // Use the parsed number
       pendingUsed: pendingUsedNum, // Use the parsed number
+      pendingClaimUsed: pendingClaimUsedNum, // Track pending claim amount paid
       pastAdvanceUsed: totalPastAdvanceUsed,
       pastAdvanceUsed50Percent: pastAdvanceUsed50PercentNum,
       pastAdvanceUsed54Percent: pastAdvanceUsed54PercentNum,
@@ -614,6 +627,9 @@ export default async function handler(req, res) {
       // Bundle offer tracking fields
       offerFreeSession: Array.isArray(offerFreeSession) ? offerFreeSession : [],
       freeOfferSessionCount: freeOfferSessionCount || 0,
+      // Free sessions being REDEEMED in this billing (consumed from previous billings)
+      usedFreeSessions: Array.isArray(usedFreeSessions) ? usedFreeSessions : [],
+      usedFreeSessionCount: usedFreeSessionCount || 0,
       // Cashback offer tracking fields
       isCashbackApplied: isCashbackApplied || false,
       cashbackOfferId: cashbackOfferId || null,
@@ -631,8 +647,10 @@ export default async function handler(req, res) {
     // console.log('[BundleAPI] billingData.freeOfferSessionCount:', billingData.freeOfferSessionCount);
     // console.log('[BundleAPI] typeof billingData.offerFreeSession:', typeof billingData.offerFreeSession);
     // console.log('[BundleAPI] Array.isArray(billingData.offerFreeSession):', Array.isArray(billingData.offerFreeSession));
-    // console.log('[BundleAPI] usedFreeSessions (being redeemed):', usedFreeSessions);
-    // console.log('[BundleAPI] usedFreeSessionCount:', usedFreeSessionCount);
+    console.log('[BundleAPI] usedFreeSessions (being redeemed):', usedFreeSessions);
+    console.log('[BundleAPI] usedFreeSessionCount:', usedFreeSessionCount);
+    console.log('[BundleAPI] billingData.usedFreeSessions:', billingData.usedFreeSessions);
+    console.log('[BundleAPI] billingData.usedFreeSessionCount:', billingData.usedFreeSessionCount);
 
     const billing = await Billing.create(billingData);
     
@@ -647,6 +665,10 @@ export default async function handler(req, res) {
     console.log('[CashbackAPI] Saved billing cashbackEndDate:', savedBilling?.cashbackEndDate);
     console.log('[CashbackAPI] Saved billing has cashbackStartDate key:', 'cashbackStartDate' in (savedBilling || {}));
     console.log('[CashbackAPI] Saved billing has cashbackEndDate key:', 'cashbackEndDate' in (savedBilling || {}));
+    console.log('[FreeSessionAPI] Saved billing usedFreeSessions:', savedBilling?.usedFreeSessions);
+    console.log('[FreeSessionAPI] Saved billing usedFreeSessionCount:', savedBilling?.usedFreeSessionCount);
+    console.log('[FreeSessionAPI] Saved billing offerFreeSession:', savedBilling?.offerFreeSession);
+    console.log('[FreeSessionAPI] Saved billing freeOfferSessionCount:', savedBilling?.freeOfferSessionCount);
 
     // If free sessions are being REDEEMED, update previous billings to remove them
     if (usedFreeSessions && Array.isArray(usedFreeSessions) && usedFreeSessions.length > 0) {

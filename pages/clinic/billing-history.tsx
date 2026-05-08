@@ -428,17 +428,19 @@ const BillingHistoryPage = () => {
                   <th className="px-4 py-3 text-right font-semibold text-red-300">Pending</th>
                   <th className="px-4 py-3 text-right font-semibold">Advance</th>
                   <th className="px-4 py-3 text-right font-semibold">Advance Used</th>
+                  <th className="px-4 py-3 text-right font-semibold">Claim Amount Used</th>
                   <th className="px-4 py-3 text-right font-semibold">Past Advance</th>
                   <th className="px-4 py-3 text-right font-semibold">Past Advance Used</th>
                   <th className="px-4 py-3 text-center font-semibold">Qty</th>
                   <th className="px-4 py-3 text-center font-semibold">Session</th>
                   <th className="px-4 py-3 text-left font-semibold">Method</th>
+                  <th className="px-4 py-3 text-left font-semibold">Refund Details</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {loading ? (
                   <tr>
-                    <td colSpan={15} className="px-4 py-12">
+                    <td colSpan={17} className="px-4 py-12">
                       <div className="flex items-center justify-center gap-2">
                         <Loader2 className="w-5 h-5 animate-spin text-teal-600" />
                         <span className="text-sm text-gray-500">Loading billing history...</span>
@@ -447,7 +449,7 @@ const BillingHistoryPage = () => {
                   </tr>
                 ) : error ? (
                   <tr>
-                    <td colSpan={15} className="px-4 py-12">
+                    <td colSpan={17} className="px-4 py-12">
                       <div className="text-center">
                         <div className="text-sm text-red-600 font-medium mb-2">{error}</div>
                         <button
@@ -461,7 +463,7 @@ const BillingHistoryPage = () => {
                   </tr>
                 ) : billingHistory.length === 0 ? (
                   <tr>
-                    <td colSpan={15} className="px-4 py-12">
+                    <td colSpan={17} className="px-4 py-12">
                       <div className="text-center text-sm text-gray-500">
                         No billing history found for this appointment
                       </div>
@@ -476,10 +478,18 @@ const BillingHistoryPage = () => {
                         )
                       : billingHistory;
                     
-                    return filteredBilling.map((billing, index) => (
+                    return filteredBilling.map((billing, index) => {
+                    // Check if invoice is refunded
+                    const isRefunded = billing.isOfferRefunded || false;
+                    const refundedOffers = billing.refundedOffers || [];
+                    const refundedAt = billing.refundedAt;
+                    // const refundedBy = billing.refundedBy;
+                    // const refundedAmount = billing.refundedAmount || 0;
+                    
+                    return (
                     <tr 
                       key={billing._id || index} 
-                      className="hover:bg-gray-50 transition-colors"
+                      className={`transition-colors ${isRefunded ? 'bg-red-50 hover:bg-red-100 border-l-4 border-l-red-500' : 'hover:bg-gray-50'}`}
                     >
                       <td className="px-4 py-3">
                         <div className="text-xs font-semibold text-gray-900">
@@ -529,6 +539,9 @@ const BillingHistoryPage = () => {
                           const isFreeSessionEarned = billing.offerType === 'bundle' && billing.offerFreeSession && billing.offerFreeSession.length > 0;
                           const isFreeSessionUsed = billing.usedFreeSessions && billing.usedFreeSessions.length > 0;
                           const isCashbackUsed = billing.cashbackWalletUsed && billing.cashbackWalletUsed > 0;
+                          const isCashbackApplied = billing.isCashbackApplied || false;
+                          const cashbackEarnedAmt = billing.cashbackAmount || 0;
+                          const cashbackOfferName = billing.cashbackOfferName || '';
                           
                           const originalAmount = billing.originalAmount || 0;
                           const finalAmount = billing.amount || 0;
@@ -536,7 +549,7 @@ const BillingHistoryPage = () => {
                           const totalPercent = totalDiscountAmount > 0 && originalAmount > 0 ? (totalDiscountAmount / originalAmount * 100) : 0;
                           const membershipPercent = isMembershipDiscount && originalAmount > 0 ? (membershipDiscountAmount / originalAmount * 100) : 0;
 
-                          if (!isDoctorDiscount && !isAgentDiscount && !isMembershipDiscount && !isFreeSessionEarned && !isFreeSessionUsed && !isCashbackUsed && totalPercent <= 0) {
+                          if (!isDoctorDiscount && !isAgentDiscount && !isMembershipDiscount && !isFreeSessionEarned && !isFreeSessionUsed && !isCashbackUsed && !isCashbackApplied && totalPercent <= 0) {
                             return <div className="text-xs text-gray-400">—</div>;
                           }
 
@@ -553,6 +566,12 @@ const BillingHistoryPage = () => {
                                 </div>
                               )}
                               <div className="flex flex-col items-center gap-1 mt-0.5">
+                                {/* Cashback Offer Name */}
+                                {cashbackOfferName && isCashbackApplied && cashbackEarnedAmt > 0 && (
+                                  <div className="text-[8px] font-bold text-cyan-700 bg-cyan-50 px-1.5 py-0.5 rounded border border-cyan-200">
+                                    {cashbackOfferName}
+                                  </div>
+                                )}
                                 {/* Free Session USED (Redeemed at ₹0) */}
                                 {isFreeSessionUsed && (
                                   <div className="text-[8px] uppercase tracking-wider text-green-700 bg-green-100 px-1.5 py-0.5 rounded font-bold border border-green-200 flex items-center gap-0.5">
@@ -571,13 +590,24 @@ const BillingHistoryPage = () => {
                                     Free: {billing.offerFreeSession.join(', ')}
                                   </div>
                                 )}
-                                {isCashbackUsed && (
-                                  <div className="text-[8px] uppercase tracking-wider text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded font-bold border border-purple-200 flex items-center gap-0.5">
+                                {/* Cashback Earned Amount */}
+                                {isCashbackApplied && cashbackEarnedAmt > 0 && (
+                                  <div className="text-[8px] uppercase tracking-wider text-cyan-700 bg-cyan-100 px-1.5 py-0.5 rounded font-bold border border-cyan-200 flex items-center gap-0.5">
                                     <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20">
                                       <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z" />
                                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z" clipRule="evenodd" />
                                     </svg>
-                                    Cashback: {getCurrencySymbol(clinicCurrency)} {billing.cashbackWalletUsed.toFixed(2)}
+                                    CB Earned: {getCurrencySymbol(clinicCurrency)} {cashbackEarnedAmt.toFixed(2)}
+                                  </div>
+                                )}
+                                {/* Cashback Used */}
+                                {isCashbackUsed && (
+                                  <div className="text-[8px] uppercase tracking-wider text-orange-700 bg-orange-100 px-1.5 py-0.5 rounded font-bold border border-orange-200 flex items-center gap-0.5">
+                                    <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20">
+                                      <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z" />
+                                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z" clipRule="evenodd" />
+                                    </svg>
+                                    CB Used: {getCurrencySymbol(clinicCurrency)} {billing.cashbackWalletUsed.toFixed(2)}
                                   </div>
                                 )}
                                 {isMembershipDiscount && (
@@ -607,15 +637,20 @@ const BillingHistoryPage = () => {
                           const offerDiscountAmount = billing.offerDiscountAmount || 0;
                           const cashbackAmount = billing.cashbackAmount || 0;
                           const cashbackWalletUsed = billing.cashbackWalletUsed || 0;
+                          const isCashbackApplied = billing.isCashbackApplied || false;
+                          const cashbackOfferName = billing.cashbackOfferName || '';
                           const isFreeSession = offerType === 'bundle' && billing.offerFreeSession && billing.offerFreeSession.length > 0;
                           
-                          if (!offerName && !offerType) {
+                          // Check if any offer info is available
+                          const hasOfferInfo = offerName || offerType || cashbackOfferName || (isCashbackApplied && cashbackAmount > 0);
+                          
+                          if (!hasOfferInfo) {
                             return <div className="text-xs text-gray-400">—</div>;
                           }
 
                           return (
-                            <div className="flex flex-col gap-1">
-                              {/* Offer Name & Type */}
+                            <div className="flex flex-col gap-1.5">
+                              {/* Main Offer (Instant/Bonus/Bundle) */}
                               {offerName && (
                                 <div className="flex items-center gap-1.5">
                                   <span className="text-[10px] font-bold text-gray-900 truncate max-w-[150px]">
@@ -637,6 +672,18 @@ const BillingHistoryPage = () => {
                                 </div>
                               )}
                               
+                              {/* Cashback Offer */}
+                              {cashbackOfferName && isCashbackApplied && (
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-[10px] font-bold text-cyan-700 truncate max-w-[150px]">
+                                    {cashbackOfferName}
+                                  </span>
+                                  <span className="text-[8px] px-1.5 py-0.5 rounded font-bold uppercase bg-cyan-100 text-cyan-700">
+                                    Cashback
+                                  </span>
+                                </div>
+                              )}
+                              
                               {/* Offer Details */}
                               <div className="flex flex-wrap items-center gap-1">
                                 {/* Instant Discount Amount */}
@@ -647,17 +694,18 @@ const BillingHistoryPage = () => {
                                 )}
                                 
                                 {/* Cashback Earned Amount */}
-                                {offerType === 'cashback' && cashbackAmount > 0 && (
-                                  <span className="text-[9px] font-semibold text-purple-700">
+                                {cashbackAmount > 0 && (
+                                  <span className="text-[9px] font-semibold text-cyan-700">
                                     Earned: {getCurrencySymbol(clinicCurrency)}{cashbackAmount.toFixed(2)}
                                   </span>
                                 )}
                                 
                                 {/* Cashback Wallet Used */}
                                 {cashbackWalletUsed > 0 && (
-                                  <span className="text-[9px] font-semibold text-purple-600">
-                                    Used: {getCurrencySymbol(clinicCurrency)}{cashbackWalletUsed.toFixed(2)}
-                                  </span>
+                                  <div className="inline-flex flex-col items-start px-1.5 py-0.5 rounded text-[9px] font-bold bg-orange-50 text-orange-700 border border-orange-200">
+                                    <span className="text-[8px] uppercase">CB Applied</span>
+                                    <span className="text-[9px]">{getCurrencySymbol(clinicCurrency)}{cashbackWalletUsed.toFixed(2)}</span>
+                                  </div>
                                 )}
                                 
                                 {/* Free Sessions */}
@@ -706,6 +754,15 @@ const BillingHistoryPage = () => {
                         </div>
                       </td>
                       <td className="px-4 py-3 text-right">
+                        {(billing.claimAmountUsed || 0) > 0 ? (
+                          <div className="text-xs font-semibold text-blue-700">
+                            {formatCurrency(billing.claimAmountUsed)}
+                          </div>
+                        ) : (
+                          <div className="text-xs text-gray-400">—</div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right">
                         <div className="text-xs text-gray-700">
                           {formatCurrency(billing.pastAdvance || 0)}
                         </div>
@@ -741,8 +798,52 @@ const BillingHistoryPage = () => {
                           )}
                         </div>
                       </td>
+                      {/* Refund Details Column */}
+                      <td className="px-4 py-3">
+                        {isRefunded ? (
+                          <div className="flex flex-col gap-1">
+                            <div className="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-bold bg-red-100 text-red-700 border border-red-200">
+                              <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                              </svg>
+                              REFUNDED
+                            </div>
+                            {refundedOffers.length > 0 && (
+                              <div className="text-[9px] text-gray-600 space-y-0.5">
+                                {refundedOffers.map((offer: any, idx: number) => (
+                                  <div key={idx} className="flex items-start gap-1">
+                                    <span className="text-red-500">•</span>
+                                    <div className="flex flex-col">
+                                      <span className="font-medium">{offer.offerName || offer.offerType}</span>
+                                      <span className="text-[8px] text-gray-500">
+                                        {offer.offerType === 'bundle' && offer.freeSessionsRefunded?.length > 0 && (
+                                          <span>Free Sessions: {offer.freeSessionsRefunded.join(', ')}</span>
+                                        )}
+                                        {offer.cashbackRefunded > 0 && (
+                                          <span>Cashback: {getCurrencySymbol(clinicCurrency)}{offer.cashbackRefunded.toFixed(2)}</span>
+                                        )}
+                                        {offer.amount > 0 && offer.offerType !== 'cashback' && (
+                                          <span>Amount: {getCurrencySymbol(clinicCurrency)}{offer.amount.toFixed(2)}</span>
+                                        )}
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {refundedAt && (
+                              <div className="text-[8px] text-gray-400">
+                                {new Date(refundedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="text-xs text-gray-400">—</div>
+                        )}
+                      </td>
                     </tr>
-                  ));
+                    );
+                  });
                   })()
                 )}
               </tbody>

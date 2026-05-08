@@ -2,6 +2,10 @@ import dbConnect from "../../../../lib/database";
 import { getUserFromReq } from "../../lead-ms/auth";
 import { getClinicIdFromUser, checkClinicPermission } from "../../lead-ms/permissions-helper";
 import mongoose from "mongoose";
+import Clinic from "../../../../models/Clinic";
+import { isNewClinicInMockPeriod } from "../../../../lib/mockDataGenerator";
+
+const randomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 
 export default async function handler(req, res) {
   if (req.method !== "GET") {
@@ -31,6 +35,70 @@ export default async function handler(req, res) {
   const { hasPermission } = await checkClinicPermission(clinicId, moduleKey, "read");
   if (!hasPermission) {
     return res.status(403).json({ success: false, message: "You do not have permission to view reports" });
+  }
+
+  // Get clinic to check registeredAt
+  let clinic = null;
+  if (user.role === "clinic") {
+    clinic = await Clinic.findOne({ owner: user._id });
+  } else if (clinicId) {
+    clinic = await Clinic.findById(clinicId);
+  }
+
+  // Check if clinic is within 2-day mock data period and has no real data
+  if (clinic && isNewClinicInMockPeriod(clinic.registeredAt)) {
+    const appointmentCount = await mongoose.connection.collection("appointments").countDocuments({
+      clinicId: targetClinicId,
+      ...(qStart || qEnd ? {
+        startDate: {
+          ...(qStart ? { $gte: qStart } : {}),
+          ...(qEnd ? { $lte: qEnd } : {})
+        }
+      } : {})
+    });
+
+    if (appointmentCount === 0) {
+      console.log('📊 Returning mock patient stats for new clinic:', clinic._id);
+      
+      return res.status(200).json({
+        success: true,
+        data: {
+          topVisited: [
+            { patientId: new mongoose.Types.ObjectId(), patientName: 'Ahmed Ali', visits: randomInt(5, 15) },
+            { patientId: new mongoose.Types.ObjectId(), patientName: 'Fatima Hassan', visits: randomInt(4, 12) },
+            { patientId: new mongoose.Types.ObjectId(), patientName: 'Mohammed Khan', visits: randomInt(3, 10) },
+          ],
+          membershipByPatient: [
+            { patientId: new mongoose.Types.ObjectId(), patientName: 'Ahmed Ali', membershipRevenue: randomInt(1000, 5000), count: randomInt(1, 3) },
+            { patientId: new mongoose.Types.ObjectId(), patientName: 'Fatima Hassan', membershipRevenue: randomInt(800, 4000), count: randomInt(1, 2) },
+          ],
+          packageByPatient: [
+            { patientId: new mongoose.Types.ObjectId(), patientName: 'Mohammed Khan', revenue: randomInt(2000, 8000), count: randomInt(2, 5) },
+            { patientId: new mongoose.Types.ObjectId(), patientName: 'Sara Ahmad', revenue: randomInt(1500, 6000), count: randomInt(1, 4) },
+          ],
+          highestPending: [
+            { patientId: new mongoose.Types.ObjectId(), patientName: 'Omar Hassan', pendingAmount: randomInt(500, 3000) },
+            { patientId: new mongoose.Types.ObjectId(), patientName: 'Layla Mohammed', pendingAmount: randomInt(300, 2000) },
+          ],
+          highestAdvance: [
+            { patientId: new mongoose.Types.ObjectId(), patientName: 'Yousef Ali', advanceAmount: randomInt(1000, 4000) },
+            { patientId: new mongoose.Types.ObjectId(), patientName: 'Noura Abdullah', advanceAmount: randomInt(800, 3000) },
+          ],
+          revenueByPatient: [
+            { patientId: new mongoose.Types.ObjectId(), patientName: 'Ahmed Ali', revenue: randomInt(3000, 12000) },
+            { patientId: new mongoose.Types.ObjectId(), patientName: 'Fatima Hassan', revenue: randomInt(2500, 10000) },
+            { patientId: new mongoose.Types.ObjectId(), patientName: 'Mohammed Khan', revenue: randomInt(2000, 8000) },
+          ],
+          summary: {
+            totalPatients: randomInt(20, 50),
+            newPatients: randomInt(10, 25),
+            returningPatients: randomInt(10, 25),
+          },
+        },
+        isMockData: true,
+        message: 'Showing sample patient data for new clinic!',
+      });
+    }
   }
 
   const parseDate = (v) => {

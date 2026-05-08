@@ -32,7 +32,7 @@ const Zeva360ProblemSection: React.FC = () => {
   return (
     <section className="py-16 bg-white">
       <div className="max-w-5xl mx-auto px-6 lg:px-8 text-center">
-        <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-gray-900 mb-12 whitespace-nowrap">
+        <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-gray-900 mb-12">
           Why Most Clinics Lose{" "}
           <span className="text-orange-500">₹50,000+</span>{" "}
           Every Month

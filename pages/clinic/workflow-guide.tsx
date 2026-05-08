@@ -676,241 +676,224 @@ const WorkflowGuide: NextPageWithLayout = () => {
               <Building2 className="w-10 h-10 text-teal-600" />
               <h2 className="text-3xl font-bold text-gray-900">Clinic Dashboard Overview</h2>
             </div>
-            
+
             <div className="prose max-w-none">
               <p className="text-base text-gray-600 mb-8 leading-relaxed">
-                The Clinic Dashboard is your central command center where you can monitor all clinic operations,
-                view key metrics, and quickly access different modules. This comprehensive guide covers all
-                dashboard features and navigation.
+                The <strong>Clinic Dashboard</strong> is your central hub. It gives you a real-time overview of all
+                clinic activity — from appointments and revenue to leads and patient trends.
+                Use the date filters at the top to switch between Today, This Week, This Month, or Overall views.
               </p>
-              
-              {/* Dashboard Overview Section */}
+
+              {/* 1. Layout & Navigation */}
               <div className="bg-gradient-to-r from-teal-50 to-blue-50 border-l-4 border-teal-500 p-8 mb-10 rounded-r-lg">
                 <h4 className="font-bold text-lg text-teal-900 mb-5 flex items-center gap-2">
                   <span className="flex items-center justify-center w-10 h-10 bg-teal-600 text-white rounded-full text-base font-bold">1</span>
-                  Dashboard Layout & Navigation
+                  Dashboard Layout &amp; Navigation
                 </h4>
                 <div className="ml-12 space-y-4">
                   <p className="text-base text-teal-800 leading-relaxed">
-                    The dashboard provides a complete overview of your clinic's daily operations:
+                    The dashboard uses a persistent left sidebar for navigation and a main content area for data.
                   </p>
-                  <ul className="list-disc list-inside space-y-3 text-base text-teal-700">
-                    <li><strong>Sidebar Navigation:</strong> Quick access to all clinic modules (Business Management, HR, Marketing, etc.)</li>
-                    <li><strong>Header Bar:</strong> Clinic name, notifications, user profile, and quick actions</li>
-                    <li><strong>Main Content Area:</strong> Statistics cards, charts, and activity feeds</li>
-                    <li><strong>Module Cards:</strong> Visual tiles for each functional area</li>
-                    <li><strong>Responsive Design:</strong> Works seamlessly on desktop, tablet, and mobile</li>
-                  </ul>
-                  
-                  {/* Image Section - Dashboard Overview */}
-                  <div className="w-full bg-teal-50 rounded-xl border border-teal-200 p-6 mb-8">
-                    <h3 className="text-xl font-bold text-gray-800 mb-4">
-                      Complete Dashboard Interface
-                    </h3>
-                    <div className="bg-white rounded-lg border-2 border-teal-200 flex flex-col items-center justify-center relative overflow-hidden group shadow-sm" style={{ minHeight: '500px', maxHeight: '600px' }}>
-                      <img 
-                        src="/clinic-dashboard-overview.png" 
-                        alt="Clinic Dashboard Overview" 
+                  {/* Dashboard Screenshot */}
+                  <div className="w-full bg-teal-50 rounded-xl border border-teal-200 p-6 mb-2">
+                    <h3 className="text-xl font-bold text-gray-800 mb-4">Complete Dashboard Interface</h3>
+                    <div
+                      className="bg-white rounded-lg border-2 border-teal-200 flex flex-col items-center justify-center relative overflow-hidden shadow-sm"
+                      style={{ minHeight: '500px', maxHeight: '600px' }}
+                    >
+                      <img
+                        src="/dashboard.png"
+                        alt="Clinic Dashboard Overview"
                         className="w-full h-full object-cover"
                         onError={(e) => {
                           const target = e.target as HTMLImageElement;
                           target.style.display = 'none';
-                          target.parentElement?.querySelector('.placeholder-dashboard')?.classList.remove('hidden');
+                          const placeholder = target.parentElement?.querySelector('.placeholder-dashboard-1') as HTMLElement | null;
+                          if (placeholder) placeholder.style.display = 'flex';
                         }}
                       />
-                      <div className="placeholder-dashboard hidden absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-teal-50 to-blue-50 text-gray-500">
+                      <div
+                        className="placeholder-dashboard-1 absolute inset-0 flex-col items-center justify-center bg-gradient-to-br from-teal-50 to-blue-50 text-gray-500"
+                        style={{ display: 'none' }}
+                      >
                         <Building2 className="w-16 h-16 mb-4 text-teal-300" />
                         <p className="text-lg font-medium">Clinic Dashboard Overview</p>
-                        <p className="text-sm mt-2">Screenshot will appear here</p>
+                        <p className="text-sm mt-2">dashboard.png</p>
                       </div>
                     </div>
                   </div>
-                  
+                  <ul className="list-disc list-inside space-y-3 text-base text-teal-700 mt-4">
+                    <li><strong>Sidebar Navigation:</strong> Quick access to all clinic modules (Business Management, HR, Marketing, etc.)</li>
+                    <li><strong>Header Bar:</strong> Clinic name, notifications, user profile, and quick actions</li>
+                    <li><strong>Main Content Area:</strong> Statistics cards, charts, and activity feeds</li>
+                    <li><strong>Responsive Design:</strong> Works seamlessly on desktop, tablet, and mobile</li>
+
+                    {/* <li><strong>Date Filter (Today):</strong> Shows only today's activity — appointments, revenue, and leads for the current day.</li> */}
+                    <li><strong>Sample Data (First 2 Days):</strong> New clinics see realistic demo data for 2 days to explore the dashboard before real data is added.</li>
+                  </ul>
                   <div className="mt-4 p-4 bg-white rounded-lg border border-teal-200">
                     <p className="text-sm text-teal-700"><strong>💡 Pro Tip:</strong> Use the sidebar to quickly navigate between different modules without returning to the main dashboard.</p>
                   </div>
                 </div>
               </div>
 
-              {/* Statistics Cards Section */}
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 p-8 mb-10 rounded-r-lg">
-                <h4 className="font-bold text-lg text-blue-900 mb-5 flex items-center gap-2">
-                  <span className="flex items-center justify-center w-10 h-10 bg-blue-600 text-white rounded-full text-base font-bold">2</span>
-                  Statistics & Metrics Cards
-                </h4>
-                <div className="ml-12 space-y-4">
-                  <p className="text-base text-blue-800 leading-relaxed">
-                    Key performance indicators displayed prominently at the top of the dashboard:
-                  </p>
-                  <ul className="list-disc list-inside space-y-3 text-base text-blue-700">
-                    <li><strong>Total Patients:</strong> Overall patient count with growth indicator</li>
-                    <li><strong>Today's Appointments:</strong> Number of scheduled appointments for current day</li>
-                    <li><strong>Pending Payments:</strong> Outstanding payment amounts requiring attention</li>
-                    <li><strong>Active Treatments:</strong> Ongoing treatment packages and sessions</li>
-                    <li><strong>Revenue Summary:</strong> Daily/weekly/monthly income tracking</li>
-                    <li><strong>Color-Coded Cards:</strong> Each metric has distinct color theme for quick identification</li>
-                    <li><strong>Trend Indicators:</strong> Up/down arrows showing performance changes</li>
-                  </ul>
-                  
-                  {/* Image Section - Statistics Cards */}
-                  <div className="w-full bg-blue-50 rounded-xl border border-blue-200 p-6 mb-8">
-                    <h3 className="text-xl font-bold text-gray-800 mb-4">
-                      Statistics Cards Display
-                    </h3>
-                    <div className="bg-white rounded-lg border-2 border-blue-200 flex flex-col items-center justify-center relative overflow-hidden group shadow-sm" style={{ minHeight: '500px', maxHeight: '600px' }}>
-                      <img 
-                        src="/dashboard-statistics-cards.png" 
-                        alt="Dashboard Statistics Cards" 
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.style.display = 'none';
-                          target.parentElement?.querySelector('.placeholder-stats')?.classList.remove('hidden');
-                        }}
-                      />
-                      <div className="placeholder-stats hidden absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50 text-gray-500">
-                        <Building2 className="w-16 h-16 mb-4 text-blue-300" />
-                        <p className="text-lg font-medium">Statistics Cards</p>
-                        <p className="text-sm mt-2">Screenshot will appear here</p>
+              {/* Steps 2–6 Process Flow */}
+              <div className="relative">
+                {/* Vertical connecting line */}
+                <div className="absolute left-5 top-0 bottom-0 w-0.5 bg-gradient-to-b from-blue-300 via-purple-300 via-green-300 via-amber-300 to-teal-300" style={{ zIndex: 0 }} />
+
+                {/* Step 2: Key Statistics Cards */}
+                <div className="relative flex gap-6 mb-8" style={{ zIndex: 1 }}>
+                  <div className="flex-shrink-0 flex flex-col items-center">
+                    <span className="flex items-center justify-center w-10 h-10 bg-blue-600 text-white rounded-full text-base font-bold shadow-md ring-4 ring-blue-100">2</span>
+                  </div>
+                  <div className="flex-1 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-6 shadow-sm">
+                    <h4 className="font-bold text-lg text-blue-900 mb-1">Key Statistics Cards</h4>
+                    <p className="text-sm text-blue-700 mb-4">Six cards at the top show your most important numbers at a glance:</p>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      {[
+                        { label: "Total Reviews", icon: "⭐", desc: "Patient ratings received", color: "text-yellow-600 bg-yellow-50 border-yellow-200" },
+                        { label: "Total Enquiries", icon: "💬", desc: "Inquiries from patients", color: "text-blue-600 bg-blue-50 border-blue-200" },
+                        { label: "Appointments", icon: "📅", desc: "All scheduled visits", color: "text-indigo-600 bg-indigo-50 border-indigo-200" },
+                        { label: "Total Leads", icon: "🎯", desc: "Potential new patients", color: "text-purple-600 bg-purple-50 border-purple-200" },
+                        { label: "Total Patients", icon: "👥", desc: "Registered patients count", color: "text-green-600 bg-green-50 border-green-200" },
+                        { label: "Total Revenue", icon: "💰", desc: "Earnings from services", color: "text-orange-600 bg-orange-50 border-orange-200" },
+                      ].map((card) => (
+                        <div key={card.label} className="bg-white border border-gray-200 rounded-xl p-4">
+                          <div className={`text-xl mb-2 w-10 h-10 rounded-lg flex items-center justify-center border ${card.color}`}>{card.icon}</div>
+                          <div className="font-semibold text-gray-900 text-sm">{card.label}</div>
+                          <div className="text-xs text-gray-500 mt-1">{card.desc}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Step 3: Charts & Analytics Widgets */}
+                <div className="relative flex gap-6 mb-8" style={{ zIndex: 1 }}>
+                  <div className="flex-shrink-0 flex flex-col items-center">
+                    <span className="flex items-center justify-center w-10 h-10 bg-purple-600 text-white rounded-full text-base font-bold shadow-md ring-4 ring-purple-100">3</span>
+                  </div>
+                  <div className="flex-1 bg-gradient-to-r from-purple-50 to-violet-50 border border-purple-200 rounded-2xl p-6 shadow-sm">
+                    <h4 className="font-bold text-lg text-purple-900 mb-1">Charts &amp; Analytics Widgets</h4>
+                    <p className="text-sm text-purple-700 mb-4">Nine interactive widgets give you deep insight into clinic performance:</p>
+                    <div className="space-y-2">
+                      {[
+                        { name: "Appointment Status Breakdown", icon: "🥧", desc: "Pie chart: Scheduled, Confirmed, Completed, Cancelled counts" },
+                        { name: "Lead Analytics", icon: "📊", desc: "Bar chart: New, Contacted, Qualified, Converted, Lost leads" },
+                        { name: "Revenue Overview", icon: "📈", desc: "Line/bar chart: revenue trend over selected time period" },
+                        { name: "Most Booked Services", icon: "🏆", desc: "Horizontal bar: services ranked by number of bookings" },
+                        { name: "Most Purchased Memberships", icon: "💎", desc: "Area chart: membership plan popularity and revenue" },
+                        { name: "Top Patients (VIP)", icon: "👑", desc: "Table: highest-spending or most-frequent patients" },
+                        { name: "Commission Details", icon: "💼", desc: "Staff-wise: earned vs paid commissions with counts" },
+                        { name: "Cancellation Trend", icon: "📉", desc: "Line chart: cancellation and no-show rates week by week" },
+                        { name: "Treatment Conversion Rate", icon: "🔄", desc: "Bar chart: leads converted to appointments and treatments" },
+                      ].map((widget, i) => (
+                        <div key={widget.name} className="flex items-center gap-3 bg-white border border-purple-100 rounded-lg px-4 py-2.5">
+                          <span className="flex-shrink-0 w-6 h-6 bg-purple-100 text-purple-700 rounded-full flex items-center justify-center text-xs font-bold">{i + 1}</span>
+                          <span className="text-lg flex-shrink-0">{widget.icon}</span>
+                          <div>
+                            <span className="font-semibold text-purple-900 text-sm">{widget.name}</span>
+                            <p className="text-xs text-purple-600 mt-0.5">{widget.desc}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Step 4: Date Range Filters */}
+                <div className="relative flex gap-6 mb-8" style={{ zIndex: 1 }}>
+                  <div className="flex-shrink-0 flex flex-col items-center">
+                    <span className="flex items-center justify-center w-10 h-10 bg-green-600 text-white rounded-full text-base font-bold shadow-md ring-4 ring-green-100">4</span>
+                  </div>
+                  <div className="flex-1 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-2xl p-6 shadow-sm">
+                    <h4 className="font-bold text-lg text-green-900 mb-1">Date Range Filters</h4>
+                    <p className="text-sm text-green-700 mb-4">All dashboard data updates instantly when you switch between these time ranges:</p>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      {[
+                        { step: "Step 1", label: "Today", desc: "Stats for today only", color: "bg-green-50 border-green-300 text-green-800", dot: "bg-green-500" },
+                        { step: "Step 2", label: "This Week", desc: "Last 7 days data", color: "bg-blue-50 border-blue-300 text-blue-800", dot: "bg-blue-500" },
+                        { step: "Step 3", label: "This Month", desc: "Current month data", color: "bg-purple-50 border-purple-300 text-purple-800", dot: "bg-purple-500" },
+                        { step: "Step 4", label: "Overall", desc: "All-time data", color: "bg-orange-50 border-orange-300 text-orange-800", dot: "bg-orange-500" },
+                      ].map((filter) => (
+                        <div key={filter.label} className={`border-2 rounded-xl p-4 ${filter.color}`}>
+                         
+                          <div className="font-bold text-sm">{filter.label}</div>
+                          <div className="text-xs mt-1 opacity-80">{filter.desc}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Step 5: Sample Data vs Real Data */}
+                <div className="relative flex gap-6 mb-8" style={{ zIndex: 1 }}>
+                  <div className="flex-shrink-0 flex flex-col items-center">
+                    <span className="flex items-center justify-center w-10 h-10 bg-amber-500 text-white rounded-full text-base font-bold shadow-md ring-4 ring-amber-100">5</span>
+                  </div>
+                  <div className="flex-1 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-2xl p-6 shadow-sm">
+                    <h4 className="font-bold text-lg text-amber-900 mb-1">Sample Data vs Real Data</h4>
+                    <p className="text-sm text-amber-700 mb-4">When you first register, the system shows sample/demo data for 2 days. Here's the transition process:</p>
+                    <div className="flex flex-col md:flex-row gap-2 items-stretch">
+                      {/* Step A */}
+                      <div className="flex-1 bg-blue-50 border border-blue-200 rounded-xl p-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">A</span>
+                          <span className="font-semibold text-blue-900 text-sm">Days 1–2 · Sample Data Active</span>
+                        </div>
+                        <p className="text-xs text-blue-700">Realistic demo data fills all dashboard sections so you can explore the platform before your own data appears.</p>
+                      </div>
+                      {/* Arrow */}
+                      <div className="hidden md:flex items-center text-amber-400 text-2xl px-1">→</div>
+                      {/* Step B */}
+                      <div className="flex-1 bg-green-50 border border-green-200 rounded-xl p-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="w-6 h-6 bg-green-600 text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">B</span>
+                          <span className="font-semibold text-green-900 text-sm">Real Activity · Data Switches</span>
+                        </div>
+                        <p className="text-xs text-green-700">The moment you add a patient, appointment, lead, or billing — the system switches to your real data immediately.</p>
+                      </div>
+                      {/* Arrow */}
+                      <div className="hidden md:flex items-center text-amber-400 text-2xl px-1">→</div>
+                      {/* Step C */}
+                      <div className="flex-1 bg-gray-50 border border-gray-200 rounded-xl p-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="w-6 h-6 bg-gray-600 text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">C</span>
+                          <span className="font-semibold text-gray-900 text-sm">After Day 2 · Demo Removed</span>
+                        </div>
+                        <p className="text-xs text-gray-600">Sample data disappears. If no real activity exists yet, sections appear empty until you start using the platform.</p>
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Module Access Section */}
-              <div className="bg-gradient-to-r from-purple-50 to-violet-50 border-l-4 border-purple-500 p-8 mb-10 rounded-r-lg">
-                <h4 className="font-bold text-lg text-purple-900 mb-5 flex items-center gap-2">
-                  <span className="flex items-center justify-center w-10 h-10 bg-purple-600 text-white rounded-full text-base font-bold">3</span>
-                  Quick Module Access
-                </h4>
-                <div className="ml-12 space-y-4">
-                  <p className="text-base text-purple-800 leading-relaxed">
-                    Visual module cards providing one-click access to all clinic features:
-                  </p>
-                  <ul className="list-disc list-inside space-y-3 text-base text-purple-700">
-                    <li><strong>Business Management:</strong> Health center settings, offers, packages, services</li>
-                    <li><strong>HR Management:</strong> Staff management, job postings, commissions, referrals</li>
-                    <li><strong>Marketing:</strong> Lead generation, WhatsApp campaigns, reviews management</li>
-                    <li><strong>Content & SEO:</strong> Blog writing, content optimization tools</li>
-                    <li><strong>Patients & Appointments:</strong> Patient records, booking scheduler, complaints</li>
-                    <li><strong>Reports & Analytics:</strong> Financial reports, petty cash, performance analytics</li>
-                    <li><strong>Stock Management:</strong> Inventory tracking, purchase orders, suppliers</li>
-                    <li><strong>Security & Privacy:</strong> User permissions, authentication settings</li>
-                  </ul>
-                  
-                  {/* Image Section - Module Cards */}
-                  <div className="w-full bg-purple-50 rounded-xl border border-purple-200 p-6 mb-8">
-                    <h3 className="text-xl font-bold text-gray-800 mb-4">
-                      Module Access Cards
-                    </h3>
-                    <div className="bg-white rounded-lg border-2 border-purple-200 flex flex-col items-center justify-center relative overflow-hidden group shadow-sm" style={{ minHeight: '500px', maxHeight: '600px' }}>
-                      <img 
-                        src="/dashboard-modules.png" 
-                        alt="Dashboard Module Cards" 
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.style.display = 'none';
-                          target.parentElement?.querySelector('.placeholder-modules')?.classList.remove('hidden');
-                        }}
-                      />
-                      <div className="placeholder-modules hidden absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-purple-50 to-violet-50 text-gray-500">
-                        <Building2 className="w-16 h-16 mb-4 text-purple-300" />
-                        <p className="text-lg font-medium">Module Access Cards</p>
-                        <p className="text-sm mt-2">Screenshot will appear here</p>
-                      </div>
+                {/* Step 6: Quick Tips */}
+                <div className="relative flex gap-6" style={{ zIndex: 1 }}>
+                  <div className="flex-shrink-0 flex flex-col items-center">
+                    <span className="flex items-center justify-center w-10 h-10 bg-teal-600 text-white rounded-full text-base font-bold shadow-md ring-4 ring-teal-100">6</span>
+                  </div>
+                  <div className="flex-1 bg-gradient-to-r from-teal-50 to-blue-50 border border-teal-200 rounded-2xl p-6 shadow-sm">
+                    <h4 className="font-bold text-lg text-teal-900 mb-1">Quick Tips</h4>
+                    <p className="text-sm text-teal-700 mb-4">Follow these tips to get the most out of your dashboard:</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      {[
+                        { num: 1, tip: "Use 'Overall' filter to see your clinic's complete performance history." },
+                        { num: 2, tip: "Revenue widgets update in real time as appointments are billed." },
+                        { num: 3, tip: "Lead Analytics help you identify which lead stages need more attention." },
+                        { num: 4, tip: "Cancellation Trend helps you reduce no-shows with targeted reminders." },
+                        { num: 5, tip: "Commission Details ensure your staff payouts are transparent and accurate." },
+                        { num: 6, tip: "Top Patients widget helps you identify and retain your VIP patients." },
+                      ].map(({ num, tip }) => (
+                        <div key={num} className="flex items-start gap-3 bg-white border border-teal-100 rounded-lg px-4 py-3">
+                          <span className="flex-shrink-0 w-6 h-6 bg-teal-600 text-white rounded-full flex items-center justify-center text-xs font-bold mt-0.5">{num}</span>
+                          <p className="text-sm text-teal-900">{tip}</p>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Activity Feed Section */}
-              <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-l-4 border-green-500 p-8 mb-10 rounded-r-lg">
-                <h4 className="font-bold text-lg text-green-900 mb-5 flex items-center gap-2">
-                  <span className="flex items-center justify-center w-10 h-10 bg-green-600 text-white rounded-full text-base font-bold">4</span>
-                  Recent Activity & Notifications
-                </h4>
-                <div className="ml-12 space-y-4">
-                  <p className="text-base text-green-800 leading-relaxed">
-                    Stay updated with real-time clinic activities and important alerts:
-                  </p>
-                  <ul className="list-disc list-inside space-y-3 text-base text-green-700">
-                    <li><strong>Recent Appointments:</strong> Latest booked and completed appointments</li>
-                    <li><strong>New Patient Registrations:</strong> Recently added patient profiles</li>
-                    <li><strong>Payment Updates:</strong> Payment received and pending notifications</li>
-                    <li><strong>System Alerts:</strong> Important announcements and reminders</li>
-                    <li><strong>Activity Timeline:</strong> Chronological feed of all clinic events</li>
-                    <li><strong>Quick Actions:</strong> Direct links to perform common tasks</li>
-                  </ul>
-                  
-                  {/* Image Section - Activity Feed */}
-                  <div className="w-full bg-green-50 rounded-xl border border-green-200 p-6 mb-8">
-                    <h3 className="text-xl font-bold text-gray-800 mb-4">
-                      Activity Feed & Notifications
-                    </h3>
-                    <div className="bg-white rounded-lg border-2 border-green-200 flex flex-col items-center justify-center relative overflow-hidden group shadow-sm" style={{ minHeight: '500px', maxHeight: '600px' }}>
-                      <img 
-                        src="/dashboard-activity-feed.png" 
-                        alt="Dashboard Activity Feed" 
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.style.display = 'none';
-                          target.parentElement?.querySelector('.placeholder-activity')?.classList.remove('hidden');
-                        }}
-                      />
-                      <div className="placeholder-activity hidden absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-green-50 to-emerald-50 text-gray-500">
-                        <Building2 className="w-16 h-16 mb-4 text-green-300" />
-                        <p className="text-lg font-medium">Activity Feed</p>
-                        <p className="text-sm mt-2">Screenshot will appear here</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Dashboard Features Summary */}
-              <div className="bg-gradient-to-r from-teal-50 to-blue-50 border-l-4 border-teal-500 p-8 rounded-lg">
-                <h4 className="font-bold text-xl text-teal-900 mb-4">Key Dashboard Features</h4>
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div>
-                    <h5 className="font-semibold text-teal-800 mb-2">Navigation & Access:</h5>
-                    <ul className="space-y-2 text-sm text-teal-700">
-                      <li><strong>Sidebar Menu:</strong> Collapsible navigation panel</li>
-                      <li><strong>Breadcrumb Trail:</strong> Shows current location path</li>
-                      <li><strong>Search Function:</strong> Quick search across modules</li>
-                      <li><strong>Favorites:</strong> Pin frequently used modules</li>
-                    </ul>
-                  </div>
-                  <div>
-                    <h5 className="font-semibold text-teal-800 mb-2">Data Visualization:</h5>
-                    <ul className="space-y-2 text-sm text-teal-700">
-                      <li><strong>Interactive Charts:</strong> Click to view detailed analytics</li>
-                      <li><strong>Real-time Updates:</strong> Auto-refresh for live data</li>
-                      <li><strong>Export Options:</strong> Download reports as PDF/Excel</li>
-                      <li><strong>Date Filters:</strong> Custom date range selection</li>
-                    </ul>
-                  </div>
-                  <div>
-                    <h5 className="font-semibold text-teal-800 mb-2">User Experience:</h5>
-                    <ul className="space-y-2 text-sm text-teal-700">
-                      <li><strong>Responsive Layout:</strong> Adapts to all screen sizes</li>
-                      <li><strong>Dark Mode:</strong> Toggle light/dark themes</li>
-                      <li><strong>Keyboard Shortcuts:</strong> Power user navigation</li>
-                      <li><strong>Tooltips:</strong> Helpful hints on hover</li>
-                    </ul>
-                  </div>
-                  <div>
-                    <h5 className="font-semibold text-teal-800 mb-2">Performance:</h5>
-                    <ul className="space-y-2 text-sm text-teal-700">
-                      <li><strong>Fast Loading:</strong> Optimized data fetching</li>
-                      <li><strong>Caching:</strong> Smart data caching for speed</li>
-                      <li><strong>Error Handling:</strong> Graceful error messages</li>
-                      <li><strong>Offline Support:</strong> Limited functionality offline</li>
-                    </ul>
-                  </div>
-                </div>
               </div>
             </div>
           </div>

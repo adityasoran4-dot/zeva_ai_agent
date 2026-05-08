@@ -4,6 +4,7 @@ import Clinic from '../../../models/Clinic';
 import Service from '../../../models/Service';
 import { getUserFromReq } from '../lead-ms/auth';
 import { getClinicIdFromUser } from '../lead-ms/permissions-helper';
+import { isNewClinicInMockPeriod, generateMockBillingStats } from '../../../lib/mockDataGenerator';
 
 export default async function handler(req, res) {
   await dbConnect();
@@ -37,6 +38,65 @@ export default async function handler(req, res) {
 
     if (!clinic) {
       return res.status(404).json({ success: false, message: 'Clinic not found' });
+    }
+
+    // Check if clinic is within 2-day mock data period
+    const isInMockPeriod = isNewClinicInMockPeriod(clinic.registeredAt);
+    
+    // If in mock period, check if they have any real billing data
+    let hasRealData = false;
+    if (isInMockPeriod) {
+      const { filter, startDate, endDate, date } = req.query;
+      let startOfDay, endOfDay;
+      const now = new Date();
+
+      if (filter === 'today') {
+        const queryDate = date ? new Date(date) : now;
+        startOfDay = new Date(queryDate);
+        startOfDay.setHours(0, 0, 0, 0);
+        endOfDay = new Date(queryDate);
+        endOfDay.setHours(23, 59, 59, 999);
+      } else if (filter === 'month') {
+        if (startDate && endDate) {
+          startOfDay = new Date(startDate);
+          startOfDay.setHours(0, 0, 0, 0);
+          endOfDay = new Date(endDate);
+          endOfDay.setHours(23, 59, 59, 999);
+        } else {
+          startOfDay = new Date(now.getFullYear(), now.getMonth(), 1);
+          endOfDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        }
+      } else if (filter === 'overall') {
+        startOfDay = new Date(0);
+        endOfDay = new Date();
+        endOfDay.setHours(23, 59, 59, 999);
+      } else {
+        startOfDay = new Date(now);
+        startOfDay.setHours(0, 0, 0, 0);
+        endOfDay = new Date(now);
+        endOfDay.setHours(23, 59, 59, 999);
+      }
+
+      const billingCount = await Billing.countDocuments({
+        clinicId: clinic._id,
+        createdAt: { $gte: startOfDay, $lte: endOfDay }
+      });
+      
+      hasRealData = billingCount > 0;
+    }
+    
+    // If in mock period AND no real data, return mock data
+    if (isInMockPeriod && !hasRealData) {
+      console.log('📊 Returning mock billing stats for new clinic:', clinic._id);
+      const mockData = generateMockBillingStats();
+      
+      return res.status(200).json({
+        success: true,
+        topPackages: mockData.topPackages,
+        topServices: mockData.topServices,
+        isMockData: true,
+        message: 'Showing sample billing data for new clinic!',
+      });
     }
 
     // Get filter type and date range from query

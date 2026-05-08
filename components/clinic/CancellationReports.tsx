@@ -74,12 +74,18 @@ const CancellationReports: React.FC<CancellationReportsProps> = ({
         });
 
       if (res.data.success) {
-       setCancellationTrend(res.data.data.cancellationTrend || []);
-       setCancellationReasons(res.data.data.cancellationReasons || []);
-       setNoShowPatientList(res.data.data.noShowPatientList || []);
-       setCurrentPage(1); // Reset to first page when data changes
+        // Handle both mock data (root level) and real data (nested under data)
+        const responseData = res.data.data || res.data;
+        setCancellationTrend(responseData.cancellationTrend || []);
+        setCancellationReasons(responseData.cancellationReasons || []);
+        setNoShowPatientList(responseData.noShowPatientList || responseData.noShowAppointments || []);
+        setCurrentPage(1); // Reset to first page when data changes
+        
+        if (res.data.isMockData) {
+          console.log('📊 Showing mock cancellation reports');
+        }
       } else {
-       setError(res.data.message || 'Failed to fetch data');
+        setError(res.data.message || 'Failed to fetch data');
       }
       } catch (err: any) {
       console.error('Error fetching cancellation reports:', err);

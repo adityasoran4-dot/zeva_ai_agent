@@ -2,6 +2,10 @@ import dbConnect from "../../../../lib/database";
 import { getUserFromReq } from "../../lead-ms/auth";
 import { getClinicIdFromUser, checkClinicPermission } from "../../lead-ms/permissions-helper";
 import mongoose from "mongoose";
+import Clinic from "../../../../models/Clinic";
+import { isNewClinicInMockPeriod } from "../../../../lib/mockDataGenerator";
+
+const randomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 
 export default async function handler(req, res) {
   if (req.method !== "GET") {
@@ -31,6 +35,66 @@ export default async function handler(req, res) {
   const { hasPermission } = await checkClinicPermission(clinicId, moduleKey, "read");
   if (!hasPermission) {
     return res.status(403).json({ success: false, message: "You do not have permission to view reports" });
+  }
+
+  // Get clinic to check registeredAt
+  let clinic = null;
+  if (user.role === "clinic") {
+    clinic = await Clinic.findOne({ owner: user._id });
+  } else if (clinicId) {
+    clinic = await Clinic.findById(clinicId);
+  }
+
+  // Check if clinic is within 2-day mock data period and has no real data
+  if (clinic && isNewClinicInMockPeriod(clinic.registeredAt)) {
+    const appointmentCount = await mongoose.connection.collection("appointments").countDocuments({
+      clinicId: targetClinicId,
+      ...(qStart || qEnd ? {
+        startDate: {
+          ...(qStart ? { $gte: qStart } : {}),
+          ...(qEnd ? { $lte: qEnd } : {})
+        }
+      } : {})
+    });
+
+    if (appointmentCount === 0) {
+      console.log('📊 Returning mock appointment stats for new clinic:', clinic._id);
+      
+      return res.status(200).json({
+        success: true,
+        data: {
+          statusCounts: {
+            completed: randomInt(20, 60),
+            booked: randomInt(10, 30),
+            cancelled: randomInt(3, 10),
+            noShow: randomInt(2, 8),
+            pending: randomInt(5, 15),
+          },
+          dailyTrend: [
+            { date: 'Mon', appointments: randomInt(10, 30) },
+            { date: 'Tue', appointments: randomInt(10, 30) },
+            { date: 'Wed', appointments: randomInt(10, 30) },
+            { date: 'Thu', appointments: randomInt(10, 30) },
+            { date: 'Fri', appointments: randomInt(10, 30) },
+            { date: 'Sat', appointments: randomInt(5, 20) },
+            { date: 'Sun', appointments: randomInt(2, 10) },
+          ],
+          doctorPerformance: [
+            { doctorId: new mongoose.Types.ObjectId(), doctorName: 'Dr. Smith', totalAppointments: randomInt(15, 50), revenue: randomInt(5000, 20000) },
+            { doctorId: new mongoose.Types.ObjectId(), doctorName: 'Dr. Johnson', totalAppointments: randomInt(12, 45), revenue: randomInt(4000, 18000) },
+            { doctorId: new mongoose.Types.ObjectId(), doctorName: 'Dr. Williams', totalAppointments: randomInt(10, 40), revenue: randomInt(3500, 15000) },
+          ],
+          summary: {
+            totalAppointments: randomInt(50, 150),
+            completionRate: randomInt(60, 85),
+            cancellationRate: randomInt(5, 15),
+            noShowRate: randomInt(3, 10),
+          },
+        },
+        isMockData: true,
+        message: 'Showing sample appointment data for new clinic!',
+      });
+    }
   }
 
   const parseId = (v) => {

@@ -3,6 +3,7 @@ import Offer from '../../../models/CreateOffer';
 import Clinic from '../../../models/Clinic';
 import { getUserFromReq } from '../lead-ms/auth';
 import { getClinicIdFromUser } from '../lead-ms/permissions-helper';
+import { isNewClinicInMockPeriod, generateMockOfferStats } from '../../../lib/mockDataGenerator';
 
 export default async function handler(req, res) {
   await dbConnect();
@@ -36,6 +37,35 @@ export default async function handler(req, res) {
 
     if (!clinic) {
       return res.status(404).json({ success: false, message: 'Clinic not found' });
+    }
+
+    // Check if clinic is within 2-day mock data period
+    const isInMockPeriod = isNewClinicInMockPeriod(clinic.registeredAt);
+    
+    // If in mock period, check if they have any real offer data
+    let hasRealData = false;
+    if (isInMockPeriod) {
+      const offerCount = await Offer.countDocuments({
+        clinicId: clinic._id
+      });
+      
+      hasRealData = offerCount > 0;
+    }
+    
+    // If in mock period AND no real data, return mock data
+    if (isInMockPeriod && !hasRealData) {
+      console.log('📊 Returning mock offer stats for new clinic:', clinic._id);
+      const mockData = generateMockOfferStats();
+      
+      return res.status(200).json({
+        success: true,
+        offerStatusBreakdown: mockData.statusData.reduce((acc, item) => {
+          acc[item.name] = item.value;
+          return acc;
+        }, {}),
+        isMockData: true,
+        message: 'Showing sample offer data for new clinic!',
+      });
     }
 
     // Get filter type and date range from query

@@ -51,9 +51,9 @@ export default async function handler(req, res) {
       });
     }
 
-    // Verify user is an agent or doctorStaff for agent permission logic
-    if (!['agent', 'doctorStaff'].includes(me.role)) {
-      return res.status(403).json({ success: false, message: 'Access denied. Agent role required' });
+    // Verify user is an agent, doctorStaff, or staff for agent permission logic
+    if (!['agent', 'doctorStaff', 'staff'].includes(me.role)) {
+      return res.status(403).json({ success: false, message: 'Access denied. Agent/Staff role required' });
     }
 
     // Get module permissions for agents

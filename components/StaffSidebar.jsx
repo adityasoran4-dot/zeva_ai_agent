@@ -158,7 +158,7 @@ const Sidebar = () => {
         icon: "🧑‍⚕️", 
         description: "View & Manage Patients" 
       },
-      { 
+      {
         label: "Add Treatment", 
         path: "/staff/add-treatment", 
         icon: "➕", 

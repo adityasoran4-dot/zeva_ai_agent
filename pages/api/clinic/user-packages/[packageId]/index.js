@@ -1,6 +1,7 @@
 import dbConnect from "../../../../../lib/database";
 import UserPackage from "../../../../../models/UserPackage";
 import { getAuthorizedStaffUser } from "../../../../../server/staff/authHelpers";
+import { getClinicIdFromUser } from "../../../lead-ms/permissions-helper";
 
 export default async function handler(req, res) {
   await dbConnect();
@@ -13,7 +14,7 @@ export default async function handler(req, res) {
 
   let user;
   try {
-    user = await getAuthorizedStaffUser(req, { allowedRoles: ["clinic", "staff", "admin"] });
+    user = await getAuthorizedStaffUser(req, { allowedRoles: ["clinic", "agent", "doctorStaff","admin"] });
   } catch (err) {
     return res.status(err.status || 401).json({ success: false, message: err.message || "Authentication error" });
   }
@@ -27,7 +28,16 @@ export default async function handler(req, res) {
   if (method === 'PATCH') {
     try {
       const { action } = req.body;
-      const clinicId = user.clinicId;
+      
+      // Get clinicId using the helper function
+      const { clinicId, error: clinicError } = await getClinicIdFromUser(user);
+       
+      if (clinicError || !clinicId) {
+        return res.status(403).json({ 
+          success: false,
+          message: clinicError || "Unable to determine clinic access" 
+        });
+      }
 
       const pkg = await UserPackage.findOne({ _id: packageId, clinicId }).populate('patientId', 'firstName lastName emrNumber');
       

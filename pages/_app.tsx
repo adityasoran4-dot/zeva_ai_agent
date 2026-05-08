@@ -79,7 +79,7 @@ function MyApp({ Component, pageProps }: AppPropsWithLayout) {
     Component.getLayout || ((page: ReactNode) => <Layout>{page}</Layout>);
 
   // Check if current route should have no layout
-  const noLayoutRoutes = ["/consent-success", "/clinic-management-software-india", "/clinic/billing-history"];
+  const noLayoutRoutes = ["/consent-success", "/clinic-management-software-india", "/clinic/billing-history", "/demo-thank-you"];
   if (noLayoutRoutes.includes(router.pathname)) {
     getLayout = (page: ReactNode) => <>{page}</>;
   }
@@ -560,7 +560,7 @@ function MyApp({ Component, pageProps }: AppPropsWithLayout) {
         containerStyle={{
           top: 8,
           right: 8,
-          zIndex: 9999,
+          zIndex: 10000,
         }}
         toastOptions={{
           duration: 4000,

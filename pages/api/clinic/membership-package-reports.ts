@@ -2,9 +2,11 @@ import dbConnect from "../../../lib/database";
 import PatientRegistration from "../../../models/PatientRegistration";
 import MembershipPlan from "../../../models/MembershipPlan";
 import Package from "../../../models/Package";
+import Clinic from "../../../models/Clinic";
 import { getAuthorizedStaffUser } from "../../../server/staff/authHelpers";
 import { getClinicIdFromUser, checkClinicPermission } from "../lead-ms/permissions-helper";
 import { NextApiRequest, NextApiResponse } from 'next';
+import { isNewClinicInMockPeriod, generateMockMembershipPackageReports } from '../../../lib/mockDataGenerator';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   await dbConnect();
@@ -35,6 +37,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       success: false,
       message: clinicError || "Unable to determine clinic access",
     });
+  }
+
+  // Get clinic to check registeredAt
+  let clinic = null;
+  if (user.role === "clinic") {
+    clinic = await Clinic.findOne({ owner: user._id });
+  } else if (clinicId) {
+    clinic = await Clinic.findById(clinicId);
+  }
+
+  // Check if clinic is within 2-day mock data period
+  if (clinic && isNewClinicInMockPeriod(clinic.registeredAt)) {
+    // Check if they have any real patient/package data
+    const patientCount = await PatientRegistration.countDocuments({ clinicId });
+    
+    if (patientCount === 0) {
+      console.log('📊 Returning mock membership/package reports for new clinic:', clinic._id);
+      const mockData = generateMockMembershipPackageReports();
+      
+      return res.status(200).json({
+        success: true,
+        data: mockData,
+        isMockData: true,
+        message: 'Showing sample membership & package data for new clinic!',
+      });
+    }
   }
 
   const moduleKey = "Clinic_services_setup";

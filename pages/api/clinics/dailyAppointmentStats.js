@@ -12,6 +12,7 @@ import Membership from '../../../models/Membership';
 import User from '../../../models/Users';
 import { getUserFromReq } from '../lead-ms/auth';
 import { getClinicIdFromUser } from '../lead-ms/permissions-helper';
+import { isNewClinicInMockPeriod, generateMockDailyStats } from '../../../lib/mockDataGenerator';
 
 export default async function handler(req, res) {
   await dbConnect();
@@ -47,6 +48,60 @@ export default async function handler(req, res) {
 
     if (!clinic) {
       return res.status(404).json({ success: false, message: 'Clinic not found' });
+    }
+
+    // Check if clinic is within 2-day mock data period (only for new users with registeredAt)
+    const isInMockPeriod = isNewClinicInMockPeriod(clinic.registeredAt);
+    
+    // If in mock period, check if they have any real activity for the requested date
+    let hasRealData = false;
+    if (isInMockPeriod) {
+      // Get date from query, default to today
+      const { date } = req.query;
+      let queryDate;
+      if (date) {
+        queryDate = new Date(date);
+      } else {
+        queryDate = new Date();
+      }
+      
+      const startOfDay = new Date(queryDate);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(queryDate);
+      endOfDay.setHours(23, 59, 59, 999);
+      
+      // Quick check for any real data on this date
+      const [appointmentCount, leadCount, patientCount] = await Promise.all([
+        Appointment.countDocuments({ 
+          clinicId: clinic._id,
+          startDate: { $gte: startOfDay, $lte: endOfDay }
+        }),
+        Lead.countDocuments({ 
+          clinicId: clinic._id,
+          createdAt: { $gte: startOfDay, $lte: endOfDay }
+        }),
+        PatientRegistration.countDocuments({ 
+          userId: { $in: [clinic.owner] },
+          createdAt: { $gte: startOfDay, $lte: endOfDay }
+        }),
+      ]);
+      
+      hasRealData = appointmentCount > 0 || leadCount > 0 || patientCount > 0;
+    }
+    
+    // If in mock period AND no real data, return mock data
+    if (isInMockPeriod && !hasRealData) {
+      console.log('📊 Returning mock daily stats for new clinic:', clinic._id);
+      const mockStats = generateMockDailyStats();
+      
+      return res.status(200).json({
+        success: true,
+        stats: mockStats,
+        daily: mockStats.daily,
+        totals: mockStats.totals,
+        isMockData: true,
+        message: 'Showing sample daily data for new clinic - start adding real data to see actual stats!',
+      });
     }
 
     // Get all user IDs associated with this clinic (owner + all users with clinicId)

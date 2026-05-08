@@ -28,6 +28,7 @@ export default async function handler(req, res) {
   const query = {
     isApproved: true,
     declined: { $ne: true }, // Ensure not declined
+    name: { $not: /zeva/i }, // Exclude Zeva clinics
     location: {
       $near: {
         $geometry: {
@@ -330,6 +331,8 @@ export default async function handler(req, res) {
 
       const queryWithoutLocation = { ...query };
       delete queryWithoutLocation.location;
+      // Ensure Zeva is still excluded in fallback query
+      queryWithoutLocation.name = { $not: /zeva/i };
 
       console.log(
         "Query without location:",
@@ -552,6 +555,7 @@ export default async function handler(req, res) {
           name: {
             $regex:
               /ramacare|rama care|ramacare polyclinic|rama care polyclinic/i,
+            $not: /zeva/i, // Exclude Zeva clinics
           },
           address: { $regex: /dubai/i },
           isApproved: true,

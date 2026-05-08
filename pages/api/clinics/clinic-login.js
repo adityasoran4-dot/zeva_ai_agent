@@ -39,7 +39,7 @@ export default async function handler(req, res) {
     }
     console.log('clinic details', clinic);
 
-    // 🔍 Check 2-hour trial period (only for new users with registeredAt field)
+    // 🔍 Check 30-day trial period (only for new users with registeredAt field)
     // Legacy users (registeredAt is null) are exempt from trial restriction
     let isTrialExpired = false;
     let hoursRemaining = 999; // Large number for legacy users
@@ -47,11 +47,11 @@ export default async function handler(req, res) {
     let trialEndDate = null;
     
     if (clinic.registeredAt) {
-      // New user - apply 2-hour trial logic
+      // New user - apply 30-day trial logic
       const accountCreatedAt = clinic.registeredAt;
       const currentDate = new Date();
       trialEndDate = new Date(accountCreatedAt);
-      trialEndDate.setHours(trialEndDate.getHours() + 2); // 2 hours trial
+      trialEndDate.setDate(trialEndDate.getDate() + 30); // 30 days trial
 
       isTrialExpired = currentDate > trialEndDate;
       hoursRemaining = Math.max(0, Math.ceil((trialEndDate - currentDate) / (1000 * 60 * 60)));

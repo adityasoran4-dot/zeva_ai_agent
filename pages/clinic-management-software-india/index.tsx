@@ -138,7 +138,7 @@ function HeroSection() {
             {/* Badge */}
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-blue-100 bg-blue-50 text-sm font-medium text-blue-700">
               <CheckCircle className="w-4 h-4 text-blue-600" />
-              Trusted by 100+ Clinics Across India
+              Trusted by 100+ Clinics Across World
             </div>
 
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight text-gray-900">
@@ -819,7 +819,7 @@ function ReviewsSection() {
         <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 mb-5 leading-tight">
           Trusted by{" "}
           <span className="text-blue-600">Leading Clinics</span>
-          <br />Across India
+          <br />Across World
         </h2>
         <p className="text-gray-500 text-lg mb-14 max-w-2xl mx-auto">
           Real doctors, real results. See what clinic owners are saying about ZEVA

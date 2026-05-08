@@ -24,8 +24,8 @@ export default async function handler(req, res) {
         .json({ success: false, message: "User not authenticated" });
     }
 
-    // Allow clinics, agents, doctors, doctorStaff, and admins
-    if (!requireRole(user, ["clinic", "agent", "admin", "doctor", "doctorStaff"])) {
+    // Allow clinics, agents, doctors, doctorStaff, staff, and admins
+    if (!requireRole(user, ["clinic", "agent", "admin", "doctor", "doctorStaff", "staff"])) {
       return res.status(403).json({ success: false, message: "Access denied" });
     }
 
@@ -39,8 +39,8 @@ export default async function handler(req, res) {
           .json({ success: false, message: "Clinic not found for this user" });
       }
       clinicId = clinic._id;
-    } else if (user.role === "agent" || user.role === "doctorStaff") {
-      // agent and doctorStaff must have clinicId
+    } else if (user.role === "agent" || user.role === "doctorStaff" || user.role === "staff") {
+      // agent, doctorStaff, and staff must have clinicId
       if (!user.clinicId) {
         return res
           .status(403)
@@ -62,8 +62,8 @@ export default async function handler(req, res) {
       }
     }
 
-    // ✅ Check permission for reading offers (only for doctorStaff and agent, clinic/admin/doctor bypass)
-    if (!["admin", "clinic", "doctor"].includes(user.role) && clinicId) {
+    // ✅ Check permission for reading offers (only for doctorStaff and agent, clinic/admin/doctor/staff bypass)
+    if (!["admin", "clinic", "doctor", "staff"].includes(user.role) && clinicId) {
       // If user is doctorStaff or agent, check read permission for create_offers module
       if (['agent', 'doctorStaff'].includes(user.role)) {
         const { hasPermission, error: permissionError } = await checkAgentPermission(
@@ -110,13 +110,35 @@ export default async function handler(req, res) {
       .sort({ createdAt: -1 })
       .lean();
 
-    // Compute expired status in-memory without DB write (only for active offers)
+    // Compute expired status in-memory and update database for expired offers
+    const expiredOfferIds = [];
+    
     const shapedOffers = offers.map((offer) => {
+      // If offer is active but end date has passed, mark as expired
+      const isDateExpired = offer.endsAt && new Date(offer.endsAt) < now;
+      const shouldBeExpired = isDateExpired && offer.status === "active";
+      
+      if (shouldBeExpired) {
+        // Track this offer ID to update in database
+        expiredOfferIds.push(offer._id);
+      }
+      
       return {
         ...offer,
-        status: offer.endsAt && new Date(offer.endsAt) < now && offer.status === "active" ? "expired" : offer.status,
+        status: shouldBeExpired ? "expired" : offer.status,
       };
     });
+    
+    // Update all expired offers in database (fire and forget - don't block response)
+    if (expiredOfferIds.length > 0) {
+      console.log(`[OfferExpiry] Auto-expiring ${expiredOfferIds.length} offers:`, expiredOfferIds);
+      Offer.updateMany(
+        { _id: { $in: expiredOfferIds } },
+        { $set: { status: "expired", updatedAt: now } }
+      ).catch(err => {
+        console.error('[OfferExpiry] Failed to update expired offers in DB:', err);
+      });
+    }
 
     // Light caching for 5s (client-side private cache)
     res.setHeader("Cache-Control", "private, max-age=5, stale-while-revalidate=30");

@@ -8,6 +8,7 @@ import { getUserFromReq } from "../lead-ms/auth";
 import { getClinicIdFromUser, checkClinicPermission } from "../lead-ms/permissions-helper";
 import dayjs from"dayjs";
 import mongoose from "mongoose";
+import { isNewClinicInMockPeriod, generateMockDoctorPerformance } from "../../../lib/mockDataGenerator";
 
 export default async function handler(req, res) {
   await dbConnect();
@@ -38,7 +39,68 @@ export default async function handler(req, res) {
   // GET: Fetch doctor performance data
   if (req.method === "GET") {
     try {
-  const { hasPermission, error: permError } = await checkClinicPermission(
+      // Get clinic to check registeredAt
+      const clinic = await Clinic.findById(clinicId);
+      
+      // Check if clinic is within 2-day mock data period
+      const isInMockPeriod = isNewClinicInMockPeriod(clinic?.registeredAt);
+      
+      // If in mock period, check if they have any real appointment data
+      let hasRealData = false;
+      if (isInMockPeriod && clinic) {
+        const { filter, date, startDate, endDate } = req.query;
+        let queryStartDate = null;
+        let queryEndDate = null;
+
+        if (filter === 'today') {
+          const baseDate = date ? dayjs(date) : dayjs();
+          queryStartDate = baseDate.startOf('day').toDate();
+          queryEndDate = baseDate.endOf('day').toDate();
+        } else if (filter === 'week') {
+          const end = date ? dayjs(date) : dayjs();
+          const start = end.subtract(6, 'day');
+          queryStartDate = start.startOf('day').toDate();
+          queryEndDate = end.endOf('day').toDate();
+        } else if (filter === 'month') {
+          const end = date ? dayjs(date) : dayjs();
+          const start = end.subtract(30, 'day');
+          queryStartDate = start.startOf('day').toDate();
+          queryEndDate = end.endOf('day').toDate();
+        } else {
+          const baseDate = dayjs();
+          queryStartDate = baseDate.startOf('month').toDate();
+          queryEndDate = baseDate.endOf('month').toDate();
+        }
+
+        if (startDate && endDate) {
+          queryStartDate = dayjs(startDate).startOf('day').toDate();
+          queryEndDate = dayjs(endDate).endOf('day').toDate();
+        }
+
+        const appointmentCount = await Appointment.countDocuments({
+          clinicId,
+          ...(queryStartDate && queryEndDate ? {
+            startDate: { $gte: queryStartDate, $lte: queryEndDate }
+          } : {})
+        });
+        
+        hasRealData = appointmentCount > 0;
+      }
+      
+      // If in mock period AND no real data, return mock data
+      if (isInMockPeriod && !hasRealData) {
+        console.log('📊 Returning mock doctor performance for new clinic:', clinicId);
+        const mockData = generateMockDoctorPerformance();
+        
+        return res.status(200).json({
+          success: true,
+          data: mockData,
+          isMockData: true,
+          message: 'Showing sample doctor performance data for new clinic!',
+        });
+      }
+
+      const { hasPermission, error: permError } = await checkClinicPermission(
     clinicId,
        "clinic_Appointment",  // Changed to match your clinic's module name
        "read"

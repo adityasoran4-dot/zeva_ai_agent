@@ -165,6 +165,17 @@ const CountryPhoneInput = ({ countryCode, phone, onCountryChange, onPhoneChange 
     );
   }, [query]);
   const selected = useMemo(() => COUNTRY_CODES.find(c => c.code === countryCode) || COUNTRY_CODES.find(c => c.code === "+971"), [countryCode]);
+  
+  // Extract local number (without country code) for display
+  const localNumber = useMemo(() => {
+    if (!phone) return '';
+    if (phone.startsWith(countryCode)) {
+      return phone.slice(countryCode.length);
+    }
+    // If it doesn't start with country code, return as is
+    return phone.replace(/^\+\d+/, '');
+  }, [phone, countryCode]);
+  
   return (
     <div className="relative w-full">
       <div className={`flex items-center border border-gray-300 rounded-md overflow-hidden focus-within:ring-1 focus-within:ring-teal-600`}>
@@ -181,7 +192,7 @@ const CountryPhoneInput = ({ countryCode, phone, onCountryChange, onPhoneChange 
         </button>
         <input
           type="tel"
-          value={phone}
+          value={localNumber}
           onChange={e => onPhoneChange(e.target.value)}
           maxLength={15}
           inputMode="numeric"
@@ -225,7 +236,7 @@ const CountryPhoneInput = ({ countryCode, phone, onCountryChange, onPhoneChange 
 
 const INITIAL_FORM_DATA = {
   invoiceNumber: "", emrNumber: "", firstName: "", lastName: "", email: "",
-  mobileNumber: "+91", countryCode: "+91", gender: "", patientType: "New", referredBy: "No",
+  mobileNumber: "", countryCode: "+91", gender: "", patientType: "New", referredBy: "No",
   insurance: "No", advanceGivenAmount: "", coPayPercent: "", advanceClaimStatus: "Pending",
   insuranceType: "Paid",
   membership: "No", membershipStartDate: "", membershipEndDate: "", membershipId: "",
@@ -256,6 +267,196 @@ const InvoiceManagementSystem = ({ onSuccess, isCompact = false, onCancel }) => 
   const [membershipPackagesEnabled, setMembershipPackagesEnabled] = useState(true);
   const [insuranceEnabled, setInsuranceEnabled] = useState(false);
 
+  // Claim-specific state
+  const [claimData, setClaimData] = useState({
+    insuranceProvider: "",
+    policyNumber: "",
+    expiryDate: "",
+    insuranceCardFile: "",
+    tableOfBenefitsFile: "",
+    departmentId: "",
+    departmentName: "",
+    serviceId: "",
+    serviceName: "",
+    doctorId: "",
+    doctorName: "",
+    claimAmount: "",
+    claimType: "Paid",
+    coPayPercent: "",
+    coPayType: "Patient Pays",
+    notes: "",
+    documentFiles: [],
+    advanceStatus: "Full Pay",
+    advanceAmount: 0,
+  });
+  const [departments, setDepartments] = useState([]);
+  const [services, setServices] = useState([]);
+  const [doctors, setDoctors] = useState([]);
+  const [claimSubmitting, setClaimSubmitting] = useState(false);
+  const [uploadingFiles, setUploadingFiles] = useState(false);
+
+  // Fetch departments, services, and doctors for claim form
+  useEffect(() => {
+    const fetchClaimDropdowns = async () => {
+      try {
+        const headers = getAuthHeaders();
+        if (!headers) return;
+
+        // Fetch departments
+        const deptRes = await fetch("/api/clinic/departments", { headers });
+        if (deptRes.ok) {
+          const deptData = await deptRes.json();
+          if (deptData.success) setDepartments(deptData.departments || []);
+        }
+
+        // Fetch services
+        const svcRes = await fetch("/api/clinic/services", { headers });
+        if (svcRes.ok) {
+          const svcData = await svcRes.json();
+          if (svcData.success) setServices(svcData.services || []);
+        }
+
+        // Fetch doctor staff
+        const docRes = await fetch("/api/admin/get-all-doctor-staff", { headers });
+        if (docRes.ok) {
+          const docData = await docRes.json();
+          if (docData.success) setDoctors(docData.data || []);
+        }
+      } catch (err) {
+        console.error("Error fetching claim dropdowns:", err);
+      }
+    };
+    fetchClaimDropdowns();
+  }, []);
+
+  // Filter services by selected department
+  const filteredServices = useMemo(() => {
+    if (!claimData.departmentId) return services;
+    return services.filter(s => s.departmentId === claimData.departmentId || String(s.departmentId) === String(claimData.departmentId));
+  }, [services, claimData.departmentId]);
+
+  // Handle claim field changes
+  const handleClaimChange = useCallback((e) => {
+    const { name, value } = e.target;
+    setClaimData(prev => {
+      const updated = { ...prev, [name]: value };
+      // Auto-calculate advance amount
+      if (name === "claimAmount" || name === "advanceStatus") {
+        const amt = name === "claimAmount" ? parseFloat(value) || 0 : parseFloat(prev.claimAmount) || 0;
+        const status = name === "advanceStatus" ? value : prev.advanceStatus;
+        if (prev.claimType === "Advance") {
+          updated.advanceAmount = status === "Full Pay" ? amt : amt * 0.5;
+        }
+      }
+      if (name === "claimType" && value !== "Advance") {
+        updated.advanceStatus = "Full Pay";
+        updated.advanceAmount = 0;
+      }
+      if (name === "claimType" && value === "Advance") {
+        const amt = parseFloat(prev.claimAmount) || 0;
+        updated.advanceAmount = prev.advanceStatus === "Full Pay" ? amt : amt * 0.5;
+      }
+      return updated;
+    });
+  }, []);
+
+  // Handle department change - also update departmentName and reset service
+  const handleDepartmentChange = useCallback((e) => {
+    const deptId = e.target.value;
+    const dept = departments.find(d => d._id === deptId);
+    setClaimData(prev => ({
+      ...prev,
+      departmentId: deptId,
+      departmentName: dept ? dept.name : "",
+      serviceId: "",
+      serviceName: "",
+    }));
+  }, [departments]);
+
+  // Handle service change - also update serviceName
+  const handleServiceChange = useCallback((e) => {
+    const svcId = e.target.value;
+    const svc = services.find(s => s._id === svcId);
+    setClaimData(prev => ({
+      ...prev,
+      serviceId: svcId,
+      serviceName: svc ? svc.name : "",
+    }));
+  }, [services]);
+
+  // Handle doctor change - also update doctorName
+  const handleDoctorChange = useCallback((e) => {
+    const docId = e.target.value;
+    const doc = doctors.find(d => d._id === docId);
+    setClaimData(prev => ({
+      ...prev,
+      doctorId: docId,
+      doctorName: doc ? doc.name : "",
+    }));
+  }, [doctors]);
+
+  // Handle file upload for claim
+  const handleClaimFileUpload = useCallback(async (e, field) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    try {
+      setUploadingFiles(true);
+      const headers = getAuthHeaders();
+      const uploadFormData = new FormData();
+      uploadFormData.append(field, file);
+
+      const res = await fetch("/api/clinic/insurance-claims/upload", {
+        method: "POST",
+        headers: { Authorization: headers?.Authorization || "" },
+        body: uploadFormData,
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        if (field === "insuranceCard") {
+          setClaimData(prev => ({ ...prev, insuranceCardFile: data.data.insuranceCardFile }));
+        } else if (field === "tableOfBenefits") {
+          setClaimData(prev => ({ ...prev, tableOfBenefitsFile: data.data.tableOfBenefitsFile }));
+        } else if (field === "documents") {
+          setClaimData(prev => ({ ...prev, documentFiles: [...prev.documentFiles, ...data.data.documentFiles] }));
+        }
+      }
+    } catch (err) {
+      console.error("File upload error:", err);
+    } finally {
+      setUploadingFiles(false);
+    }
+  }, []);
+
+  // Handle claim document upload (multiple)
+  const handleClaimDocumentsUpload = useCallback(async (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+
+    try {
+      setUploadingFiles(true);
+      const headers = getAuthHeaders();
+      const uploadFormData = new FormData();
+      files.forEach(f => uploadFormData.append("documents", f));
+
+      const res = await fetch("/api/clinic/insurance-claims/upload", {
+        method: "POST",
+        headers: { Authorization: headers?.Authorization || "" },
+        body: uploadFormData,
+      });
+
+      const data = await res.json();
+      if (data.success && data.data.documentFiles) {
+        setClaimData(prev => ({ ...prev, documentFiles: [...prev.documentFiles, ...data.data.documentFiles] }));
+      }
+    } catch (err) {
+      console.error("Document upload error:", err);
+    } finally {
+      setUploadingFiles(false);
+    }
+  }, []);
+
   const formatDate = useCallback((dateObj) => {
     const y = dateObj.getFullYear();
     const m = String(dateObj.getMonth() + 1).padStart(2, "0");
@@ -272,6 +473,71 @@ const InvoiceManagementSystem = ({ onSuccess, isCompact = false, onCancel }) => 
   const removeToast = useCallback((id) => {
     setToasts(prev => prev.filter(t => t.id !== id));
   }, []);
+
+  // Submit claim after patient registration (must be after showToast)
+  const submitInsuranceClaim = useCallback(async (patientId) => {
+    try {
+      setClaimSubmitting(true);
+      const headers = getAuthHeaders();
+      const res = await fetch("/api/clinic/insurance-claims", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...headers },
+        body: JSON.stringify({
+          patientId,
+          insuranceProvider: claimData.insuranceProvider,
+          policyNumber: claimData.policyNumber,
+          expiryDate: claimData.expiryDate,
+          insuranceCardFile: claimData.insuranceCardFile,
+          tableOfBenefitsFile: claimData.tableOfBenefitsFile,
+          departmentId: claimData.departmentId,
+          departmentName: claimData.departmentName,
+          serviceId: claimData.serviceId,
+          serviceName: claimData.serviceName,
+          doctorId: claimData.doctorId,
+          doctorName: claimData.doctorName,
+          claimAmount: claimData.claimAmount,
+          claimType: claimData.claimType,
+          coPayPercent: claimData.coPayPercent,
+          coPayType: claimData.coPayType,
+          notes: claimData.notes,
+          documentFiles: claimData.documentFiles,
+          advanceStatus: claimData.advanceStatus,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast("Insurance claim created successfully!", "success");
+        setClaimData({
+          insuranceProvider: "",
+          policyNumber: "",
+          expiryDate: "",
+          insuranceCardFile: "",
+          tableOfBenefitsFile: "",
+          departmentId: "",
+          departmentName: "",
+          serviceId: "",
+          serviceName: "",
+          doctorId: "",
+          doctorName: "",
+          claimAmount: "",
+          claimType: "Paid",
+          coPayPercent: "",
+          coPayType: "Patient Pays",
+          notes: "",
+          documentFiles: [],
+          advanceStatus: "Full Pay",
+          advanceAmount: 0,
+        });
+      } else {
+        showToast(data.message || "Failed to create insurance claim", "error");
+      }
+    } catch (err) {
+      console.error("Claim submission error:", err);
+      showToast("Failed to create insurance claim", "error");
+    } finally {
+      setClaimSubmitting(false);
+    }
+  }, [claimData, showToast]);
 
   useEffect(() => {
     if (!formData.emrNumber) {
@@ -716,6 +982,10 @@ const handleSubmit = useCallback(async () => {
         const data = await res.json();
         
         if (res.ok && data.success) {
+          // If insurance is enabled, submit the claim after patient registration
+          if (insuranceEnabled && formData.insurance === 'Yes' && data.data?._id) {
+            await submitInsuranceClaim(data.data._id);
+          }
           // Show success popup for clinic route
           if (isClinicRoute && isCompact) {
             showToast("Registered successfully!", "success");
@@ -760,7 +1030,7 @@ const handleSubmit = useCallback(async () => {
       setConfirmModal({ isOpen: false, action: null });
     }
   });
-}, [formData, autoFields, currentUser, calculatedFields, validateForm, showToast, router, onSuccess, isCompact]);
+}, [formData, autoFields, currentUser, calculatedFields, validateForm, showToast, router, onSuccess, isCompact, submitInsuranceClaim, insuranceEnabled]);
 
   const resetForm = useCallback(() => {
     setConfirmModal({
@@ -917,28 +1187,25 @@ return (
                     phone={formData.mobileNumber}
                     onCountryChange={(code) => {
                       setFormData(prev => {
-                        // If number already starts with the old code, replace it
-                        // Otherwise, just prepend the new code if the number is empty or doesn't have a code
-                        let newMobile = prev.mobileNumber;
-                        const oldCode = prev.countryCode;
-                        
-                        if (newMobile.startsWith(oldCode)) {
-                          newMobile = code + newMobile.slice(oldCode.length);
-                        } else if (!newMobile.startsWith('+')) {
-                          newMobile = code + newMobile;
+                        // Extract local number from current mobileNumber
+                        let localNum = prev.mobileNumber;
+                        if (localNum.startsWith(prev.countryCode)) {
+                          localNum = localNum.slice(prev.countryCode.length);
                         } else {
-                          // If it starts with a different code already (maybe manual entry), just replace it
-                          // but this is complex, let's keep it simple: always use the new code as prefix
-                          newMobile = code + newMobile.replace(/^\+\d+/, '');
+                          localNum = localNum.replace(/^\+\d+/, '');
                         }
                         
+                        // Prepend new country code
+                        const newMobile = code + localNum;
                         return { ...prev, countryCode: code, mobileNumber: newMobile };
                       });
                     }}
                     onPhoneChange={(val) => {
-                      // Allow digits and the leading '+'
-                      const sanitized = val.replace(/[^\d+]/g, "").slice(0, 15);
-                      setFormData(prev => ({ ...prev, mobileNumber: sanitized }));
+                      // Allow only digits (no + sign in the local number)
+                      const sanitized = val.replace(/[^\d]/g, "").slice(0, 15);
+                      // Prepend country code to the local number
+                      const fullNumber = formData.countryCode + sanitized;
+                      setFormData(prev => ({ ...prev, mobileNumber: fullNumber }));
                       if (errors.mobileNumber) setErrors(prev => ({ ...prev, mobileNumber: "" }));
                     }}
                   />
@@ -1171,67 +1438,162 @@ return (
                     </button>
                   </div>
                   {/* Fixed height container - always same minimum size */}
-                  <div className={`transition-all duration-300 overflow-hidden ${insuranceEnabled ? 'max-h-[2000px]' : 'max-h-0'}`} style={{ minHeight: insuranceEnabled ? 'auto' : '100px' }}>
+                  <div className={`transition-all duration-300 overflow-hidden ${insuranceEnabled ? 'max-h-[5000px]' : 'max-h-0'}`} style={{ minHeight: insuranceEnabled ? 'auto' : '100px' }}>
                     <div className="p-2" style={{ opacity: insuranceEnabled ? 1 : 0, transition: 'opacity 0.3s' }}>
-                      {/* Insurance Details (existing block) */}
-                      <div className={`flex flex-wrap gap-2 items-end`}>
+                      {/* Insurance Toggle */}
+                      <div className="flex flex-wrap gap-2 items-end mb-3">
                         <div className="flex-1 min-w-[120px]">
-                          <label className={`block text-[10px] mb-0.5 font-medium text-gray-700`}>Insurance</label>
+                          <label className="block text-[10px] mb-0.5 font-medium text-gray-700">Insurance</label>
                           <select name="insurance" value={formData.insurance} onChange={handleInputChange} className="w-full px-2 py-1 text-[10px] border border-gray-300 rounded-md focus:ring-1 focus:ring-indigo-500 text-gray-900">
                             <option value="No">No</option>
                             <option value="Yes">Yes</option>
                           </select>
                         </div>
-                        {formData.insurance === 'Yes' && (
-                          <>
-                            <div className="flex-1 min-w-[120px]">
-                              <label className={`block text-[10px] mb-0.5 font-medium text-gray-700`}>Type</label>
-                              <select name="insuranceType" value={formData.insuranceType} onChange={handleInputChange} className="w-full px-2 py-1 text-[10px] border border-gray-300 rounded-md focus:ring-1 focus:ring-indigo-500 text-gray-900">
-                                <option value="Paid">Paid</option>
-                                <option value="Advance">Advance</option>
-                              </select>
-                            </div>
-                            {formData.insuranceType === 'Advance' && (
-                              <>
-                                <div className="flex-1 min-w-[120px]">
-                                  <label className={`block text-[10px] mb-0.5 font-medium text-gray-700`}>Advance Payment Amount</label>
-                                  <input 
-                                    type="number" 
-                                    name="advanceGivenAmount" 
-                                    value={formData.advanceGivenAmount || ""} 
-                                    onChange={handleInputChange}
-                                    className={`w-full px-2 py-1 text-[10px] border border-gray-300 rounded-md focus:ring-1 focus:ring-gray-900 focus:border-gray-900 text-gray-900`} 
-                                    placeholder="0"
-                                    step="0.01"
-                                  />
-                                </div>
-                                <div className="flex-1 min-w-[120px]">
-                                  <label className={`block text-[10px] mb-0.5 font-medium text-gray-700`}>Co-Pay % <span className="text-red-500">*</span></label>
-                                  <input 
-                                    type="number" 
-                                    name="coPayPercent" 
-                                    value={formData.coPayPercent} 
-                                    onChange={handleInputChange} 
-                                    className={`w-full px-2 py-1 text-[10px] border rounded-md text-gray-900 ${errors.coPayPercent ? 'border-red-500 bg-red-50' : 'border-gray-300'}`} 
-                                    placeholder="0-100" 
-                                    min="0" 
-                                    max="100" 
-                                  />
-                                </div>
-                                <div className="flex-1 min-w-[120px]">
-                                  <label className={`block text-[10px] mb-0.5 font-medium text-gray-700`}>Need to Pay (Auto)</label>
-                                  <input 
-                                    type="text" 
-                                    value={`د.إ ${calculatedFields.needToPay.toFixed(2)}`} 
-                                    disabled 
-                                    className="w-full px-2 py-1 text-[10px] bg-gray-50 border border-gray-300 rounded-md text-gray-900 font-semibold" 
-                                  />
-                                </div>
-                              </>
-                            )}
-                          </>
-                        )}
                       </div>
+
+                      {formData.insurance === 'Yes' && (
+                        <>
+                          {/* Section A: Insurance Details (Mandatory) */}
+                          <div className="mb-3 p-2 bg-blue-50 rounded-md border border-blue-200">
+                            <div className="text-[10px] font-semibold text-blue-800 mb-2">Insurance Details (Required)</div>
+                            <div className="flex flex-wrap gap-2 items-end">
+                              <div className="flex-1 min-w-[140px]">
+                                <label className="block text-[10px] mb-0.5 font-medium text-gray-700">Insurance Provider <span className="text-red-500">*</span></label>
+                                <input type="text" name="insuranceProvider" value={claimData.insuranceProvider} onChange={handleClaimChange} className="w-full px-2 py-1 text-[10px] border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 text-gray-900" placeholder="Provider name" />
+                              </div>
+                              <div className="flex-1 min-w-[140px]">
+                                <label className="block text-[10px] mb-0.5 font-medium text-gray-700">Policy Number <span className="text-red-500">*</span></label>
+                                <input type="text" name="policyNumber" value={claimData.policyNumber} onChange={handleClaimChange} className="w-full px-2 py-1 text-[10px] border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 text-gray-900" placeholder="Policy number" />
+                              </div>
+                              <div className="flex-1 min-w-[130px]">
+                                <label className="block text-[10px] mb-0.5 font-medium text-gray-700">Expiry Date <span className="text-red-500">*</span></label>
+                                <input type="date" name="expiryDate" value={claimData.expiryDate} onChange={handleClaimChange} className="w-full px-2 py-1 text-[10px] border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 text-gray-900" />
+                              </div>
+                              <div className="flex-1 min-w-[140px]">
+                                <label className="block text-[10px] mb-0.5 font-medium text-gray-700">Insurance Card</label>
+                                <input type="file" accept="image/*,.pdf" onChange={(e) => handleClaimFileUpload(e, 'insuranceCard')} className="w-full px-1 py-0.5 text-[9px] border border-gray-300 rounded-md text-gray-700 file:mr-1 file:py-0.5 file:px-2 file:rounded file:text-[8px] file:bg-blue-100 file:text-blue-700 file:border-0" disabled={uploadingFiles} />
+                                {claimData.insuranceCardFile && (
+                                  <a href={claimData.insuranceCardFile} target="_blank" rel="noreferrer" className="text-[9px] text-blue-600 underline mt-0.5 block">View uploaded file</a>
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-[140px]">
+                                <label className="block text-[10px] mb-0.5 font-medium text-gray-700">Table of Benefits</label>
+                                <input type="file" accept="image/*,.pdf" onChange={(e) => handleClaimFileUpload(e, 'tableOfBenefits')} className="w-full px-1 py-0.5 text-[9px] border border-gray-300 rounded-md text-gray-700 file:mr-1 file:py-0.5 file:px-2 file:rounded file:text-[8px] file:bg-blue-100 file:text-blue-700 file:border-0" disabled={uploadingFiles} />
+                                {claimData.tableOfBenefitsFile && (
+                                  <a href={claimData.tableOfBenefitsFile} target="_blank" rel="noreferrer" className="text-[9px] text-blue-600 underline mt-0.5 block">View uploaded file</a>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Section B: Claim Source */}
+                          <div className="mb-3 p-2 bg-green-50 rounded-md border border-green-200">
+                            <div className="text-[10px] font-semibold text-green-800 mb-2">Claim Source</div>
+                            <div className="flex flex-wrap gap-2 items-end">
+                              <div className="flex-1 min-w-[140px]">
+                                <label className="block text-[10px] mb-0.5 font-medium text-gray-700">Department</label>
+                                <select name="departmentId" value={claimData.departmentId} onChange={handleDepartmentChange} className="w-full px-2 py-1 text-[10px] border border-gray-300 rounded-md focus:ring-1 focus:ring-green-500 text-gray-900">
+                                  <option value="">Select Department</option>
+                                  {departments.map(d => (
+                                    <option key={d._id} value={d._id}>{d.name}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div className="flex-1 min-w-[140px]">
+                                <label className="block text-[10px] mb-0.5 font-medium text-gray-700">Service</label>
+                                <select name="serviceId" value={claimData.serviceId} onChange={handleServiceChange} className="w-full px-2 py-1 text-[10px] border border-gray-300 rounded-md focus:ring-1 focus:ring-green-500 text-gray-900">
+                                  <option value="">Select Service</option>
+                                  {filteredServices.map(s => (
+                                    <option key={s._id} value={s._id}>{s.name}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div className="flex-1 min-w-[140px]">
+                                <label className="block text-[10px] mb-0.5 font-medium text-gray-700">Doctor <span className="text-red-500">*</span></label>
+                                <select name="doctorId" value={claimData.doctorId} onChange={handleDoctorChange} className="w-full px-2 py-1 text-[10px] border border-gray-300 rounded-md focus:ring-1 focus:ring-green-500 text-gray-900">
+                                  <option value="">Select Doctor</option>
+                                  {doctors.map(d => (
+                                    <option key={d._id} value={d._id}>{d.name}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div className="flex-1 min-w-[120px]">
+                                <label className="block text-[10px] mb-0.5 font-medium text-gray-700">Claim Amount <span className="text-red-500">*</span></label>
+                                <input type="number" name="claimAmount" value={claimData.claimAmount} onChange={handleClaimChange} className="w-full px-2 py-1 text-[10px] border border-gray-300 rounded-md focus:ring-1 focus:ring-green-500 text-gray-900" placeholder="0" min="0" step="0.01" />
+                              </div>
+                              <div className="flex-1 min-w-[120px]">
+                                <label className="block text-[10px] mb-0.5 font-medium text-gray-700">Claim Type <span className="text-red-500">*</span></label>
+                                <select name="claimType" value={claimData.claimType} onChange={handleClaimChange} className="w-full px-2 py-1 text-[10px] border border-gray-300 rounded-md focus:ring-1 focus:ring-green-500 text-gray-900">
+                                  <option value="Paid">Paid</option>
+                                  <option value="Advance">Advance</option>
+                                </select>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Section C: Claim Details (when type is Paid or Advance) */}
+                          <div className="mb-3 p-2 bg-purple-50 rounded-md border border-purple-200">
+                            <div className="text-[10px] font-semibold text-purple-800 mb-2">Claim Details</div>
+                            <div className="flex flex-wrap gap-2 items-end">
+                              <div className="flex-1 min-w-[120px]">
+                                <label className="block text-[10px] mb-0.5 font-medium text-gray-700">Co-Pay %</label>
+                                <input type="number" name="coPayPercent" value={claimData.coPayPercent} onChange={handleClaimChange} className="w-full px-2 py-1 text-[10px] border border-gray-300 rounded-md focus:ring-1 focus:ring-purple-500 text-gray-900" placeholder="0-100" min="0" max="100" />
+                              </div>
+                              <div className="flex-1 min-w-[140px]">
+                                <label className="block text-[10px] mb-0.5 font-medium text-gray-700">Co-Pay Type</label>
+                                <select name="coPayType" value={claimData.coPayType} onChange={handleClaimChange} className="w-full px-2 py-1 text-[10px] border border-gray-300 rounded-md focus:ring-1 focus:ring-purple-500 text-gray-900">
+                                  <option value="Patient Pays">Patient Pays</option>
+                                  <option value="Deduct from Claim">Deduct from Claim</option>
+                                  <option value="Clinic Adjusts">Clinic Adjusts</option>
+                                </select>
+                              </div>
+                              <div className="flex-1 min-w-[140px]">
+                                <label className="block text-[10px] mb-0.5 font-medium text-gray-700">Notes</label>
+                                <input type="text" name="notes" value={claimData.notes} onChange={handleClaimChange} className="w-full px-2 py-1 text-[10px] border border-gray-300 rounded-md focus:ring-1 focus:ring-purple-500 text-gray-900" placeholder="Additional notes" />
+                              </div>
+                              <div className="flex-1 min-w-[140px]">
+                                <label className="block text-[10px] mb-0.5 font-medium text-gray-700">Documents</label>
+                                <input type="file" multiple accept="image/*,.pdf" onChange={handleClaimDocumentsUpload} className="w-full px-1 py-0.5 text-[9px] border border-gray-300 rounded-md text-gray-700 file:mr-1 file:py-0.5 file:px-2 file:rounded file:text-[8px] file:bg-purple-100 file:text-purple-700 file:border-0" disabled={uploadingFiles} />
+                                {claimData.documentFiles.length > 0 && (
+                                  <div className="mt-0.5">
+                                    <span className="text-[9px] text-gray-600">{claimData.documentFiles.length} file(s) uploaded</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Advance-specific fields */}
+                            {claimData.claimType === 'Advance' && (
+                              <div className="flex flex-wrap gap-2 items-end mt-2 pt-2 border-t border-purple-200">
+                                <div className="flex-1 min-w-[140px]">
+                                  <label className="block text-[10px] mb-0.5 font-medium text-gray-700">Advance Status</label>
+                                  <select name="advanceStatus" value={claimData.advanceStatus} onChange={handleClaimChange} className="w-full px-2 py-1 text-[10px] border border-gray-300 rounded-md focus:ring-1 focus:ring-purple-500 text-gray-900">
+                                    <option value="Full Pay">Full Pay</option>
+                                    <option value="Partial Pay">Partial Pay</option>
+                                  </select>
+                                </div>
+                                <div className="flex-1 min-w-[140px]">
+                                  <label className="block text-[10px] mb-0.5 font-medium text-gray-700">Advance Amount (Auto)</label>
+                                  <input type="text" value={claimData.advanceAmount.toFixed(2)} disabled className="w-full px-2 py-1 text-[10px] bg-gray-50 border border-gray-300 rounded-md text-gray-900 font-semibold" />
+                                </div>
+                                <div className="flex-1 min-w-[120px]">
+                                  <label className="block text-[10px] mb-0.5 font-medium text-gray-700">Status</label>
+                                  <div className="px-2 py-1 text-[10px] bg-yellow-50 border border-yellow-300 rounded-md text-yellow-800 font-semibold">Under Review</div>
+                                </div>
+                              </div>
+                            )}
+
+                            {claimData.claimType === 'Paid' && (
+                              <div className="flex flex-wrap gap-2 items-end mt-2 pt-2 border-t border-purple-200">
+                                <div className="flex-1 min-w-[120px]">
+                                  <label className="block text-[10px] mb-0.5 font-medium text-gray-700">Status</label>
+                                  <div className="px-2 py-1 text-[10px] bg-yellow-50 border border-yellow-300 rounded-md text-yellow-800 font-semibold">Under Review</div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>

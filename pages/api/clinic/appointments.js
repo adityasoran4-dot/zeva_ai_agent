@@ -564,8 +564,8 @@ export default async function handler(req, res) {
       );
 
       // Validation 2: Check for duplicate booking for the same patient
-      // Prevent same patient from being booked in the same room OR with the same doctor at the same time
-      // This ensures that if booked under Doctor column (with room), it blocks re-booking under Room column (for same patient)
+      // Allow multiple bookings for the same patient - enable maximum flexibility
+      /*
       const duplicateQuery = {
         clinicId,
         patientId, // Same patient
@@ -593,6 +593,7 @@ export default async function handler(req, res) {
           });
         }
       }
+      */
 
       // Validation 3 removed for clinic, agent, and doctorStaff roles (handled below)
 

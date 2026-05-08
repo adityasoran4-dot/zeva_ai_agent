@@ -37,9 +37,7 @@ export default function CreateOfferModal({
     timezone: "Asia/Kolkata",
     status: "draft" as "draft" | "active" | "paused" | "expired" | "archived",
     enabled: true,
-    maxUses: null as number | null,
     usesCount: 0,
-    perUserLimit: 1,
     
     // Applicability Control
     applyOnType: "all_services" as "all_services" | "selected_services" | "selected_departments" | "selected_doctors",
@@ -301,9 +299,7 @@ export default function CreateOfferModal({
         timezone: offer.timezone || "Asia/Kolkata",
         status: offer.status || "draft",
         enabled: offer.enabled ?? true,
-        maxUses: offer.maxUses || null,
         usesCount: offer.usesCount || 0,
-        perUserLimit: offer.perUserLimit || 1,
         
         applyOnType: offer.applyOnAllServices ? "all_services" : 
                     offer.departmentIds?.length > 0 ? "selected_departments" :
@@ -372,8 +368,8 @@ export default function CreateOfferModal({
       setErrors({ ...errors, [baseKey]: "" });
     }
 
-    if (["discountValue", "perUserLimit", "maxUses", "cashbackAmount", "cashbackExpiryDays", "buyQty", "freeQty", "maxBenefitCap", "minimumBillAmount", "marginThresholdPercent"].includes(name)) {
-      setForm((prev) => ({ ...prev, [name]: value ? Number(value) : (name === "maxUses" ? null : 0) }));
+    if (["discountValue", "cashbackAmount", "cashbackExpiryDays", "buyQty", "freeQty", "maxBenefitCap", "minimumBillAmount", "marginThresholdPercent"].includes(name)) {
+      setForm((prev) => ({ ...prev, [name]: value ? Number(value) : 0 }));
       return;
     }
 
@@ -528,9 +524,15 @@ export default function CreateOfferModal({
       // Final adjustments based on applyOnType
       const finalForm = { ...form };
       finalForm.applyOnAllServices = form.applyOnType === "all_services";
-      if (form.applyOnType !== "selected_services") finalForm.serviceIds = [];
-      if (form.applyOnType !== "selected_departments") finalForm.departmentIds = [];
-      if (form.applyOnType !== "selected_doctors") finalForm.doctorIds = [];
+      
+      // When applyOnAllServices is true, populate serviceIds with all clinic services
+      if (form.applyOnType === "all_services") {
+        finalForm.serviceIds = allServices.map(s => s._id);
+      } else {
+        if (form.applyOnType !== "selected_services") finalForm.serviceIds = [];
+        if (form.applyOnType !== "selected_departments") finalForm.departmentIds = [];
+        if (form.applyOnType !== "selected_doctors") finalForm.doctorIds = [];
+      }
 
       const res = await fetch(url, {
         method,
@@ -613,9 +615,15 @@ export default function CreateOfferModal({
       // Final adjustments based on applyOnType
       const finalForm = { ...form };
       finalForm.applyOnAllServices = form.applyOnType === "all_services";
-      if (form.applyOnType !== "selected_services") finalForm.serviceIds = [];
-      if (form.applyOnType !== "selected_departments") finalForm.departmentIds = [];
-      if (form.applyOnType !== "selected_doctors") finalForm.doctorIds = [];
+      
+      // When applyOnAllServices is true, populate serviceIds with all clinic services
+      if (form.applyOnType === "all_services") {
+        finalForm.serviceIds = allServices.map(s => s._id);
+      } else {
+        if (form.applyOnType !== "selected_services") finalForm.serviceIds = [];
+        if (form.applyOnType !== "selected_departments") finalForm.departmentIds = [];
+        if (form.applyOnType !== "selected_doctors") finalForm.doctorIds = [];
+      }
 
       const res = await fetch(url, {
         method,
@@ -781,29 +789,6 @@ export default function CreateOfferModal({
                     required
                   />
                   {errors.endsAt && <p className="text-red-500 text-[10px] mt-1">{errors.endsAt}</p>}
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-medium text-teal-700 mb-1">Total Usage Limit (Global)</label>
-                  <input
-                    type="number"
-                    name="maxUses"
-                    value={form.maxUses || ""}
-                    onChange={handleChange}
-                    className="text-gray-900 w-full border border-gray-200 rounded-lg px-2.5 py-2 text-xs sm:text-sm"
-                    placeholder="Unlimited"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-medium text-teal-700 mb-1">Usage Limit Per Patient</label>
-                  <input
-                    type="number"
-                    name="perUserLimit"
-                    value={form.perUserLimit}
-                    onChange={handleChange}
-                    className="text-gray-900 w-full border border-gray-200 rounded-lg px-2.5 py-2 text-xs sm:text-sm"
-                  />
                 </div>
 
                 <div>
@@ -1074,6 +1059,20 @@ export default function CreateOfferModal({
                   <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">
                     <input
                       type="checkbox"
+                      name="autoApplyBestOffer"
+                      checked={form.autoApplyBestOffer}
+                      onChange={handleChange}
+                      className="w-4 h-4 text-teal-600 rounded"
+                    />
+                    <div className="flex flex-col">
+                      <span className="text-xs font-semibold text-teal-900">Auto Apply Best Offer</span>
+                      <span className="text-[10px] text-gray-500">System automatically picks highest benefit</span>
+                    </div>
+                  </label>
+
+                  <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">
+                    <input
+                      type="checkbox"
                       name="allowCombiningWithOtherOffers"
                       checked={form.allowCombiningWithOtherOffers}
                       onChange={handleChange}
@@ -1102,7 +1101,7 @@ export default function CreateOfferModal({
 
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-[10px] font-medium text-teal-700 mb-1">Max Total Benefit Cap (%) *</label>
+                    <label className="block text-[10px] font-medium text-teal-700 mb-1">Max Total Benefit Cap *</label>
                     <input
                       type="number"
                       name="maxBenefitCap"
@@ -1130,36 +1129,7 @@ export default function CreateOfferModal({
               </div>
             </section>
 
-            {/* 4. SMART TOGGLES - COMMENTED OUT */}
-            {/* <section className="space-y-4">
-              <h3 className="text-sm font-bold text-teal-800 border-b border-gray-200 pb-1.5 flex items-center gap-2">
-                <span className="bg-teal-100 text-teal-800 px-2 py-0.5 rounded text-[10px]">4</span>
-                SMART TOGGLES
-              </h3>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {[
-                  { name: "autoApplyBestOffer", label: "Auto Apply Best Offer", sub: "System automatically picks highest benefit" },
-                  { name: "allowManualOverride", label: "Allow Manual Override", sub: "Restricted manual selection by staff" },
-                  { name: "requireApprovalForOverride", label: "Require Approval for Override", sub: "Admin PIN required for manual changes" },
-                  { name: "blockIfProfitMarginBelowX", label: "Block if Margin Low", sub: "Prevent loss-making discounts" }
-                ].map((toggle) => (
-                  <label key={toggle.name} className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">
-                    <input
-                      type="checkbox"
-                      name={toggle.name}
-                      checked={(form as any)[toggle.name]}
-                      onChange={handleChange}
-                      className="w-4 h-4 text-teal-600 rounded"
-                    />
-                    <div className="flex flex-col">
-                      <span className="text-xs font-semibold text-teal-900">{toggle.label}</span>
-                      <span className="text-[10px] text-gray-500">{toggle.sub}</span>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            </section> */}
+ 
 
           </div>
 
