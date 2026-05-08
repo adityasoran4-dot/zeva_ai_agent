@@ -115,6 +115,17 @@ const CampaignSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Segment",
     },
+    // for manual numbers or segment
+    recipientType: {
+      type: String,
+      enum: ["segment", "manual"],
+      default: "segment",
+    },
+    manualNumbers: {
+      type: String,
+      default: "",
+    },
+
     totalBatches: {
       type: Number,
       default: 0,

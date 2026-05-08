@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useState } from "react";
+import toast from "react-hot-toast";
 import { FaWhatsapp } from "react-icons/fa";
 
 const useCampaigns = () => {
@@ -29,6 +30,8 @@ const useCampaigns = () => {
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const [isDuplicating, setIsDuplicating] = useState<boolean>(false);
+  const [isExporting, setIsExporting] = useState<boolean>(false);
 
   const [showDeleteCampaignModal, setShowDeleteCampaignModal] =
     useState<boolean>(false);
@@ -246,6 +249,7 @@ const useCampaigns = () => {
       );
 
       if (res.data.success) {
+        router.push(`/clinic/campaigns/${res.data.data._id}/edit`);
         setShowCreateModal(false);
         fetchCampaigns();
       }
@@ -276,18 +280,34 @@ const useCampaigns = () => {
     }
 
     if (action === "duplicate") {
-      // Handle duplicate campaign
+      const toastId = toast.loading("Duplicating campaign...");
       try {
+        setIsDuplicating(true);
         const res = await axios.post(
-          `/api/campaigns/${campaignId}/duplicate`,
+          `/api/campaigns/duplicate/${campaignId}`,
           {},
           { headers: { Authorization: `Bearer ${token}` } },
         );
+
         if (res.data.success) {
-          fetchCampaigns();
+          toast.success("Campaign duplicated successfully!", {
+            id: toastId,
+          });
+          fetchCampaigns(); // Refresh the campaigns list
+        } else {
+          toast.error(res.data.message || "Failed to duplicate campaign", {
+            id: toastId,
+          });
         }
-      } catch (error) {
-        console.log("Error duplicating campaign: ", error);
+      } catch (error: any) {
+        console.error("Error duplicating campaign: ", error);
+        toast.error(
+          error.response?.data?.message ||
+            "An error occurred while duplicating the campaign",
+          { id: toastId },
+        );
+      } finally {
+        setIsDuplicating(false);
       }
       return;
     }
@@ -296,7 +316,7 @@ const useCampaigns = () => {
       try {
         const token = getTokenByPath();
         if (!token) return;
-
+        setIsExporting(true);
         // Fetch the CSV file from the API
         const response = await axios.get(
           `/api/campaigns/export/${campaignId}`,
@@ -342,6 +362,8 @@ const useCampaigns = () => {
         } else {
           alert("Failed to export campaign analytics");
         }
+      } finally {
+        setIsExporting(false);
       }
       return;
     }
@@ -447,6 +469,8 @@ const useCampaigns = () => {
     showDeleteCampaignModal,
     deleteCampaignLoading,
     campaignsPerPage,
+    isDuplicating,
+    isExporting,
   };
   return {
     state,

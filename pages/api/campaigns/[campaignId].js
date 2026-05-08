@@ -3,6 +3,7 @@ import { scheduleWhatsappCampaignQueue } from "../../../bullmq/queue";
 import dbConnect from "../../../lib/database";
 import Campaign from "../../../models/Campaign";
 import Segment from "../../../models/Segment";
+import Lead from "../../../models/Lead";
 import { getUserFromReq, requireRole } from "../lead-ms/auth";
 
 export default async function handler(req, res) {
@@ -41,7 +42,8 @@ async function getSingleCampaign(req, res, campaignId) {
       .populate("sender", "name label phone type")
       .populate("segmentId", "name")
       .populate("recipients", "name phone email")
-      .lean();
+      .lean()
+      .exec();
 
     if (!campaign) {
       return res.status(404).json({
@@ -82,7 +84,7 @@ async function updateCampaign(req, res, campaignId) {
     const user = await getUserFromReq(req);
     if (!user) return;
 
-    const {
+    let {
       name,
       description,
       sender,
@@ -104,6 +106,10 @@ async function updateCampaign(req, res, campaignId) {
       scheduleType,
       scheduleTime,
       isDraft = true,
+
+      // for recipients (manual numbers or segment)
+      recipientType,
+      manualNumbers,
     } = req.body;
 
     // Find campaign
@@ -146,6 +152,10 @@ async function updateCampaign(req, res, campaignId) {
     campaign.buttonVariableMappings =
       buttonVariableMappings || campaign.buttonVariableMappings;
 
+    // Update recipientType and manualNumbers
+    if (recipientType !== undefined) campaign.recipientType = recipientType;
+    if (manualNumbers !== undefined) campaign.manualNumbers = manualNumbers;
+
     await campaign.save();
 
     // TODO: Calculate and deduct credits
@@ -181,6 +191,56 @@ async function updateCampaign(req, res, campaignId) {
       //   team.whatsappCredits -= credits;
       // }
       // it means we need to schedule this campaign now or later
+
+      // if recipientType is manual then create leads and segment and add to segment
+      if (recipientType === "manual") {
+        // Create leads and segment
+        // Add leads to segment
+        const newSegment = await Segment.create({
+          name: `${campaign?.name || "Untitled Campaign"}`,
+          clinicId: campaign.clinicId,
+          userId: campaign.userId,
+        });
+
+        console.log({ manualNumbers });
+        // remove duplicate numbers from manualNumbers
+        manualNumbers = manualNumbers
+          .split("\n")
+          .map((number) => number.trim());
+        const uniqueNumbers = [...new Set(manualNumbers)];
+        console.log({ uniqueNumbers, manualNumbers });
+
+        const leadsData = uniqueNumbers.map((number) => ({
+          clinicId: campaign.clinicId,
+          phone: number,
+          name: number,
+          segments: [],
+          source: "Other",
+          customSource: "Zeva Campaign",
+        }));
+        for (let i = 0; i < leadsData.length; i++) {
+          // find lead by phone number
+          const lead = await Lead.findOne({
+            phone: leadsData[i].phone,
+            clinicId: campaign.clinicId,
+          });
+          if (!lead) {
+            const newLead = await Lead.create(leadsData[i]);
+            newLead.segments.push(newSegment);
+            newSegment.leads.push(newLead?._id);
+            await newLead.save();
+          } else {
+            newSegment.leads.push(lead?._id);
+          }
+          await newSegment.save();
+        }
+
+        campaign.segmentId = newSegment._id;
+        campaign.recipients = newSegment.leads;
+        await campaign.save();
+      }
+
+      // if campaign type is whatsapp then schedule it
       if (campaign.type === "whatsapp") {
         queueJob = await scheduleWhatsappCampaignQueue.add(
           "scheduleWhatsappQueue",
