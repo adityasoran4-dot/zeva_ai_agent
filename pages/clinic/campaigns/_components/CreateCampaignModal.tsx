@@ -90,18 +90,18 @@ const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
                     icon: "💬",
                     color: "green",
                   },
-                  {
-                    value: "sms" as const,
-                    label: "SMS",
-                    icon: "📱",
-                    color: "blue",
-                  },
-                  {
-                    value: "email" as const,
-                    label: "Email",
-                    icon: "📧",
-                    color: "purple",
-                  },
+                  // {
+                  //   value: "sms" as const,
+                  //   label: "SMS",
+                  //   icon: "📱",
+                  //   color: "blue",
+                  // },
+                  // {
+                  //   value: "email" as const,
+                  //   label: "Email",
+                  //   icon: "📧",
+                  //   color: "purple",
+                  // },
                 ].map((type) => (
                   <button
                     key={type.value}

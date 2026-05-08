@@ -98,6 +98,11 @@ const CampaignEditPage: NextPageWithLayout = () => {
   const templateDropdownRef = useRef<HTMLDivElement>(null);
   const segmentDropdownRef = useRef<HTMLDivElement>(null);
 
+  const [recipientType, setRecipientType] = useState<"segment" | "manual">(
+    "segment",
+  );
+  const [manualNumbers, setManualNumbers] = useState<string>("");
+
   const selectedTemplate = templates.find((t) => t._id === selectedTemplateId);
   const selectedProvider = (
     campaign?.type === "whatsapp"
@@ -106,6 +111,23 @@ const CampaignEditPage: NextPageWithLayout = () => {
         ? smsProviders
         : []
   ).find((p) => p._id === selectedProviderId);
+
+  const handleRemoveDuplicates = () => {
+    const numbers = manualNumbers
+      .split("\n")
+      .map((num) => num.trim())
+      .filter((num) => num !== "");
+
+    const uniqueNumbers = [...new Set(numbers)];
+    setManualNumbers(uniqueNumbers.join("\n"));
+
+    const duplicates = numbers.filter(
+      (num, index) => numbers.indexOf(num) !== index,
+    );
+    if (duplicates.length > 0) {
+      toast.info(`Removed ${duplicates.length} duplicate number(s)`);
+    }
+  };
 
   // Theme colors based on campaign type
   const getThemeColors = () => {
@@ -264,6 +286,9 @@ const CampaignEditPage: NextPageWithLayout = () => {
         setVariableMappings(camp.variableMappings || {});
         setHeaderVariableMappings(camp.headerVariableMappings || {});
         setButtonVariableMappings(camp.buttonVariableMappings || {});
+
+        setRecipientType(camp.recipientType || "segment");
+        setManualNumbers(camp.manualNumbers || "");
       }
     } catch (err) {
       console.error("Error fetching campaign:", err);
@@ -508,7 +533,6 @@ const CampaignEditPage: NextPageWithLayout = () => {
           description,
           sender: selectedProviderId,
           template: selectedTemplateId,
-          segmentId: selectedSegmentId,
           whatsappMsgType,
           content:
             whatsappMsgType === "template-message"
@@ -523,6 +547,12 @@ const CampaignEditPage: NextPageWithLayout = () => {
           variableMappings,
           headerVariableMappings,
           buttonVariableMappings,
+
+          //
+          recipientType, // Add this
+          segmentId:
+            recipientType === "segment" ? selectedSegmentId : undefined,
+          manualNumbers: recipientType === "manual" ? manualNumbers : undefined,
         },
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -571,7 +601,6 @@ const CampaignEditPage: NextPageWithLayout = () => {
           description,
           sender: selectedProviderId,
           template: selectedTemplateId,
-          segmentId: selectedSegmentId,
           whatsappMsgType,
           content:
             whatsappMsgType === "template-message"
@@ -592,6 +621,11 @@ const CampaignEditPage: NextPageWithLayout = () => {
             time: scheduleData.scheduledTime,
           },
           isDraft: false,
+
+          recipientType, // Add this
+          segmentId:
+            recipientType === "segment" ? selectedSegmentId : undefined,
+          manualNumbers: recipientType === "manual" ? manualNumbers : undefined,
         },
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -688,7 +722,11 @@ const CampaignEditPage: NextPageWithLayout = () => {
                   !name ||
                   !selectedProviderId ||
                   !selectedTemplateId ||
-                  !selectedSegmentId ||
+                  (recipientType === "segment" && !selectedSegmentId) ||
+                  (recipientType === "manual" &&
+                    (!manualNumbers.trim() ||
+                      manualNumbers.split("\n").filter((n) => n.trim()).length >
+                        5000)) ||
                   !whatsappMsgType ||
                   (whatsappMsgType === "template-message" && !selectedTemplate)
                 }
@@ -708,7 +746,11 @@ const CampaignEditPage: NextPageWithLayout = () => {
                   !name ||
                   !selectedProviderId ||
                   !selectedTemplateId ||
-                  !selectedSegmentId ||
+                  (recipientType === "segment" && !selectedSegmentId) ||
+                  (recipientType === "manual" &&
+                    (!manualNumbers.trim() ||
+                      manualNumbers.split("\n").filter((n) => n.trim()).length >
+                        5000)) ||
                   !whatsappMsgType ||
                   (whatsappMsgType === "template-message" && !selectedTemplate)
                 }
@@ -896,106 +938,218 @@ const CampaignEditPage: NextPageWithLayout = () => {
                   )}
                 </div>
 
-                {/* Recipients (Segment) Selection */}
-                <div className="space-y-3 relative" ref={segmentDropdownRef}>
-                  <label className="text-sm font-bold text-gray-900 flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <Users className="w-4 h-4 text-gray-400" /> Recipients
-                      (Segment) <span className="text-red-500">*</span>
-                    </div>
-                    <button
-                      onClick={() => router.push("/clinic/segments")}
-                      className="text-sm text-blue-500 underline font-normal flex items-center gap-2"
-                    >
-                      create segment <ExternalLink className="w-4 h-4" />
-                    </button>
+                {/* Recipient Type Tabs */}
+                <div className="space-y-3">
+                  <label className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                    <Users className="w-4 h-4 text-gray-400" /> Recipient Type
+                    <span className="text-red-500">*</span>
                   </label>
-                  <div
-                    onClick={() =>
-                      setIsSegmentDropdownOpen(!isSegmentDropdownOpen)
-                    }
-                    className={`w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 flex items-center justify-between cursor-pointer hover:border-${theme.primary}-400 focus:border-${theme.primary}-400 transition-all`}
-                  >
-                    <span className="truncate">
-                      {selectedSegment
-                        ? `${selectedSegment.name} (${
-                            selectedSegment.leads?.length || 0
-                          } leads)`
-                        : "Choose a segment"}
-                    </span>
-                    <ChevronDown
-                      className={cn(
-                        "w-4 h-4 transition-transform",
-                        isSegmentDropdownOpen && "rotate-180",
-                      )}
-                    />
-                  </div>
 
-                  {isSegmentDropdownOpen && (
-                    <div className="absolute z-20 w-full mt-2 bg-white border border-gray-100 rounded-2xl shadow-2xl max-h-80 overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
-                      <div className="p-3 border-b border-gray-100 bg-gray-50/50">
-                        <div className="relative">
-                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                          <input
-                            type="text"
-                            placeholder="Search segments..."
-                            value={segmentSearchTerm}
-                            onChange={(e) =>
-                              setSegmentSearchTerm(e.target.value)
-                            }
-                            className={`w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-${theme.primary}-500 focus:border-${theme.primary}-400 outline-none transition-all`}
-                            autoFocus
-                            onClick={(e) => e.stopPropagation()}
-                          />
+                  <div className="flex gap-2 border-b border-gray-200">
+                    <button
+                      type="button"
+                      onClick={() => setRecipientType("segment")}
+                      className={cn(
+                        "px-4 py-2 text-sm font-medium transition-all relative",
+                        recipientType === "segment"
+                          ? `${theme.primaryText} border-b-2 border-${theme.primary}-500`
+                          : "text-gray-500 hover:text-gray-700",
+                      )}
+                    >
+                      <Users className="w-4 h-4 inline mr-2" />
+                      Segment
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRecipientType("manual")}
+                      className={cn(
+                        "px-4 py-2 text-sm font-medium transition-all relative",
+                        recipientType === "manual"
+                          ? `${theme.primaryText} border-b-2 border-${theme.primary}-500`
+                          : "text-gray-500 hover:text-gray-700",
+                      )}
+                    >
+                      <Phone className="w-4 h-4 inline mr-2" />
+                      Manual Numbers
+                    </button>
+                  </div>
+                </div>
+
+                {/* Segment Selection (shown when recipientType is "segment") */}
+                {/* Recipients (Segment) Selection */}
+                {recipientType === "segment" && (
+                  <div className="space-y-3 relative" ref={segmentDropdownRef}>
+                    <label className="text-sm font-bold text-gray-900 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <Users className="w-4 h-4 text-gray-400" /> Recipients
+                        (Segment) <span className="text-red-500">*</span>
+                      </div>
+                      <button
+                        onClick={() => router.push("/clinic/segments")}
+                        className="text-sm text-blue-500 underline font-normal flex items-center gap-2"
+                      >
+                        create segment <ExternalLink className="w-4 h-4" />
+                      </button>
+                    </label>
+                    <div
+                      onClick={() =>
+                        setIsSegmentDropdownOpen(!isSegmentDropdownOpen)
+                      }
+                      className={`w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 flex items-center justify-between cursor-pointer hover:border-${theme.primary}-400 focus:border-${theme.primary}-400 transition-all`}
+                    >
+                      <span className="truncate">
+                        {selectedSegment
+                          ? `${selectedSegment.name} (${
+                              selectedSegment.leads?.length || 0
+                            } leads)`
+                          : "Choose a segment"}
+                      </span>
+                      <ChevronDown
+                        className={cn(
+                          "w-4 h-4 transition-transform",
+                          isSegmentDropdownOpen && "rotate-180",
+                        )}
+                      />
+                    </div>
+
+                    {isSegmentDropdownOpen && (
+                      <div className="absolute z-20 w-full mt-2 bg-white border border-gray-100 rounded-2xl shadow-2xl max-h-80 overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+                        <div className="p-3 border-b border-gray-100 bg-gray-50/50">
+                          <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                            <input
+                              type="text"
+                              placeholder="Search segments..."
+                              value={segmentSearchTerm}
+                              onChange={(e) =>
+                                setSegmentSearchTerm(e.target.value)
+                              }
+                              className={`w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-${theme.primary}-500 focus:border-${theme.primary}-400 outline-none transition-all`}
+                              autoFocus
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          </div>
+                        </div>
+                        <div className="overflow-y-auto flex-1">
+                          {filteredSegments.length === 0 ? (
+                            <div className="p-8 text-center text-gray-400 text-sm italic font-medium">
+                              No segments found
+                            </div>
+                          ) : (
+                            <ul className="py-2">
+                              {filteredSegments.map((s) => (
+                                <li
+                                  key={s._id}
+                                  className={cn(
+                                    "px-4 py-3 hover:bg-gray-50 cursor-pointer transition-colors group",
+                                    selectedSegmentId === s._id
+                                      ? theme.primaryLight
+                                      : "",
+                                  )}
+                                  onClick={() => {
+                                    setSelectedSegmentId(s._id);
+                                    setIsSegmentDropdownOpen(false);
+                                    setSegmentSearchTerm("");
+                                  }}
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex flex-col">
+                                      <span
+                                        className={`text-sm font-bold text-gray-900 group-hover:${theme.primaryText} transition-colors`}
+                                      >
+                                        {s.name}
+                                      </span>
+                                      <span className="text-[10px] text-gray-500 font-medium">
+                                        {s.leads?.length || 0} leads
+                                      </span>
+                                    </div>
+                                    {selectedSegmentId === s._id && (
+                                      <CheckCircle2
+                                        className={`w-4 h-4 ${theme.primaryText}`}
+                                      />
+                                    )}
+                                  </div>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
                         </div>
                       </div>
-                      <div className="overflow-y-auto flex-1">
-                        {filteredSegments.length === 0 ? (
-                          <div className="p-8 text-center text-gray-400 text-sm italic font-medium">
-                            No segments found
-                          </div>
-                        ) : (
-                          <ul className="py-2">
-                            {filteredSegments.map((s) => (
-                              <li
-                                key={s._id}
-                                className={cn(
-                                  "px-4 py-3 hover:bg-gray-50 cursor-pointer transition-colors group",
-                                  selectedSegmentId === s._id
-                                    ? theme.primaryLight
-                                    : "",
-                                )}
-                                onClick={() => {
-                                  setSelectedSegmentId(s._id);
-                                  setIsSegmentDropdownOpen(false);
-                                  setSegmentSearchTerm("");
-                                }}
-                              >
-                                <div className="flex items-center justify-between">
-                                  <div className="flex flex-col">
-                                    <span
-                                      className={`text-sm font-bold text-gray-900 group-hover:${theme.primaryText} transition-colors`}
-                                    >
-                                      {s.name}
-                                    </span>
-                                    <span className="text-[10px] text-gray-500 font-medium">
-                                      {s.leads?.length || 0} leads
-                                    </span>
-                                  </div>
-                                  {selectedSegmentId === s._id && (
-                                    <CheckCircle2
-                                      className={`w-4 h-4 ${theme.primaryText}`}
-                                    />
-                                  )}
-                                </div>
-                              </li>
-                            ))}
-                          </ul>
+                    )}
+                  </div>
+                )}
+
+                {/* Manual Numbers Input (shown when recipientType is "manual") */}
+                {recipientType === "manual" && (
+                  <div className="space-y-3">
+                    <label className="text-sm font-bold text-gray-900 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <Phone className="w-4 h-4 text-gray-400" /> WhatsApp
+                        Numbers
+                        <span className="text-red-500">*</span>
+                      </div>
+                      <span className="text-xs text-gray-500">
+                        Max 5000 numbers
+                      </span>
+                    </label>
+
+                    <div className="relative">
+                      <textarea
+                        value={manualNumbers}
+                        onChange={(e) => setManualNumbers(e.target.value)}
+                        placeholder="Enter phone numbers with country code (e.g., 919876543210)
+One number per line Max 5000 numbers"
+                        rows={8}
+                        className={cn(
+                          `w-full px-4 py-3 bg-gray-50 text-gray-500 border rounded-xl text-sm font-mono focus:ring-2 focus:ring-${theme.primary}-500 focus:border-${theme.primary}-400 outline-none transition-all resize-y`,
+                          !manualNumbers && recipientType === "manual"
+                            ? `border-${theme.primary}-500`
+                            : "border-gray-200",
+                        )}
+                      />
+
+                      {/* Remove Duplicate Button */}
+                      {manualNumbers.trim() && (
+                        <button
+                          type="button"
+                          onClick={handleRemoveDuplicates}
+                          className="absolute bottom-3 right-3 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-all flex items-center gap-1 shadow-sm"
+                        >
+                          <X className="w-3 h-3" />
+                          Remove Duplicate
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Numbers Counter */}
+                    {manualNumbers.trim() && (
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-gray-500">
+                          Total numbers:{" "}
+                          <strong className="text-gray-700">
+                            {
+                              manualNumbers.split("\n").filter((n) => n.trim())
+                                .length
+                            }
+                          </strong>{" "}
+                          / 5000
+                        </span>
+                        {manualNumbers.split("\n").filter((n) => n.trim())
+                          .length > 5000 && (
+                          <span className="text-red-500 flex items-center gap-1">
+                            <AlertCircle className="w-3 h-3" />
+                            Exceeds limit
+                          </span>
                         )}
                       </div>
+                    )}
+
+                    <div className="p-3 bg-blue-50 rounded-lg text-xs text-blue-700">
+                      💡 Numbers must include country code (e.g., 91 for India).
+                      Example: 919876543210
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
 
                 {/* Message Type */}
                 {/* <div>

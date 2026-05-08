@@ -19,6 +19,7 @@ import {
   Download,
   MessageSquare,
   Mail,
+  Copy,
 } from "lucide-react";
 import CreateCampaignModal from "./_components/CreateCampaignModal";
 import DeleteCampaignModal from "./_components/DeleteCampaignModal";
@@ -80,6 +81,8 @@ const CampaignsPage: NextPageWithLayout = () => {
     showDeleteCampaignModal,
     // deleteCampaignLoading,
     campaignsPerPage,
+    isDuplicating,
+    isExporting,
   } = state;
 
   useEffect(() => {
@@ -429,6 +432,18 @@ const CampaignsPage: NextPageWithLayout = () => {
                         : `Created ${formatDate(campaign.createdAt)}`}
                     </div>
                     <div className="flex items-center gap-2">
+                      {campaign.status === "completed" && (
+                        <button
+                          onClick={() =>
+                            handleCampaignAction("duplicate", campaign._id)
+                          }
+                          className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
+                          title="Duplicate"
+                          disabled={isDuplicating}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </button>
+                      )}
                       {campaign.status === "draft" && (
                         <button
                           onClick={() =>
@@ -457,6 +472,7 @@ const CampaignsPage: NextPageWithLayout = () => {
                           }
                           className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
                           title="Export Analytics"
+                          disabled={isExporting}
                         >
                           <Download className="h-4 w-4" />
                         </button>
@@ -548,14 +564,16 @@ const CampaignsPage: NextPageWithLayout = () => {
                   const progress = calculateProgress(campaign);
                   return (
                     <tr key={campaign._id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 min-w-[250px]">
                         <div className="flex items-center gap-3">
                           <div className="p-2 bg-gray-100 text-gray-500 rounded-lg">
                             {getCampaignTypeIcon(campaign.type)}
                           </div>
                           <div>
                             <div className="text-base font-medium text-gray-800">
-                              {campaign.name}
+                              {campaign.name?.length > 18
+                                ? campaign.name?.slice(0, 18) + "..."
+                                : campaign.name || "Untitled Campaign"}
                             </div>
                             <div className="text-sm text-gray-500 mt-1 line-clamp-1 max-w-md">
                               {campaign.description || "No description"}
@@ -659,6 +677,19 @@ const CampaignsPage: NextPageWithLayout = () => {
                             <Eye className="h-4 w-4" />
                           </button>
 
+                          {campaign.status === "completed" && (
+                            <button
+                              onClick={() =>
+                                handleCampaignAction("duplicate", campaign._id)
+                              }
+                              className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
+                              title="Duplicate"
+                              disabled={isDuplicating}
+                            >
+                              <Copy className="h-4 w-4" />
+                            </button>
+                          )}
+
                           {campaign.status === "draft" && (
                             <button
                               onClick={() =>
@@ -678,6 +709,7 @@ const CampaignsPage: NextPageWithLayout = () => {
                               }
                               className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
                               title="Export Analytics"
+                              disabled={isExporting}
                             >
                               <Download className="h-4 w-4" />
                             </button>
