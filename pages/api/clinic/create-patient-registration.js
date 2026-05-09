@@ -211,6 +211,8 @@ export default async function handler(req, res) {
         cashbackAmount,
         // Cashback WALLET usage (when patient uses previously earned cashback)
         cashbackWalletUsed,
+        // Unpaid packages being paid in this billing
+        unpaidPackagesPaid,
       } = req.body;
 
     console.log({ bmModify: req.body });
@@ -569,6 +571,10 @@ export default async function handler(req, res) {
         service === "Package" && Array.isArray(selectedPackageTreatments)
           ? selectedPackageTreatments
           : [],
+      // Track unpaid packages paid in this billing
+      unpaidPackagesPaid: Array.isArray(unpaidPackagesPaid) 
+        ? unpaidPackagesPaid 
+        : [],
       amount: amountNum,
       paid: paidNum, // ONLY store actual money received today (not credits)
       advanceUsed: advanceUsedNum, // Use the parsed number
@@ -923,6 +929,56 @@ export default async function handler(req, res) {
         commissionErr,
       );
       // Do not fail the billing creation if commission creation fails
+    }
+
+    // Update package payment status if unpaid packages are being paid
+    if (unpaidPackagesPaid && Array.isArray(unpaidPackagesPaid) && unpaidPackagesPaid.length > 0) {
+      console.log('[PackagePaymentAPI] Updating package payment status for:', unpaidPackagesPaid);
+      
+      try {
+        for (const pkgPayment of unpaidPackagesPaid) {
+          const { packageId, packageSubId, amount } = pkgPayment;
+          
+          if (!packageId || !packageSubId) {
+            console.warn('[PackagePaymentAPI] Skipping package with missing IDs:', pkgPayment);
+            continue;
+          }
+          
+          // Find the package in the patient's packages array and update it
+          const patient = await PatientRegistration.findById(userId);
+          
+          if (patient && patient.packages && patient.packages.length > 0) {
+            const packageIndex = patient.packages.findIndex(
+              (pkg) => String(pkg._id) === String(packageSubId) && String(pkg.packageId) === String(packageId)
+            );
+            
+            if (packageIndex !== -1) {
+              // Update the package payment status to Full
+              patient.packages[packageIndex].paymentStatus = 'Full';
+              patient.packages[packageIndex].paidAmount = amount;
+              patient.packages[packageIndex].paymentMethod = paymentMethod || 'Cash';
+              
+              console.log('[PackagePaymentAPI] Updated package:', {
+                packageId,
+                packageSubId,
+                paymentStatus: 'Full',
+                paidAmount: amount,
+                paymentMethod: paymentMethod || 'Cash'
+              });
+              
+              await patient.save();
+            } else {
+              console.warn('[PackagePaymentAPI] Package not found in patient packages array:', {
+                packageId,
+                packageSubId
+              });
+            }
+          }
+        }
+      } catch (packageUpdateError) {
+        console.error('[PackagePaymentAPI] Error updating package payment status:', packageUpdateError);
+        // Don't fail the billing if package update fails
+      }
     }
 
     // Doctor/Staff commission based on AgentProfile (supports flat, target-based, and after_deduction)

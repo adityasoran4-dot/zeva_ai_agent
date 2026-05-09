@@ -566,7 +566,21 @@
         });
 
         if (response.data.success) {
-          setAppointments(response.data.appointments || []);
+          const newAppointments = response.data.appointments || [];
+          setAppointments(newAppointments);
+          
+          // Update selectedAppointment if it matches any in the new list
+          if (selectedAppointment) {
+            const updated = newAppointments.find((a: Appointment) => a._id === selectedAppointment._id);
+            if (updated) setSelectedAppointment(updated);
+          }
+          
+          // Update complaintAppointment if it matches any in the new list
+          if (complaintAppointment) {
+            const updated = newAppointments.find((a: Appointment) => a._id === complaintAppointment._id);
+            if (updated) setComplaintAppointment(updated);
+          }
+
           setTotal(response.data.total || 0);
           setTotalPages(response.data.totalPages || 1);
         } else {

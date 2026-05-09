@@ -50,6 +50,30 @@ export default async function handler(req, res) {
             .json({ success: false, message: "Patient not found" });
         }
 
+        // Populate package names in packages array
+        if (patient.packages && Array.isArray(patient.packages) && patient.packages.length > 0) {
+          const Package = (await import("../../../models/Package")).default;
+          const UserPackage = (await import("../../../models/UserPackage")).default;
+          
+          for (let i = 0; i < patient.packages.length; i++) {
+            const pkg = patient.packages[i];
+            if (pkg.packageId) {
+              // Try to find in Package model first
+              let packageDoc = await Package.findById(pkg.packageId).lean();
+              
+              // If not found, try UserPackage model
+              if (!packageDoc) {
+                packageDoc = await UserPackage.findById(pkg.packageId).lean();
+              }
+              
+              // Add package name to the package object
+              if (packageDoc) {
+                patient.packages[i].packageName = packageDoc.name || '';
+              }
+            }
+          }
+        }
+
         return res.status(200).json({
           success: true,
           patient: patient,

@@ -199,12 +199,12 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
   // Patient EMR stats — total spend from Billing, visits from Appointment
   interface PatientEMRStats {
     totalSpend: number; totalBilled: number; totalPending: number;
-    totalVisits: number; completedVisits: number; cancelledNoShow: number; billingCount: number;
+    totalVisits: number; billingCount: number;
     recentBillings: Array<{ service: string; label: string; amount: number; paid: number; pending: number; date: string }>;
   }
   const [patientStats, setPatientStats] = useState<PatientEMRStats | null>(null);
   const [loadingPatientStats, setLoadingPatientStats] = useState(false);
-  const [patientBalance, setPatientBalance] = useState({ pendingBalance: 0, advanceBalance: 0 });
+  const [patientBalance, setPatientBalance] = useState({ pendingBalance: 0, advanceBalance: 0, pendingClaim: 0 });
   // Ref to scroll to Previous Complaints when History is clicked
   const previousComplaintsRef = useRef<HTMLDivElement | null>(null);
   const [expandedComplaints, setExpandedComplaints] = useState<
@@ -588,7 +588,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
       setExpandedComplaints({});
       setPatientStats(null);
       setLoadingPatientStats(false);
-      setPatientBalance({ pendingBalance: 0, advanceBalance: 0 });
+      setPatientBalance({ pendingBalance: 0, advanceBalance: 0, pendingClaim: 0 });
       setItems([]);
       setCurrentItem({
         itemId: "",
@@ -676,7 +676,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
     setAfterImage("");
     setPreviousComplaints([]);
     setPatientStats(null);
-    setPatientBalance({ pendingBalance: 0, advanceBalance: 0 });
+    setPatientBalance({ pendingBalance: 0, advanceBalance: 0, pendingClaim: 0 });
     setProgressNotes([]);
     setPrescriptionHistory([]);
     setUpcomingAppointments([]);
@@ -864,62 +864,18 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
         const headers = getAuthHeaders();
         if (!headers) return;
 
-        // Fetch appointments for the past year to calculate total visits
-        const today = new Date().toISOString().split('T')[0];
-        const oneYearAgo = new Date();
-        oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-       
-        const [appointmentsRes, balanceRes] = await Promise.all([
-          axios.get(
-            `/api/clinic/all-appointments?page=1&limit=1000&fromDate=${oneYearAgo.toISOString().split('T')[0]}&toDate=${today}`,
-            { headers }
-          ),
-          axios.get(`/api/clinic/patient-balance/${patientId}`, { headers }).catch(() => ({ data: { success: false } }))
-        ]);
-
-        let totalVisits = 0;
-        let completedVisits = 0;
-        let cancelledNoShow = 0;
-        let totalSpend = 0;
-
-        if (appointmentsRes.data.success) {
-          const patientAppointments = appointmentsRes.data.appointments?.filter(
-            (apt: any) => apt.patientId === patientId
-          ) || [];
-         
-          // Count total visits based on specific statuses
-          const visitStatuses = ['arrived', 'waiting', 'consultation', 'approved', 'rescheduled', 'completed', 'discharge', 'invoice'];
-          totalVisits = patientAppointments.filter((apt: any) => {
-            const status = (apt.status || '').toLowerCase();
-            return visitStatuses.includes(status);
-          }).length;
-         
-          patientAppointments.forEach((apt: any) => {
-            const status = (apt.status || apt.appointmentStatus || '').toLowerCase();
-            if (['cancelled', 'rejected', 'no show', 'no-show'].includes(status)) {
-              cancelledNoShow += 1;
-            }
-            if (['completed', 'discharge', 'approved'].includes(status)) {
-              completedVisits += 1;
-            }
+        const response = await axios.get(`/api/clinic/patient-emr-stats/${patientId}`, { headers });
+        if (response.data?.success) {
+          const s = response.data;
+          setPatientStats({
+            totalSpend: s.totalSpend || 0,
+            totalBilled: s.totalBilled || 0,
+            totalPending: s.totalPending || 0,
+            totalVisits: s.totalVisits || 0,
+            billingCount: s.billingCount || 0,
+            recentBillings: s.recentBillings || [],
           });
         }
-
-        // Get total spend from patient balance API
-        if (balanceRes.data?.success && balanceRes.data.balances) {
-          totalSpend = Number(balanceRes.data.balances.totalSpent) || 0;
-        }
-
-        setPatientStats({
-          totalSpend,
-          totalVisits,
-          completedVisits,
-          cancelledNoShow,
-          totalBilled: 0,
-          totalPending: 0,
-          billingCount: 0,
-          recentBillings: [],
-        });
       } catch (error) {
         console.error('Error fetching patient stats:', error);
       } finally {
@@ -1120,6 +1076,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
       await axios.patch(`/api/clinic/appointment-services/${details.appointmentId}`, { serviceIds }, { headers });
       setServicesSaved(true);
       setShowAddServiceDropdown(false);
+      if (onSuccess) onSuccess();
     } catch (err: any) {
       setServicesError(err.response?.data?.message || "Failed to save services.");
     } finally {
@@ -2950,6 +2907,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
                                             try {
                                               await axios.patch(`/api/clinic/appointment-services/${details.appointmentId}`, { serviceIds: [svc._id] }, { headers: getAuthHeaders() });
                                               setAddedRecServices((p) => ({ ...p, [patientServiceKey]: true }));
+                                              if (onSuccess) onSuccess();
                                             } catch (err: any) {
                                               // If API fails, remove from selectedServices
                                               setSelectedServices((prev) => prev.filter((s) => s._id !== svc._id));
@@ -3628,6 +3586,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
                                             try {
                                               await axios.patch(`/api/clinic/appointment-services/${details.appointmentId}`, { serviceIds: [svc._id] }, { headers: getAuthHeaders() });
                                               setAddedRecServices((p) => ({ ...p, [patientServiceKey]: true }));
+                                              if (onSuccess) onSuccess();
                                             } catch (err: any) {
                                               // If API fails, remove from selectedServices
                                               setSelectedServices((prev) => prev.filter((s) => s._id !== svc._id));
@@ -4641,6 +4600,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
                                             try {
                                               await axios.patch(`/api/clinic/appointment-services/${details.appointmentId}`, { serviceIds: [svc._id] }, { headers: getAuthHeaders() });
                                               setAddedRecServices((p) => ({ ...p, [patientServiceKey]: true }));
+                                              if (onSuccess) onSuccess();
                                             } catch (err: any) {
                                               // If API fails, remove from selectedServices
                                               setSelectedServices((prev) => prev.filter((s) => s._id !== svc._id));
@@ -5242,14 +5202,14 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
                           <span className="text-xs text-gray-500">Total Paid (All-Time)</span>
                           <span className="text-base font-bold text-gray-900">{getCurrencySymbol(currency)} {patientStats.totalSpend.toLocaleString()}</span>
                         </div>
-                        <div className="flex items-center justify-between">
+                        {/* <div className="flex items-center justify-between">
                           <span className="text-xs text-gray-500">Total Billed</span>
                           <span className="text-xs font-semibold text-gray-700">{getCurrencySymbol(currency)} {patientStats.totalBilled.toLocaleString()}</span>
-                        </div>
-                        {patientStats.totalPending > 0 && (
+                        </div> */}
+                        {(patientBalance.pendingBalance > 0 || patientBalance.pendingClaim > 0) && (
                           <div className="flex items-center justify-between">
                             <span className="text-xs text-gray-500">Outstanding</span>
-                            <span className="text-xs font-semibold text-red-500">{getCurrencySymbol(currency)} {patientBalance.pendingBalance.toLocaleString()}</span>
+                            <span className="text-xs font-semibold text-red-500">{getCurrencySymbol(currency)} {(patientBalance.pendingBalance + patientBalance.pendingClaim).toLocaleString()}</span>
                           </div>
                         )}
                         <div className="flex items-center justify-between border-t border-gray-100 pt-2">

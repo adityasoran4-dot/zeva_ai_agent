@@ -538,6 +538,48 @@ const PatientProfileDashboard = ({ patientData, onClose, onPatientUpdated }: { p
   const [loadingBilling, setLoadingBilling] = useState(false);
   const [billingSearchQuery, setBillingSearchQuery] = useState('');
   const [billingSearchType, setBillingSearchType] = useState<'all' | 'invoice' | 'treatment'>('all');
+  
+  // Cache for package names to avoid repeated API calls
+  const [packageNameCache, setPackageNameCache] = useState<Record<string, string>>({});
+  const [allPackagesLoaded, setAllPackagesLoaded] = useState(false);
+
+  // Function to fetch package name by ID
+  const fetchPackageName = async (packageId: string): Promise<string> => {
+    // Return from cache if available
+    if (packageNameCache[packageId]) {
+      return packageNameCache[packageId];
+    }
+
+    // If we haven't loaded all packages yet, load them now
+    if (!allPackagesLoaded) {
+      try {
+        const headers = getAuthHeaders();
+        if (!headers) return 'Package';
+        
+        const res = await axios.get('/api/clinic/packages', { headers });
+        if (res.data?.success && res.data?.packages) {
+          // Build cache from all packages
+          const newCache: Record<string, string> = { ...packageNameCache };
+          res.data.packages.forEach((pkg: any) => {
+            if (pkg._id && pkg.name) {
+              newCache[pkg._id] = pkg.name;
+            }
+          });
+          setPackageNameCache(newCache);
+          setAllPackagesLoaded(true);
+          
+          // Return the package name if found
+          if (newCache[packageId]) {
+            return newCache[packageId];
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching packages:', error);
+      }
+    }
+    
+    return 'Package';
+  };
 
   // Cashback state
   const [validCashback, setValidCashback] = useState<any>(null);
@@ -2254,9 +2296,36 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
       const response = await axios.get(`/api/clinic/billing-history/${patientData._id}`, { headers });
      
       if (response.data.success) {
-        const billings = response.data.billings || [];
-        setBillingHistory(billings);
-        calculateFinancialSnapshot(billings);
+        let billings = response.data.billings || [];
+        
+        // Resolve package names for unpaidPackagesPaid
+        const billingsWithPackageNames = await Promise.all(
+          billings.map(async (billing: any) => {
+            if (billing.unpaidPackagesPaid && billing.unpaidPackagesPaid.length > 0) {
+              const updatedPackages = await Promise.all(
+                billing.unpaidPackagesPaid.map(async (pkg: any) => {
+                  // If packageName already exists, use it
+                  if (pkg.packageName) {
+                    return pkg;
+                  }
+                  
+                  // Otherwise fetch it from packageId
+                  if (pkg.packageId) {
+                    const packageName = await fetchPackageName(pkg.packageId);
+                    return { ...pkg, packageName };
+                  }
+                  
+                  return pkg;
+                })
+              );
+              return { ...billing, unpaidPackagesPaid: updatedPackages };
+            }
+            return billing;
+          })
+        );
+        
+        setBillingHistory(billingsWithPackageNames);
+        calculateFinancialSnapshot(billingsWithPackageNames);
        
         // Calculate valid cashback from billing history
         const today = new Date();
@@ -6058,7 +6127,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                         </td>
                                         {/* Treatment / Package */}
                                         <td className="px-3 py-3">
-                                          <div className="text-xs text-gray-700 max-w-[150px] truncate" title={billing.package || billing.treatment}>
+                                          <div className="text-xs text-gray-700 max-w-[150px]" title={billing.package || billing.treatment}>
                                             {billing.package ? (
                                               <div className="flex flex-col">
                                                 <span className="font-semibold text-indigo-700 flex items-center gap-1">
@@ -6073,6 +6142,19 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                               </div>
                                             ) : (
                                               billing.treatment || '-'
+                                            )}
+                                            {/* Show unpaid packages that were paid in this billing */}
+                                            {billing.unpaidPackagesPaid && billing.unpaidPackagesPaid.length > 0 && (
+                                              <div className="mt-1 space-y-0.5">
+                                                {billing.unpaidPackagesPaid.map((pkg: any, idx: number) => (
+                                                  <div key={idx} className="text-[9px] text-blue-700 flex items-center gap-1 bg-blue-50 px-1.5 py-0.5 rounded">
+                                                    <Check className="w-2.5 h-2.5 text-blue-600" strokeWidth={3} />
+                                                    <span className="truncate">
+                                                      Pkg: {pkg.packageName || 'Package'} ({getCurrencySymbol(currency)}{pkg.amount?.toFixed(2)})
+                                                    </span>
+                                                  </div>
+                                                ))}
+                                              </div>
                                             )}
                                           </div>
                                         </td>
@@ -6368,11 +6450,24 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                           <div className="text-[9px] text-gray-400">{billing.invoicedDate ? new Date(billing.invoicedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}</div>
                                         </td>
                                         <td className="px-3 py-3">
-                                          <div className="text-xs text-gray-700 max-w-[120px] truncate" title={billing.treatment || billing.package}>
+                                          <div className="text-xs text-gray-700 max-w-[120px]" title={billing.treatment || billing.package}>
                                             {billing.package ? (
                                               <span className="font-semibold text-indigo-700">{billing.package}</span>
                                             ) : (billing.treatment || '-')}
                                           </div>
+                                          {/* Show unpaid packages that were paid in this billing */}
+                                          {billing.unpaidPackagesPaid && billing.unpaidPackagesPaid.length > 0 && (
+                                            <div className="mt-1 space-y-0.5">
+                                              {billing.unpaidPackagesPaid.map((pkg: any, idx: number) => (
+                                                <div key={idx} className="text-[9px] text-blue-700 flex items-center gap-1 bg-blue-50 px-1.5 py-0.5 rounded">
+                                                  <Check className="w-2.5 h-2.5 text-blue-600" strokeWidth={3} />
+                                                  <span className="truncate">
+                                                    Pkg: {pkg.packageName || 'Package'} ({getCurrencySymbol(currency)}{pkg.amount?.toFixed(2)})
+                                                  </span>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          )}
                                           {isBundleOffer && earnedFreeSessionNames.length > 0 && (
                                             <div className="text-[8px] text-pink-600 truncate mt-0.5" title={earnedFreeSessionNames.join(', ')}>
                                               Free: {earnedFreeSessionNames.slice(0, 1).join(', ')}{earnedFreeSessionNames.length > 1 ? '...' : ''}
@@ -6476,7 +6571,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                         </div>
                                       </div>
                                       
-                                      {/* Treatment */}
+                                      {/* Treatment / Package */}
                                       <div className="mb-3">
                                         <div className="text-xs text-gray-700">
                                           {billing.package ? (
@@ -6487,6 +6582,19 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                         </div>
                                         {billing.treatment && billing.package && (
                                           <div className="text-[10px] text-gray-500 truncate">{billing.treatment}</div>
+                                        )}
+                                        {/* Show unpaid packages that were paid in this billing */}
+                                        {billing.unpaidPackagesPaid && billing.unpaidPackagesPaid.length > 0 && (
+                                          <div className="mt-1 space-y-0.5">
+                                            {billing.unpaidPackagesPaid.map((pkg: any, idx: number) => (
+                                              <div key={idx} className="text-[9px] text-blue-700 flex items-center gap-1 bg-blue-50 px-1.5 py-0.5 rounded">
+                                                <Check className="w-2.5 h-2.5 text-blue-600" strokeWidth={3} />
+                                                <span className="truncate">
+                                                  Pkg: {pkg.packageName || 'Package'} ({getCurrencySymbol(currency)}{pkg.amount?.toFixed(2)})
+                                                </span>
+                                              </div>
+                                            ))}
+                                          </div>
                                         )}
                                       </div>
                                       

@@ -47,6 +47,7 @@ export default async function handler(req, res) {
 
     const packageData = {
       packageId,
+      packageName: pkg.name || '', // Store the package name
       assignedDate: new Date(),
       validityInMonths: validityInMonths !== undefined ? parseInt(validityInMonths) : (pkg.validityInMonths || 0),
       startDate: startDate ? new Date(startDate) : (pkg.startDate || new Date()),

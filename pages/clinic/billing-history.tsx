@@ -37,6 +37,48 @@ const BillingHistoryPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [clinicCurrency, setClinicCurrency] = useState('INR');
   const [searchInvoice, setSearchInvoice] = useState('');
+  
+  // Cache for package names to avoid repeated API calls
+  const [packageNameCache, setPackageNameCache] = useState<Record<string, string>>({});
+  const [allPackagesLoaded, setAllPackagesLoaded] = useState(false);
+
+  // Function to fetch package name by ID
+  const fetchPackageName = async (packageId: string): Promise<string> => {
+    // Return from cache if available
+    if (packageNameCache[packageId]) {
+      return packageNameCache[packageId];
+    }
+
+    // If we haven't loaded all packages yet, load them now
+    if (!allPackagesLoaded) {
+      try {
+        const headers = getAuthHeaders();
+        if (!headers) return 'Package';
+        
+        const res = await axios.get('/api/clinic/packages', { headers });
+        if (res.data?.success && res.data?.packages) {
+          // Build cache from all packages
+          const newCache: Record<string, string> = { ...packageNameCache };
+          res.data.packages.forEach((pkg: any) => {
+            if (pkg._id && pkg.name) {
+              newCache[pkg._id] = pkg.name;
+            }
+          });
+          setPackageNameCache(newCache);
+          setAllPackagesLoaded(true);
+          
+          // Return the package name if found
+          if (newCache[packageId]) {
+            return newCache[packageId];
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching packages:', error);
+      }
+    }
+    
+    return 'Package';
+  };
 
   useEffect(() => {
     if (appointmentId || patientId) {
@@ -205,10 +247,19 @@ const BillingHistoryPage = () => {
         
         const offerDesc = offerParts.length > 0 ? offerParts.join('\n') : '—';
         
+        // Build treatment/package display including unpaid packages paid
+        let treatmentPackageDisplay = item.treatment || item.package || '—';
+        if (item.unpaidPackagesPaid && item.unpaidPackagesPaid.length > 0) {
+          const packageNames = item.unpaidPackagesPaid.map((pkg: any) => 
+            `Pkg: ${pkg.packageName || 'Package'} (${formatCurrency(pkg.amount || 0)})`
+          );
+          treatmentPackageDisplay = treatmentPackageDisplay + '\n' + packageNames.join('\n');
+        }
+        
         return [
           formatDate(item.invoicedDate),
           item.invoiceNumber || '—',
-          item.treatment || item.package || '—',
+          treatmentPackageDisplay,
           discountDesc,
           offerDesc,
           formatCurrency(item.originalAmount || item.amount || 0),
@@ -326,7 +377,34 @@ const BillingHistoryPage = () => {
           (!b.isAdvanceOnly && b.treatment !== "Advance Payment" && b.treatment !== "Historical Advance Balance") ||
           b.treatment === "Pending Balance Payment"
         );
-        setBillingHistory(billingData);
+        
+        // Resolve package names for unpaidPackagesPaid
+        const billingsWithPackageNames = await Promise.all(
+          billingData.map(async (billing: any) => {
+            if (billing.unpaidPackagesPaid && billing.unpaidPackagesPaid.length > 0) {
+              const updatedPackages = await Promise.all(
+                billing.unpaidPackagesPaid.map(async (pkg: any) => {
+                  // If packageName already exists, use it
+                  if (pkg.packageName) {
+                    return pkg;
+                  }
+                  
+                  // Otherwise fetch it from packageId
+                  if (pkg.packageId) {
+                    const packageName = await fetchPackageName(pkg.packageId);
+                    return { ...pkg, packageName };
+                  }
+                  
+                  return pkg;
+                })
+              );
+              return { ...billing, unpaidPackagesPaid: updatedPackages };
+            }
+            return billing;
+          })
+        );
+        
+        setBillingHistory(billingsWithPackageNames);
       } else {
         setBillingHistory([]);
       }
@@ -504,6 +582,22 @@ const BillingHistoryPage = () => {
                           <div className="text-xs font-medium text-gray-900 mb-1">
                             {billing.treatment || billing.package || '—'}
                           </div>
+                          {/* Show unpaid packages that were paid in this billing */}
+                          {billing.unpaidPackagesPaid && billing.unpaidPackagesPaid.length > 0 && (
+                            <div className="mt-1 space-y-1">
+                              {billing.unpaidPackagesPaid.map((pkg: any, idx: number) => (
+                                <div key={idx} className="text-[10px] text-blue-700 flex items-center gap-1.5 pl-1 bg-blue-50 px-2 py-1 rounded">
+                                  <Check className="w-3 h-3 text-blue-600" strokeWidth={3} />
+                                  <span className="font-medium">
+                                    Package Paid: {pkg.packageName || 'Package'}
+                                  </span>
+                                  <span className="text-blue-600 font-semibold ml-1">
+                                    ({getCurrencySymbol(clinicCurrency)}{pkg.amount?.toFixed(2)})
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                           {billing.selectedPackageTreatments && billing.selectedPackageTreatments.length > 0 ? (
                             <div className="mt-1 space-y-1">
                               {billing.selectedPackageTreatments.map((item: any, idx: number) => (

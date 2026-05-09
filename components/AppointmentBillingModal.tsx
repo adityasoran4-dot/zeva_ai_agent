@@ -248,6 +248,8 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
   const [loadingMembershipUsage, setLoadingMembershipUsage] = useState(false);
   const [activePackageUsage, setActivePackageUsage] = useState<any[]>([]);
   const [loadingActivePackageUsage, setLoadingActivePackageUsage] = useState(false);
+  const [unpaidPackagesTotal, setUnpaidPackagesTotal] = useState<number>(0);
+  const [unpaidPackagesBeingPaid, setUnpaidPackagesBeingPaid] = useState<Array<{packageId: string, packageSubId: string, amount: number}>>([]);
   const [availableFreeSessions, setAvailableFreeSessions] = useState<any[]>([]);
   const [loadingFreeSessions, setLoadingFreeSessions] = useState(false);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
@@ -781,12 +783,48 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
       try {
         const headers = getAuthHeaders();
         if (!headers.Authorization) return;
-        const res = await axios.get(`/api/clinic/${appointment.patientId}`, {
+        const res = await axios.get(`/api/clinic/patient-registration?id=${appointment.patientId}`, {
           headers,
         });
-        setPatientDetails(res.data || null);
+        setPatientDetails(res.data?.patient || null);
+        
+        // Calculate unpaid and partially paid packages total
+        if (res.data?.patient?.packages && Array.isArray(res.data.patient.packages)) {
+          // Include both Unpaid and Partial payment status packages
+          const unpaidOrPartialPackages = res.data.patient.packages
+            .filter((pkg: any) => 
+              pkg.paymentStatus === 'Unpaid' || 
+              pkg.paymentStatus === 'Partial' || 
+              pkg.paidAmount < pkg.totalPrice
+            );
+          
+          // Calculate remaining amount for each package (totalPrice - paidAmount)
+          const unpaidTotal = unpaidOrPartialPackages
+            .reduce((sum: number, pkg: any) => {
+              const remaining = (pkg.totalPrice || 0) - (pkg.paidAmount || 0);
+              return sum + Math.max(0, remaining);
+            }, 0);
+          
+          setUnpaidPackagesTotal(unpaidTotal);
+          
+          // Track packages with their remaining amounts
+          const unpaidPackageDetails = unpaidOrPartialPackages.map((pkg: any) => {
+            const remaining = (pkg.totalPrice || 0) - (pkg.paidAmount || 0);
+            return {
+              packageId: pkg.packageId,
+              packageSubId: pkg._id,
+              amount: Math.max(0, remaining),
+              packageName: pkg.packageName
+            };
+          });
+          setUnpaidPackagesBeingPaid(unpaidPackageDetails);
+        } else {
+          setUnpaidPackagesTotal(0);
+          setUnpaidPackagesBeingPaid([]);
+        }
       } catch (e) {
         setPatientDetails(null);
+        setUnpaidPackagesTotal(0);
       }
     };
     fetchPatient();
@@ -1263,8 +1301,13 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
   // to prevent accidental billing of remaining treatments.
   useEffect(() => {
     if (!isOpen || !appointment || treatments.length === 0) return;
-    // Only auto-initialize if the user hasn't already selected treatments manually
-    if (initializedAppointmentId.current === appointment._id) return;
+    
+    // Create a unique key based on appointment ID and its services to detect changes
+    const serviceIdsStr = (appointment.serviceIds || []).map(s => typeof s === 'string' ? s : s?._id).sort().join(',');
+    const initKey = `${appointment._id}-${serviceIdsStr}`;
+
+    // Only auto-initialize if we haven't already initialized for this specific appointment and its services
+    if (initializedAppointmentId.current === initKey) return;
 
     // If billing history has loaded, check if ANY billing exists for this appointment
     if (billingHistoryFetched) {
@@ -1272,9 +1315,8 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
 
       if (hasAnyBillingForAppointment) {
         // Don't pre-select any treatments - user must manually select what to bill
-        // console.log('[BillingModal] Billing already exists for this appointment. Not pre-selecting treatments.');
         setSelectedTreatments([]);
-        initializedAppointmentId.current = appointment._id;
+        initializedAppointmentId.current = initKey;
         return;
       }
     }
@@ -1316,9 +1358,8 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
 
     // Only initialize if billing history has loaded
     if (billingHistoryFetched) {
-      // console.log('[BillingModal] First billing for this appointment. Pre-selecting:', initialTreatments.map(t => t.treatmentName));
       setSelectedTreatments(initialTreatments);
-      initializedAppointmentId.current = appointment._id;
+      initializedAppointmentId.current = initKey;
     }
   }, [isOpen, appointment, treatments, billingHistory, billingHistoryFetched, billedTreatmentInfos]);
 
@@ -2830,14 +2871,16 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
    
     // Always ensure amount has a value - either with previous pending or just the discounted total
     // Include pending balance AND pending claim in the total
+    // Also include unpaid packages total
     const invoiceTotal = Number(
-      (discountedTotal + (balances.pendingBalance || 0) + (balances.pendingClaim || 0)).toFixed(2),
+      (discountedTotal + (balances.pendingBalance || 0) + (balances.pendingClaim || 0) + unpaidPackagesTotal).toFixed(2),
     );
    
     console.log("Adding previous pending:", {
       discountedTotal,
       previousPending: balances.pendingBalance,
       pendingClaim: balances.pendingClaim,
+      unpaidPackagesTotal,
       invoiceTotal,
       currentAmount: formData.amount
     });
@@ -2849,7 +2892,7 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
         amount: invoiceTotal.toFixed(2),
       }));
     }
-  }, [balances.pendingBalance, balances.pendingClaim, formData.discountedAmount]);
+  }, [balances.pendingBalance, balances.pendingClaim, formData.discountedAmount, unpaidPackagesTotal]);
 
   // Auto-calc pending/advance considering applied advance balances
   useEffect(() => {
@@ -2872,11 +2915,11 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
     // Total pending being rolled in (for amountForCredits calculation)
     const pendingBeingRolledIn = pendingUsed + pendingClaimUsed;
     
-    // Amount for credits = discounted amount + all pending (balance + claim)
-    // This equals invoiceTotal which includes: discountedAmount + pendingBalance + pendingClaim
+    // Amount for credits = discounted amount + all pending (balance + claim) + unpaid packages
+    // This equals invoiceTotal which includes: discountedAmount + pendingBalance + pendingClaim + unpaidPackagesTotal
 
-    // Amount available for applying credits = final amount after cashback + pending rolled in
-    const amountForCredits = finalAmountAfterCashback + pendingBeingRolledIn;
+    // Amount available for applying credits = final amount after cashback + pending rolled in + unpaid packages
+    const amountForCredits = finalAmountAfterCashback + pendingBeingRolledIn + unpaidPackagesTotal;
     
     console.log('[PendingCalculation] Calculation breakdown:', {
       originalAmount: originalAmountNum,
@@ -2884,6 +2927,7 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
       cashbackDeduction,
       finalAmountAfterCashback,
       pendingBeingRolledIn,
+      unpaidPackagesTotal,
       amountForCredits
     });
 
@@ -3020,6 +3064,7 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
     balances.pendingClaim,
     useMultiplePayments,
     multiplePayments,
+    unpaidPackagesTotal,
   ]);
 
   // Close dropdowns when clicking outside
@@ -3818,6 +3863,16 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
             isUserPackage: true
           });
         }
+      }
+
+      // Track unpaid packages being paid in this billing
+      // Only include packages where the full amount is being paid
+      const paidAmount = parseFloat(formData.paid) || 0;
+      
+      // If paid amount covers the unpaid packages total, mark them as being paid
+      if (unpaidPackagesTotal > 0 && paidAmount >= unpaidPackagesTotal) {
+        payload.unpaidPackagesPaid = unpaidPackagesBeingPaid;
+        console.log('[PackagePayment] Tracking unpaid packages being paid:', unpaidPackagesBeingPaid);
       }
 
       console.log("Final submission payload:", payload);
@@ -5189,6 +5244,11 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
                             + Pending Claim Added
                           </div>
                         )}
+                        {unpaidPackagesTotal > 0 && (
+                          <div className="text-[9px] text-red-600 mt-0.5 font-bold uppercase tracking-wider">
+                            + Unpaid Package Amount Added
+                          </div>
+                        )}
                         {(isDoctorDiscountApplied || isAgentDiscountApplied) && (
                           <div className="text-[9px] text-red-500 mt-0.5 font-medium italic">
                             Discounted from {getCurrencySymbol(currency)} {parseFloat(formData.originalAmount || "0").toFixed(2)}
@@ -5244,7 +5304,8 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
                               const pendingUsed = balances.pendingBalance || 0;
                               const pendingClaimUsed = balances.pendingClaim || 0;
                               const pendingBeingRolledIn = pendingUsed + pendingClaimUsed;
-                              const amountForCredits = finalAmountAfterCashback + pendingBeingRolledIn;
+                              // Include unpaid packages total in amount for credits
+                              const amountForCredits = finalAmountAfterCashback + pendingBeingRolledIn + unpaidPackagesTotal;
                               
                               const appliedAdvance = applyAdvance 
                                 ? Math.min(balances.advanceBalance, amountForCredits) 
@@ -5518,6 +5579,19 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
                         </div>
                       )}
 
+                      {/* Unpaid Packages Total */}
+                      {unpaidPackagesTotal > 0 && (
+                        <div className="flex items-center justify-between text-[11px]">
+                          <div className="flex items-center gap-1">
+                            <span className="text-gray-600">Unpaid Packages</span>
+                            <span className="px-1.5 py-0.5 text-[8px] font-bold bg-red-100 text-red-700 rounded border border-red-200 uppercase">
+                              Added
+                            </span>
+                          </div>
+                          <span className="font-semibold text-red-600">+{getCurrencySymbol(currency)} {unpaidPackagesTotal.toFixed(2)}</span>
+                        </div>
+                      )}
+
                       {/* Membership Discount (if applied) */}
                       {isMembershipApplied && finalMembershipDiscount > 0 && (
                         <div className="flex items-center justify-between text-[11px]">
@@ -5618,6 +5692,11 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
                           {balances.pendingClaim > 0 && (
                             <span className="px-1.5 py-0.5 text-[8px] font-bold bg-purple-100 text-purple-700 rounded border border-purple-200 uppercase">
                               + Pending Claim Added
+                            </span>
+                          )}
+                          {unpaidPackagesTotal > 0 && (
+                            <span className="px-1.5 py-0.5 text-[8px] font-bold bg-red-100 text-red-700 rounded border border-red-200 uppercase">
+                              + Added Package Unpaid Price
                             </span>
                           )}
                         </div>
@@ -5951,6 +6030,7 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
                             const isExpired = pkg.endDate && new Date(pkg.endDate) < new Date();
                             const paymentStatus = pkg.paymentStatus || 'Unpaid';
                             const paidAmount = pkg.paidAmount || 0;
+                            const isUnpaid = paymentStatus === 'Unpaid' || paidAmount === 0;
 
                             return (
                               <div key={`${pkg.packageId || pkg._id}-${pkgIndex}`} className={`border ${isExpired ? 'border-red-200 bg-red-50' : 'border-teal-200 bg-gradient-to-br from-teal-50 to-cyan-50'} rounded-xl overflow-hidden relative shadow-sm`}>
@@ -5975,6 +6055,9 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
                                         )}
                                         {!isExpired && paymentStatus === 'Partial' && (
                                           <span className="px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[7px] font-black uppercase tracking-tighter shadow-sm">Partial (₹{paidAmount})</span>
+                                        )}
+                                        {!isExpired && isUnpaid && (
+                                          <span className="px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 text-[7px] font-black uppercase tracking-tighter shadow-sm">Unpaid</span>
                                         )}
                                       </div>
                                       <div className="text-[8px] text-gray-500 flex items-center gap-2">
