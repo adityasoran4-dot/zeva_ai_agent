@@ -438,6 +438,11 @@ billingSchema.pre("save", function (next) {
     );
   }
 
+  // Check if pending was directly modified, if so skip calculation
+  if (this.isModified('pending')) {
+    return next();
+  }
+
   // Effective due after applying previous advance AND insurance claim to this invoice
   const totalCreditsUsed = this.advanceUsed + this.claimAmountUsed;
   const effectiveDue = Math.max(0, this.amount - totalCreditsUsed);

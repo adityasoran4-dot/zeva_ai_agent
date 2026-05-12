@@ -39,6 +39,7 @@ import {
   Venus,
   Mars,
   AlertCircle,
+  Wrench,
 } from "lucide-react";
 import { jsPDF } from "jspdf";
 import useStockItems from "@/hooks/useStockItems";
@@ -394,6 +395,17 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
   const [servicesError, setServicesError] = useState("");
   const [loadingServices, setLoadingServices] = useState(false);
 
+  // Custom Service Add state
+  const [showAddCustomService, setShowAddCustomService] = useState(false);
+  const [departments, setDepartments] = useState<any[]>([]);
+  const [departmentsLoading, setDepartmentsLoading] = useState(false);
+  const [customServiceName, setCustomServiceName] = useState("");
+  const [customServicePrice, setCustomServicePrice] = useState("");
+  const [customServiceClinicPrice, setCustomServiceClinicPrice] = useState("");
+  const [customServiceDuration, setCustomServiceDuration] = useState("");
+  const [customServiceDepartment, setCustomServiceDepartment] = useState("");
+  const [addingCustomService, setAddingCustomService] = useState(false);
+
   // Create Package state
   const [showCreatePackage, setShowCreatePackage] = useState(false);
   const [createdPackage, setCreatedPackage] = useState<any>(null);
@@ -647,6 +659,13 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
       setServicesSaved(false);
       setServicesError("");
       setLoadingServices(false);
+      setShowAddCustomService(false);
+      setDepartments([]);
+      setCustomServiceName("");
+      setCustomServicePrice("");
+      setCustomServiceClinicPrice("");
+      setCustomServiceDuration("");
+      setCustomServiceDepartment("");
       setShowCreatePackage(false);
       setCreatedPackage(null);
       setPkgModalName("");
@@ -709,6 +728,13 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
     setServicesSaved(false);
     setServicesError("");
     setLoadingServices(false);
+    setShowAddCustomService(false);
+    setDepartments([]);
+    setCustomServiceName("");
+    setCustomServicePrice("");
+    setCustomServiceClinicPrice("");
+    setCustomServiceDuration("");
+    setCustomServiceDepartment("");
     setShowCreatePackage(false);
     setCreatedPackage(null);
     setPkgModalName("");
@@ -835,66 +861,6 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
       }
     };
 
-    const fetchPreviousComplaints = async (patientId: string) => {
-      setLoadingComplaints(true);
-      try {
-        const headers = getAuthHeaders();
-        const complaintsResponse = await axios.get(
-          "/api/clinic/patient-complaints",
-          {
-            headers,
-            params: { patientId },
-          },
-        );
-
-        if (complaintsResponse.data?.success) {
-          setPreviousComplaints(complaintsResponse.data.complaints || []);
-        }
-      } catch (err: any) {
-        console.error("Failed to fetch previous complaints:", err);
-        // Don't show error for complaints, just log it
-      } finally {
-        setLoadingComplaints(false);
-      }
-    };
-
-    const fetchPatientStats = async (patientId: string) => {
-      setLoadingPatientStats(true);
-      try {
-        const headers = getAuthHeaders();
-        if (!headers) return;
-
-        const response = await axios.get(`/api/clinic/patient-emr-stats/${patientId}`, { headers });
-        if (response.data?.success) {
-          const s = response.data;
-          setPatientStats({
-            totalSpend: s.totalSpend || 0,
-            totalBilled: s.totalBilled || 0,
-            totalPending: s.totalPending || 0,
-            totalVisits: s.totalVisits || 0,
-            billingCount: s.billingCount || 0,
-            recentBillings: s.recentBillings || [],
-          });
-        }
-      } catch (error) {
-        console.error('Error fetching patient stats:', error);
-      } finally {
-        setLoadingPatientStats(false);
-      }
-    };
-
-    const fetchPatientBalance = async (patientId: string) => {
-      try {
-        const headers = getAuthHeaders();
-        const res = await axios.get(`/api/clinic/patient-balance/${patientId}`, { headers });
-        if (res.data?.success && res.data.balances) {
-          setPatientBalance(res.data.balances);
-        }
-      } catch {
-        // silent
-      }
-    };
-
     fetchDetails();
   }, [isOpen, appointment, getAuthHeaders]);
 
@@ -1013,6 +979,30 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
     }
   };
 
+  // Fetch previous complaints
+  const fetchPreviousComplaints = async (patientId: string) => {
+    setLoadingComplaints(true);
+    try {
+      const headers = getAuthHeaders();
+      const complaintsResponse = await axios.get(
+        "/api/clinic/patient-complaints",
+        {
+          headers,
+          params: { patientId },
+        },
+      );
+
+      if (complaintsResponse.data?.success) {
+        setPreviousComplaints(complaintsResponse.data.complaints || []);
+      }
+    } catch (err: any) {
+      console.error("Failed to fetch previous complaints:", err);
+      // Don't show error for complaints, just log it
+    } finally {
+      setLoadingComplaints(false);
+    }
+  };
+
   // Fetch upcoming appointments for this patient (dates > today)
   const fetchUpcomingAppointments = async (patientId: string) => {
     setLoadingUpcoming(true);
@@ -1032,6 +1022,45 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
     }
   };
 
+  // Fetch patient EMR stats
+  const fetchPatientStats = async (patientId: string) => {
+    setLoadingPatientStats(true);
+    try {
+      const headers = getAuthHeaders();
+      if (!headers) return;
+
+      const response = await axios.get(`/api/clinic/patient-emr-stats/${patientId}`, { headers });
+      if (response.data?.success) {
+        const s = response.data;
+        setPatientStats({
+          totalSpend: s.totalSpend || 0,
+          totalBilled: s.totalBilled || 0,
+          totalPending: s.totalPending || 0,
+          totalVisits: s.totalVisits || 0,
+          billingCount: s.billingCount || 0,
+          recentBillings: s.recentBillings || [],
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching patient stats:', error);
+    } finally {
+      setLoadingPatientStats(false);
+    }
+  };
+
+  // Fetch patient balance
+  const fetchPatientBalance = async (patientId: string) => {
+    try {
+      const headers = getAuthHeaders();
+      const res = await axios.get(`/api/clinic/patient-balance/${patientId}`, { headers });
+      if (res.data?.success && res.data.balances) {
+        setPatientBalance(res.data.balances);
+      }
+    } catch {
+      // silent
+    }
+  };
+
   // Fetch all clinic services
   const fetchAllServices = async () => {
     setLoadingServices(true);
@@ -1045,6 +1074,67 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
       // silently ignore
     } finally {
       setLoadingServices(false);
+    }
+  };
+
+  // Fetch departments for custom service
+  const fetchDepartments = async () => {
+    setDepartmentsLoading(true);
+    try {
+      const headers = getAuthHeaders();
+      const res = await axios.get("/api/clinic/departments", { headers });
+      if (res.data?.success) {
+        setDepartments(res.data.departments || []);
+      }
+    } catch {
+      // silently ignore
+    } finally {
+      setDepartmentsLoading(false);
+    }
+  };
+
+  // Add custom service
+  const addCustomService = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customServiceName.trim()) return;
+    if (!customServicePrice) return;
+    if (!customServiceDepartment) return;
+
+    setAddingCustomService(true);
+    try {
+      const headers = getAuthHeaders();
+      const res = await axios.post(
+        "/api/clinic/services",
+        {
+          departmentId: customServiceDepartment,
+          items: [
+            {
+              name: customServiceName.trim(),
+              price: parseFloat(customServicePrice),
+              durationMinutes: customServiceDuration ? parseInt(customServiceDuration) : 0,
+              clinicPrice: customServiceClinicPrice ? parseFloat(customServiceClinicPrice) : null,
+            },
+          ],
+        },
+        { headers }
+      );
+      if (res.data?.success) {
+        // Reset form
+        setCustomServiceName("");
+        setCustomServicePrice("");
+        setCustomServiceClinicPrice("");
+        setCustomServiceDuration("");
+        setCustomServiceDepartment("");
+        setShowAddCustomService(false);
+        // Refresh services list
+        await fetchAllServices();
+        toast.success("Service added successfully!");
+      }
+    } catch (error) {
+      console.error("Error adding custom service:", error);
+      toast.error("Failed to add service");
+    } finally {
+      setAddingCustomService(false);
     }
   };
 
@@ -1135,7 +1225,35 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
               validityInMonths: parseInt(pkgModalValidityInMonths) || 0,
               startDate: pkgModalStartDate,
               endDate: pkgModalEndDate,
+              totalPrice: packagePrice,
+              paidAmount: 0,
+              paymentStatus: "Unpaid",
+              paymentMethod: "Cash",
             }, { headers });
+
+            // Create a package billing record so it gets added to the patient's pending balance
+            try {
+              await axios.post("/api/clinic/package-billing", {
+                patientId: details.patientId,
+                packageName: pkgModalName.trim(),
+                packageId: newPkgId,
+                totalAmount: packagePrice,
+                paidAmount: 0,
+                paymentMethod: "Cash",
+                paymentStatus: "Unpaid",
+                advanceBalanceUsed: 0,
+                claimAmountUsed: 0,
+                treatments: pkgSelectedTreatments,
+              }, { headers });
+              console.log('Package billing created for pending balance');
+              
+              // Refresh patient balance to show updated pending balance
+              fetchPatientBalance(details.patientId);
+              fetchPatientStats(details.patientId);
+            } catch (billingErr: any) {
+              console.error('Error creating package billing:', billingErr);
+            }
+            
             setPkgSuccess("Package created and added to patient profile!");
             setCreatedPackage(createdPkgData);
           } catch {
@@ -2224,6 +2342,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
                               type="button"
                               onClick={() => {
                                 setShowAddServiceDropdown(true);
+                                setShowAddCustomService(false);
                                 setShowCreatePackage(false);
                                 setServicesSaved(false);
                                 setServicesError("");
@@ -2236,8 +2355,21 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
                             <button
                               type="button"
                               onClick={() => {
+                                setShowAddCustomService(true);
+                                setShowAddServiceDropdown(false);
+                                setShowCreatePackage(false);
+                                if (departments.length === 0) fetchDepartments();
+                              }}
+                              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition-all shadow-md hover:shadow-lg"
+                            >
+                              <Wrench size={16} /> Add Custom Service
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
                                 setShowCreatePackage(true);
                                 setShowAddServiceDropdown(false);
+                                setShowAddCustomService(false);
                                 setPkgError("");
                                 setPkgSuccess("");
                                 if (allServices.length === 0) fetchAllServices(); // Load clinic services
@@ -2357,6 +2489,127 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
                                 </>
                               )}
                             </button>
+                          </div>
+                        )}
+
+                        {/* Custom Service Add Panel */}
+                        {showAddCustomService && (
+                          <div className="px-5 py-4 border-b border-gray-100 bg-gradient-to-br from-emerald-50/50 to-teal-50/50">
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
+                                  <Wrench className="w-4 h-4 text-emerald-600" />
+                                </div>
+                                <span className="text-sm font-bold text-emerald-800">Add Custom Service</span>
+                              </div>
+                              <button type="button" onClick={() => {
+                                setShowAddCustomService(false);
+                                setCustomServiceName("");
+                                setCustomServicePrice("");
+                                setCustomServiceClinicPrice("");
+                                setCustomServiceDuration("");
+                                setCustomServiceDepartment("");
+                              }} className="text-gray-400 hover:text-gray-600 transition-colors">
+                                <XIcon size={16} />
+                              </button>
+                            </div>
+
+                            <form onSubmit={addCustomService} className="space-y-3">
+                              <div>
+                                <label className="block text-xs font-semibold text-emerald-700 mb-1.5">Department <span className="text-red-500">*</span></label>
+                                <select
+                                  value={customServiceDepartment}
+                                  onChange={(e) => setCustomServiceDepartment(e.target.value)}
+                                  className="w-full px-3 py-2 text-sm border border-emerald-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent shadow-sm"
+                                  disabled={departmentsLoading}
+                                  required
+                                >
+                                  <option value="" disabled>Select department</option>
+                                  {departments.map((dept) => (
+                                    <option key={dept._id} value={dept._id}>
+                                      {dept.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              <div>
+                                <label className="block text-xs font-semibold text-emerald-700 mb-1.5">Service Name <span className="text-red-500">*</span></label>
+                                <input
+                                  type="text"
+                                  value={customServiceName}
+                                  onChange={(e) => setCustomServiceName(e.target.value)}
+                                  placeholder="Enter service name"
+                                  className="w-full px-3 py-2 text-sm border border-emerald-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent shadow-sm"
+                                  required
+                                />
+                              </div>
+
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                <div>
+                                  <label className="block text-xs font-semibold text-emerald-700 mb-1.5">Price <span className="text-red-500">*</span></label>
+                                  <div className="relative">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500 font-medium">{getCurrencySymbol(currency)}</span>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step="0.01"
+                                      value={customServicePrice}
+                                      onChange={(e) => setCustomServicePrice(e.target.value)}
+                                      placeholder="0.00"
+                                      className="w-full pl-10 pr-4 py-2 text-sm font-semibold border border-emerald-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent shadow-sm"
+                                      required
+                                    />
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <label className="block text-xs font-semibold text-emerald-700 mb-1.5">Clinic Price (Optional)</label>
+                                  <div className="relative">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500 font-medium">{getCurrencySymbol(currency)}</span>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step="0.01"
+                                      value={customServiceClinicPrice}
+                                      onChange={(e) => setCustomServiceClinicPrice(e.target.value)}
+                                      placeholder="0.00"
+                                      className="w-full pl-10 pr-4 py-2 text-sm font-semibold border border-emerald-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent shadow-sm"
+                                    />
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <label className="block text-xs font-semibold text-emerald-700 mb-1.5">Duration (Minutes)</label>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={customServiceDuration}
+                                    onChange={(e) => setCustomServiceDuration(e.target.value)}
+                                    placeholder="30"
+                                    className="w-full px-3 py-2 text-sm border border-emerald-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent shadow-sm"
+                                  />
+                                </div>
+                              </div>
+
+                              <button
+                                type="submit"
+                                disabled={addingCustomService}
+                                className="w-full flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md hover:shadow-lg"
+                              >
+                                {addingCustomService ? (
+                                  <>
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    Adding...
+                                  </>
+                                ) : (
+                                  <>
+                                    <CheckCircle className="w-4 h-4" />
+                                    Add Custom Service
+                                  </>
+                                )}
+                              </button>
+                            </form>
                           </div>
                         )}
 

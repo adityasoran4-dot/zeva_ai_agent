@@ -158,9 +158,10 @@ export default async function handler(req, res) {
       totalPastAdvanceUsed
     });
 
+    // Pending balance is sum of actual pending fields from each invoice
     const pendingBalance = Math.max(
       0,
-      Number((totalPending - totalPendingUsed).toFixed(2)),
+      Number(totalPending.toFixed(2)),
     );
     const advanceBalance = Math.max(
       0,

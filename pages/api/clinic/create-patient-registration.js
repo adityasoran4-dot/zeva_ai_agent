@@ -937,7 +937,7 @@ export default async function handler(req, res) {
       
       try {
         for (const pkgPayment of unpaidPackagesPaid) {
-          const { packageId, packageSubId, amount } = pkgPayment;
+          const { packageId, packageSubId, amount, packageName } = pkgPayment;
           
           if (!packageId || !packageSubId) {
             console.warn('[PackagePaymentAPI] Skipping package with missing IDs:', pkgPayment);
@@ -955,14 +955,15 @@ export default async function handler(req, res) {
             if (packageIndex !== -1) {
               // Update the package payment status to Full
               patient.packages[packageIndex].paymentStatus = 'Full';
-              patient.packages[packageIndex].paidAmount = amount;
+              patient.packages[packageIndex].paidAmount = amount || patient.packages[packageIndex].totalPrice;
               patient.packages[packageIndex].paymentMethod = paymentMethod || 'Cash';
               
               console.log('[PackagePaymentAPI] Updated package:', {
                 packageId,
                 packageSubId,
+                packageName: packageName || patient.packages[packageIndex].packageName,
                 paymentStatus: 'Full',
-                paidAmount: amount,
+                paidAmount: patient.packages[packageIndex].paidAmount,
                 paymentMethod: paymentMethod || 'Cash'
               });
               
@@ -979,6 +980,36 @@ export default async function handler(req, res) {
         console.error('[PackagePaymentAPI] Error updating package payment status:', packageUpdateError);
         // Don't fail the billing if package update fails
       }
+    }
+
+    // Update existing pending invoices if pendingUsedNum > 0
+    if (pendingUsedNum > 0) {
+      console.log('[CreatePatientRegistration] Updating pending invoices with pendingUsed:', pendingUsedNum);
+      
+      // Fetch all pending invoices (oldest first)
+      const pendingInvoices = await Billing.find({
+        clinicId: clinic._id,
+        patientId: patientRegistration._id,
+        pending: { $gt: 0 },
+        isAdvanceOnly: { $ne: true }
+      }).sort({ invoicedDate: 1, createdAt: 1 });
+
+      let remainingPendingUsed = pendingUsedNum;
+
+      for (const invoice of pendingInvoices) {
+        if (remainingPendingUsed <= 0) break;
+
+        const paymentForInvoice = Math.min(remainingPendingUsed, invoice.pending);
+
+        invoice.paid = (invoice.paid || 0) + paymentForInvoice;
+        invoice.pending = invoice.pending - paymentForInvoice;
+
+        await invoice.save();
+
+        remainingPendingUsed -= paymentForInvoice;
+      }
+
+      console.log('[CreatePatientRegistration] Updated pending invoices, remaining:', remainingPendingUsed);
     }
 
     // Doctor/Staff commission based on AgentProfile (supports flat, target-based, and after_deduction)
