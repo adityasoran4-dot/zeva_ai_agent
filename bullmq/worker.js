@@ -2,7 +2,7 @@ import { Worker } from "bullmq";
 import "dotenv/config";
 import mongoose from "mongoose";
 
-// --- Error Handlers ---
+// --------- Error Handlers ---------- //
 process.on("unhandledRejection", (reason, promise) => {
   console.error("❌ Unhandled Rejection at:", promise, "reason:", reason);
 });
@@ -10,7 +10,7 @@ process.on("unhandledRejection", (reason, promise) => {
 process.on("uncaughtException", (err) => {
   console.error("❌ Uncaught Exception:", err);
 });
-// ----------------------
+// --------- Error Handlers ---------- //
 
 import Lead from "../models/Lead.js";
 import Segment from "../models/Segment.js";
