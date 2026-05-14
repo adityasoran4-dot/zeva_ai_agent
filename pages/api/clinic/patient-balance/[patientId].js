@@ -56,8 +56,11 @@ export default async function handler(req, res) {
       }
     }
 
-    const match = { patientId };
-    if (clinicId) match.clinicId = clinicId;
+    const match = { 
+      patientId: patientId,
+      clinicId: clinicId,
+      isAdvanceOnly: { $ne: true }
+    };
 
     // We track advance and pending separately (not net)
     const billings = await Billing.find(match)
@@ -69,6 +72,23 @@ export default async function handler(req, res) {
 
     // Debug logging
     console.log(`[Patient Balance] Found ${billings.length} billing records for patient ${patientId}`);
+    console.log(`[Patient Balance] Query match:`, JSON.stringify(match));
+    
+    // Log all billing records to see their pending amounts
+    if (billings.length > 0) {
+      const pendingAmounts = billings.map(b => ({ invoice: b.invoiceNumber, pending: b.pending, pendingUsed: b.pendingUsed }));
+      console.log(`[Patient Balance] All billing records pending amounts:`, JSON.stringify(pendingAmounts, null, 2));
+      
+      // Log advance amounts
+      const advanceAmounts = billings.map(b => ({ 
+        invoice: b.invoiceNumber, 
+        treatment: b.treatment,
+        isAdvanceOnly: b.isAdvanceOnly,
+        advance: b.advance, 
+        advanceUsed: b.advanceUsed 
+      }));
+      console.log(`[Patient Balance] All billing records advance amounts:`, JSON.stringify(advanceAmounts, null, 2));
+    }
     const recordsWithImages = billings.filter(b => b.pendingBalanceImage && b.pendingBalanceImage.length > 0);
     console.log(`[Patient Balance] Records with images: ${recordsWithImages.length}`);
     if (recordsWithImages.length > 0) {
@@ -129,9 +149,19 @@ export default async function handler(req, res) {
       }
     }
 
+    console.log(`[Patient Balance] Totals calculated:`, {
+      totalPending,
+      totalPendingUsed,
+      totalAdvanceGenerated,
+      totalAdvanceUsed,
+      totalPastAdvanceGenerated,
+      totalPastAdvanceUsed
+    });
+
+    // Pending balance is sum of actual pending fields from each invoice
     const pendingBalance = Math.max(
       0,
-      Number((totalPending - totalPendingUsed).toFixed(2)),
+      Number(totalPending.toFixed(2)),
     );
     const advanceBalance = Math.max(
       0,

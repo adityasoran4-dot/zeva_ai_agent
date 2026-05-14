@@ -99,7 +99,7 @@ export default async function handler(req, res) {
       pending: 0,
       paymentMethod,
       status: "Completed",
-      isAdvanceOnly: true,
+      isAdvanceOnly: false, // Set to false so pastAdvance amount is included in balance calculation
       notes: notes,
       multiplePayments: [],
       paymentHistory: [],

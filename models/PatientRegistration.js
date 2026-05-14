@@ -133,6 +133,7 @@ const patientRegistrationSchema = new mongoose.Schema(
     packages: [
       {
         packageId: { type: mongoose.Schema.Types.ObjectId, ref: "Package" },
+        packageName: { type: String, trim: true }, // Store package name for quick display
         assignedDate: { type: Date, default: Date.now },
         validityInMonths: { type: Number, default: 0 },
         startDate: { type: Date },

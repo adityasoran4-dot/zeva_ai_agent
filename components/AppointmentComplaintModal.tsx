@@ -39,6 +39,7 @@ import {
   Venus,
   Mars,
   AlertCircle,
+  Wrench,
 } from "lucide-react";
 import { jsPDF } from "jspdf";
 import useStockItems from "@/hooks/useStockItems";
@@ -199,12 +200,12 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
   // Patient EMR stats — total spend from Billing, visits from Appointment
   interface PatientEMRStats {
     totalSpend: number; totalBilled: number; totalPending: number;
-    totalVisits: number; completedVisits: number; cancelledNoShow: number; billingCount: number;
+    totalVisits: number; billingCount: number;
     recentBillings: Array<{ service: string; label: string; amount: number; paid: number; pending: number; date: string }>;
   }
   const [patientStats, setPatientStats] = useState<PatientEMRStats | null>(null);
   const [loadingPatientStats, setLoadingPatientStats] = useState(false);
-  const [patientBalance, setPatientBalance] = useState({ pendingBalance: 0, advanceBalance: 0 });
+  const [patientBalance, setPatientBalance] = useState({ pendingBalance: 0, advanceBalance: 0, pendingClaim: 0 });
   // Ref to scroll to Previous Complaints when History is clicked
   const previousComplaintsRef = useRef<HTMLDivElement | null>(null);
   const [expandedComplaints, setExpandedComplaints] = useState<
@@ -315,6 +316,11 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
   const [bookingNextSession, setBookingNextSession] = useState(false);
   const [nextSessionBooked, setNextSessionBooked] = useState(false);
   const [nextSessionError, setNextSessionError] = useState<string>("");
+  // Rooms state
+  interface Room { _id: string; name: string; }
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [nextSessionRoom, setNextSessionRoom] = useState<string>("");
+  const [loadingRooms, setLoadingRooms] = useState(false);
 
   // Upcoming appointments state
   interface UpcomingAppointment { _id: string; startDate: string; fromTime: string; toTime: string; status: string; followType: string; }
@@ -388,6 +394,17 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
   const [servicesSaved, setServicesSaved] = useState(false);
   const [servicesError, setServicesError] = useState("");
   const [loadingServices, setLoadingServices] = useState(false);
+
+  // Custom Service Add state
+  const [showAddCustomService, setShowAddCustomService] = useState(false);
+  const [departments, setDepartments] = useState<any[]>([]);
+  const [departmentsLoading, setDepartmentsLoading] = useState(false);
+  const [customServiceName, setCustomServiceName] = useState("");
+  const [customServicePrice, setCustomServicePrice] = useState("");
+  const [customServiceClinicPrice, setCustomServiceClinicPrice] = useState("");
+  const [customServiceDuration, setCustomServiceDuration] = useState("");
+  const [customServiceDepartment, setCustomServiceDepartment] = useState("");
+  const [addingCustomService, setAddingCustomService] = useState(false);
 
   // Create Package state
   const [showCreatePackage, setShowCreatePackage] = useState(false);
@@ -583,7 +600,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
       setExpandedComplaints({});
       setPatientStats(null);
       setLoadingPatientStats(false);
-      setPatientBalance({ pendingBalance: 0, advanceBalance: 0 });
+      setPatientBalance({ pendingBalance: 0, advanceBalance: 0, pendingClaim: 0 });
       setItems([]);
       setCurrentItem({
         itemId: "",
@@ -617,10 +634,8 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
       setNextSessionTime("09:00");
       setNextSessionBooked(false);
       setNextSessionError("");
-      setNextSessionDate(new Date().toISOString().slice(0, 10));
-      setNextSessionTime("09:00");
-      setNextSessionBooked(false);
-      setNextSessionError("");
+      setRooms([]);
+      setNextSessionRoom("");
       setUpcomingAppointments([]);
       setLoadingUpcoming(false);
       setConsentStatus(null);
@@ -644,6 +659,13 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
       setServicesSaved(false);
       setServicesError("");
       setLoadingServices(false);
+      setShowAddCustomService(false);
+      setDepartments([]);
+      setCustomServiceName("");
+      setCustomServicePrice("");
+      setCustomServiceClinicPrice("");
+      setCustomServiceDuration("");
+      setCustomServiceDepartment("");
       setShowCreatePackage(false);
       setCreatedPackage(null);
       setPkgModalName("");
@@ -673,7 +695,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
     setAfterImage("");
     setPreviousComplaints([]);
     setPatientStats(null);
-    setPatientBalance({ pendingBalance: 0, advanceBalance: 0 });
+    setPatientBalance({ pendingBalance: 0, advanceBalance: 0, pendingClaim: 0 });
     setProgressNotes([]);
     setPrescriptionHistory([]);
     setUpcomingAppointments([]);
@@ -706,6 +728,13 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
     setServicesSaved(false);
     setServicesError("");
     setLoadingServices(false);
+    setShowAddCustomService(false);
+    setDepartments([]);
+    setCustomServiceName("");
+    setCustomServicePrice("");
+    setCustomServiceClinicPrice("");
+    setCustomServiceDuration("");
+    setCustomServiceDepartment("");
     setShowCreatePackage(false);
     setCreatedPackage(null);
     setPkgModalName("");
@@ -735,6 +764,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
       }
     };
     fetchConsentForms();
+    fetchRooms();
 
     const fetchDetails = async () => {
       setLoading(true);
@@ -831,110 +861,6 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
       }
     };
 
-    const fetchPreviousComplaints = async (patientId: string) => {
-      setLoadingComplaints(true);
-      try {
-        const headers = getAuthHeaders();
-        const complaintsResponse = await axios.get(
-          "/api/clinic/patient-complaints",
-          {
-            headers,
-            params: { patientId },
-          },
-        );
-
-        if (complaintsResponse.data?.success) {
-          setPreviousComplaints(complaintsResponse.data.complaints || []);
-        }
-      } catch (err: any) {
-        console.error("Failed to fetch previous complaints:", err);
-        // Don't show error for complaints, just log it
-      } finally {
-        setLoadingComplaints(false);
-      }
-    };
-
-    const fetchPatientStats = async (patientId: string) => {
-      setLoadingPatientStats(true);
-      try {
-        const headers = getAuthHeaders();
-        if (!headers) return;
-
-        // Fetch appointments for the past year to calculate total visits
-        const today = new Date().toISOString().split('T')[0];
-        const oneYearAgo = new Date();
-        oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-       
-        const [appointmentsRes, balanceRes] = await Promise.all([
-          axios.get(
-            `/api/clinic/all-appointments?page=1&limit=1000&fromDate=${oneYearAgo.toISOString().split('T')[0]}&toDate=${today}`,
-            { headers }
-          ),
-          axios.get(`/api/clinic/patient-balance/${patientId}`, { headers }).catch(() => ({ data: { success: false } }))
-        ]);
-
-        let totalVisits = 0;
-        let completedVisits = 0;
-        let cancelledNoShow = 0;
-        let totalSpend = 0;
-
-        if (appointmentsRes.data.success) {
-          const patientAppointments = appointmentsRes.data.appointments?.filter(
-            (apt: any) => apt.patientId === patientId
-          ) || [];
-         
-          // Count total visits based on specific statuses
-          const visitStatuses = ['arrived', 'waiting', 'consultation', 'approved', 'rescheduled', 'completed', 'discharge', 'invoice'];
-          totalVisits = patientAppointments.filter((apt: any) => {
-            const status = (apt.status || '').toLowerCase();
-            return visitStatuses.includes(status);
-          }).length;
-         
-          patientAppointments.forEach((apt: any) => {
-            const status = (apt.status || apt.appointmentStatus || '').toLowerCase();
-            if (['cancelled', 'rejected', 'no show', 'no-show'].includes(status)) {
-              cancelledNoShow += 1;
-            }
-            if (['completed', 'discharge', 'approved'].includes(status)) {
-              completedVisits += 1;
-            }
-          });
-        }
-
-        // Get total spend from patient balance API
-        if (balanceRes.data?.success && balanceRes.data.balances) {
-          totalSpend = Number(balanceRes.data.balances.totalSpent) || 0;
-        }
-
-        setPatientStats({
-          totalSpend,
-          totalVisits,
-          completedVisits,
-          cancelledNoShow,
-          totalBilled: 0,
-          totalPending: 0,
-          billingCount: 0,
-          recentBillings: [],
-        });
-      } catch (error) {
-        console.error('Error fetching patient stats:', error);
-      } finally {
-        setLoadingPatientStats(false);
-      }
-    };
-
-    const fetchPatientBalance = async (patientId: string) => {
-      try {
-        const headers = getAuthHeaders();
-        const res = await axios.get(`/api/clinic/patient-balance/${patientId}`, { headers });
-        if (res.data?.success && res.data.balances) {
-          setPatientBalance(res.data.balances);
-        }
-      } catch {
-        // silent
-      }
-    };
-
     fetchDetails();
   }, [isOpen, appointment, getAuthHeaders]);
 
@@ -1024,7 +950,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
       const toDate = new Date(0, 0, 0, hh, mm + 30);
       const toTime = `${String(toDate.getHours()).padStart(2, "0")}:${String(toDate.getMinutes()).padStart(2, "0")}`;
 
-      await axios.post("/api/clinic/appointments", {
+      const appointmentData: any = {
         patientId: details.patientId,
         doctorId: details.doctorId,
         startDate: nextSessionDate,
@@ -1035,7 +961,14 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
         bookedFrom: "doctor",
         referral: "direct",
         emergency: "no",
-      }, { headers });
+      };
+
+      // Add roomId if selected
+      if (nextSessionRoom) {
+        appointmentData.roomId = nextSessionRoom;
+      }
+
+      await axios.post("/api/clinic/appointments", appointmentData, { headers });
       setNextSessionBooked(true);
       // Refresh upcoming list
       if (details?.patientId) fetchUpcomingAppointments(details.patientId);
@@ -1043,6 +976,30 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
       setNextSessionError(err.response?.data?.message || "Failed to book next session.");
     } finally {
       setBookingNextSession(false);
+    }
+  };
+
+  // Fetch previous complaints
+  const fetchPreviousComplaints = async (patientId: string) => {
+    setLoadingComplaints(true);
+    try {
+      const headers = getAuthHeaders();
+      const complaintsResponse = await axios.get(
+        "/api/clinic/patient-complaints",
+        {
+          headers,
+          params: { patientId },
+        },
+      );
+
+      if (complaintsResponse.data?.success) {
+        setPreviousComplaints(complaintsResponse.data.complaints || []);
+      }
+    } catch (err: any) {
+      console.error("Failed to fetch previous complaints:", err);
+      // Don't show error for complaints, just log it
+    } finally {
+      setLoadingComplaints(false);
     }
   };
 
@@ -1065,6 +1022,45 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
     }
   };
 
+  // Fetch patient EMR stats
+  const fetchPatientStats = async (patientId: string) => {
+    setLoadingPatientStats(true);
+    try {
+      const headers = getAuthHeaders();
+      if (!headers) return;
+
+      const response = await axios.get(`/api/clinic/patient-emr-stats/${patientId}`, { headers });
+      if (response.data?.success) {
+        const s = response.data;
+        setPatientStats({
+          totalSpend: s.totalSpend || 0,
+          totalBilled: s.totalBilled || 0,
+          totalPending: s.totalPending || 0,
+          totalVisits: s.totalVisits || 0,
+          billingCount: s.billingCount || 0,
+          recentBillings: s.recentBillings || [],
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching patient stats:', error);
+    } finally {
+      setLoadingPatientStats(false);
+    }
+  };
+
+  // Fetch patient balance
+  const fetchPatientBalance = async (patientId: string) => {
+    try {
+      const headers = getAuthHeaders();
+      const res = await axios.get(`/api/clinic/patient-balance/${patientId}`, { headers });
+      if (res.data?.success && res.data.balances) {
+        setPatientBalance(res.data.balances);
+      }
+    } catch {
+      // silent
+    }
+  };
+
   // Fetch all clinic services
   const fetchAllServices = async () => {
     setLoadingServices(true);
@@ -1081,6 +1077,83 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
     }
   };
 
+  // Fetch departments for custom service
+  const fetchDepartments = async () => {
+    setDepartmentsLoading(true);
+    try {
+      const headers = getAuthHeaders();
+      const res = await axios.get("/api/clinic/departments", { headers });
+      if (res.data?.success) {
+        setDepartments(res.data.departments || []);
+      }
+    } catch {
+      // silently ignore
+    } finally {
+      setDepartmentsLoading(false);
+    }
+  };
+
+  // Add custom service
+  const addCustomService = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customServiceName.trim()) return;
+    if (!customServicePrice) return;
+    if (!customServiceDepartment) return;
+
+    setAddingCustomService(true);
+    try {
+      const headers = getAuthHeaders();
+      const res = await axios.post(
+        "/api/clinic/services",
+        {
+          departmentId: customServiceDepartment,
+          items: [
+            {
+              name: customServiceName.trim(),
+              price: parseFloat(customServicePrice),
+              durationMinutes: customServiceDuration ? parseInt(customServiceDuration) : 0,
+              clinicPrice: customServiceClinicPrice ? parseFloat(customServiceClinicPrice) : null,
+            },
+          ],
+        },
+        { headers }
+      );
+      if (res.data?.success) {
+        // Reset form
+        setCustomServiceName("");
+        setCustomServicePrice("");
+        setCustomServiceClinicPrice("");
+        setCustomServiceDuration("");
+        setCustomServiceDepartment("");
+        setShowAddCustomService(false);
+        // Refresh services list
+        await fetchAllServices();
+        toast.success("Service added successfully!");
+      }
+    } catch (error) {
+      console.error("Error adding custom service:", error);
+      toast.error("Failed to add service");
+    } finally {
+      setAddingCustomService(false);
+    }
+  };
+
+  // Fetch all clinic rooms
+  const fetchRooms = async () => {
+    setLoadingRooms(true);
+    try {
+      const headers = getAuthHeaders();
+      const res = await axios.get("/api/clinic/rooms", { headers });
+      if (res.data?.success) {
+        setRooms(res.data.rooms || []);
+      }
+    } catch {
+      // silently ignore
+    } finally {
+      setLoadingRooms(false);
+    }
+  };
+
   // Save selected services to appointment
   const saveServicesToAppointment = async () => {
     if (!details?.appointmentId || selectedServices.length === 0) return;
@@ -1093,6 +1166,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
       await axios.patch(`/api/clinic/appointment-services/${details.appointmentId}`, { serviceIds }, { headers });
       setServicesSaved(true);
       setShowAddServiceDropdown(false);
+      if (onSuccess) onSuccess();
     } catch (err: any) {
       setServicesError(err.response?.data?.message || "Failed to save services.");
     } finally {
@@ -1151,7 +1225,35 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
               validityInMonths: parseInt(pkgModalValidityInMonths) || 0,
               startDate: pkgModalStartDate,
               endDate: pkgModalEndDate,
+              totalPrice: packagePrice,
+              paidAmount: 0,
+              paymentStatus: "Unpaid",
+              paymentMethod: "Cash",
             }, { headers });
+
+            // Create a package billing record so it gets added to the patient's pending balance
+            try {
+              await axios.post("/api/clinic/package-billing", {
+                patientId: details.patientId,
+                packageName: pkgModalName.trim(),
+                packageId: newPkgId,
+                totalAmount: packagePrice,
+                paidAmount: 0,
+                paymentMethod: "Cash",
+                paymentStatus: "Unpaid",
+                advanceBalanceUsed: 0,
+                claimAmountUsed: 0,
+                treatments: pkgSelectedTreatments,
+              }, { headers });
+              console.log('Package billing created for pending balance');
+              
+              // Refresh patient balance to show updated pending balance
+              fetchPatientBalance(details.patientId);
+              fetchPatientStats(details.patientId);
+            } catch (billingErr: any) {
+              console.error('Error creating package billing:', billingErr);
+            }
+            
             setPkgSuccess("Package created and added to patient profile!");
             setCreatedPackage(createdPkgData);
           } catch {
@@ -2240,6 +2342,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
                               type="button"
                               onClick={() => {
                                 setShowAddServiceDropdown(true);
+                                setShowAddCustomService(false);
                                 setShowCreatePackage(false);
                                 setServicesSaved(false);
                                 setServicesError("");
@@ -2252,8 +2355,21 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
                             <button
                               type="button"
                               onClick={() => {
+                                setShowAddCustomService(true);
+                                setShowAddServiceDropdown(false);
+                                setShowCreatePackage(false);
+                                if (departments.length === 0) fetchDepartments();
+                              }}
+                              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition-all shadow-md hover:shadow-lg"
+                            >
+                              <Wrench size={16} /> Add Custom Service
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
                                 setShowCreatePackage(true);
                                 setShowAddServiceDropdown(false);
+                                setShowAddCustomService(false);
                                 setPkgError("");
                                 setPkgSuccess("");
                                 if (allServices.length === 0) fetchAllServices(); // Load clinic services
@@ -2373,6 +2489,127 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
                                 </>
                               )}
                             </button>
+                          </div>
+                        )}
+
+                        {/* Custom Service Add Panel */}
+                        {showAddCustomService && (
+                          <div className="px-5 py-4 border-b border-gray-100 bg-gradient-to-br from-emerald-50/50 to-teal-50/50">
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
+                                  <Wrench className="w-4 h-4 text-emerald-600" />
+                                </div>
+                                <span className="text-sm font-bold text-emerald-800">Add Custom Service</span>
+                              </div>
+                              <button type="button" onClick={() => {
+                                setShowAddCustomService(false);
+                                setCustomServiceName("");
+                                setCustomServicePrice("");
+                                setCustomServiceClinicPrice("");
+                                setCustomServiceDuration("");
+                                setCustomServiceDepartment("");
+                              }} className="text-gray-400 hover:text-gray-600 transition-colors">
+                                <XIcon size={16} />
+                              </button>
+                            </div>
+
+                            <form onSubmit={addCustomService} className="space-y-3">
+                              <div>
+                                <label className="block text-xs font-semibold text-emerald-700 mb-1.5">Department <span className="text-red-500">*</span></label>
+                                <select
+                                  value={customServiceDepartment}
+                                  onChange={(e) => setCustomServiceDepartment(e.target.value)}
+                                  className="w-full px-3 py-2 text-sm border border-emerald-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent shadow-sm"
+                                  disabled={departmentsLoading}
+                                  required
+                                >
+                                  <option value="" disabled>Select department</option>
+                                  {departments.map((dept) => (
+                                    <option key={dept._id} value={dept._id}>
+                                      {dept.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              <div>
+                                <label className="block text-xs font-semibold text-emerald-700 mb-1.5">Service Name <span className="text-red-500">*</span></label>
+                                <input
+                                  type="text"
+                                  value={customServiceName}
+                                  onChange={(e) => setCustomServiceName(e.target.value)}
+                                  placeholder="Enter service name"
+                                  className="w-full px-3 py-2 text-sm border border-emerald-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent shadow-sm"
+                                  required
+                                />
+                              </div>
+
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                <div>
+                                  <label className="block text-xs font-semibold text-emerald-700 mb-1.5">Price <span className="text-red-500">*</span></label>
+                                  <div className="relative">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500 font-medium">{getCurrencySymbol(currency)}</span>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step="0.01"
+                                      value={customServicePrice}
+                                      onChange={(e) => setCustomServicePrice(e.target.value)}
+                                      placeholder="0.00"
+                                      className="w-full pl-10 pr-4 py-2 text-sm font-semibold border border-emerald-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent shadow-sm"
+                                      required
+                                    />
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <label className="block text-xs font-semibold text-emerald-700 mb-1.5">Clinic Price (Optional)</label>
+                                  <div className="relative">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500 font-medium">{getCurrencySymbol(currency)}</span>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step="0.01"
+                                      value={customServiceClinicPrice}
+                                      onChange={(e) => setCustomServiceClinicPrice(e.target.value)}
+                                      placeholder="0.00"
+                                      className="w-full pl-10 pr-4 py-2 text-sm font-semibold border border-emerald-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent shadow-sm"
+                                    />
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <label className="block text-xs font-semibold text-emerald-700 mb-1.5">Duration (Minutes)</label>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={customServiceDuration}
+                                    onChange={(e) => setCustomServiceDuration(e.target.value)}
+                                    placeholder="30"
+                                    className="w-full px-3 py-2 text-sm border border-emerald-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent shadow-sm"
+                                  />
+                                </div>
+                              </div>
+
+                              <button
+                                type="submit"
+                                disabled={addingCustomService}
+                                className="w-full flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md hover:shadow-lg"
+                              >
+                                {addingCustomService ? (
+                                  <>
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    Adding...
+                                  </>
+                                ) : (
+                                  <>
+                                    <CheckCircle className="w-4 h-4" />
+                                    Add Custom Service
+                                  </>
+                                )}
+                              </button>
+                            </form>
                           </div>
                         )}
 
@@ -2923,6 +3160,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
                                             try {
                                               await axios.patch(`/api/clinic/appointment-services/${details.appointmentId}`, { serviceIds: [svc._id] }, { headers: getAuthHeaders() });
                                               setAddedRecServices((p) => ({ ...p, [patientServiceKey]: true }));
+                                              if (onSuccess) onSuccess();
                                             } catch (err: any) {
                                               // If API fails, remove from selectedServices
                                               setSelectedServices((prev) => prev.filter((s) => s._id !== svc._id));
@@ -3423,6 +3661,23 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
                               })}
                             </select>
                           </div>
+                          <div className="col-span-2">
+                            <label className="block text-xs text-gray-500 mb-1.5">Select Room</label>
+                            <select
+                              value={nextSessionRoom}
+                              onChange={(e) => { setNextSessionRoom(e.target.value); setNextSessionBooked(false); setNextSessionError(""); }}
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
+                            >
+                              <option value="">Select a room...</option>
+                              {loadingRooms ? (
+                                <option disabled>Loading rooms...</option>
+                              ) : (
+                                rooms.map((room) => (
+                                  <option key={room._id} value={room._id}>{room.name}</option>
+                                ))
+                              )}
+                            </select>
+                          </div>
                         </div>
                         {nextSessionError && (
                           <div className="mb-3 flex items-center gap-2 p-2.5 rounded-lg bg-red-50 border border-red-200">
@@ -3584,6 +3839,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
                                             try {
                                               await axios.patch(`/api/clinic/appointment-services/${details.appointmentId}`, { serviceIds: [svc._id] }, { headers: getAuthHeaders() });
                                               setAddedRecServices((p) => ({ ...p, [patientServiceKey]: true }));
+                                              if (onSuccess) onSuccess();
                                             } catch (err: any) {
                                               // If API fails, remove from selectedServices
                                               setSelectedServices((prev) => prev.filter((s) => s._id !== svc._id));
@@ -4597,6 +4853,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
                                             try {
                                               await axios.patch(`/api/clinic/appointment-services/${details.appointmentId}`, { serviceIds: [svc._id] }, { headers: getAuthHeaders() });
                                               setAddedRecServices((p) => ({ ...p, [patientServiceKey]: true }));
+                                              if (onSuccess) onSuccess();
                                             } catch (err: any) {
                                               // If API fails, remove from selectedServices
                                               setSelectedServices((prev) => prev.filter((s) => s._id !== svc._id));
@@ -5198,14 +5455,14 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
                           <span className="text-xs text-gray-500">Total Paid (All-Time)</span>
                           <span className="text-base font-bold text-gray-900">{getCurrencySymbol(currency)} {patientStats.totalSpend.toLocaleString()}</span>
                         </div>
-                        <div className="flex items-center justify-between">
+                        {/* <div className="flex items-center justify-between">
                           <span className="text-xs text-gray-500">Total Billed</span>
                           <span className="text-xs font-semibold text-gray-700">{getCurrencySymbol(currency)} {patientStats.totalBilled.toLocaleString()}</span>
-                        </div>
-                        {patientStats.totalPending > 0 && (
+                        </div> */}
+                        {(patientBalance.pendingBalance > 0 || patientBalance.pendingClaim > 0) && (
                           <div className="flex items-center justify-between">
                             <span className="text-xs text-gray-500">Outstanding</span>
-                            <span className="text-xs font-semibold text-red-500">{getCurrencySymbol(currency)} {patientBalance.pendingBalance.toLocaleString()}</span>
+                            <span className="text-xs font-semibold text-red-500">{getCurrencySymbol(currency)} {(patientBalance.pendingBalance + patientBalance.pendingClaim).toLocaleString()}</span>
                           </div>
                         )}
                         <div className="flex items-center justify-between border-t border-gray-100 pt-2">

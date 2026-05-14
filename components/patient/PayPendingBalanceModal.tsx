@@ -158,12 +158,19 @@ const PayPendingBalanceModal: React.FC<PayPendingBalanceModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
+    const amountNum = Number(amount);
+    
+    if (!amount || isNaN(amountNum) || amountNum < 0) {
       setError("Please enter a valid amount.");
       return;
     }
 
-    if (Number(amount) > pendingBalance) {
+    if (amountNum === 0 && (!useAdvanceBalance || advanceUsed <= 0)) {
+      setError("Please enter a valid amount.");
+      return;
+    }
+
+    if (amountNum > pendingBalance) {
       setError("Payment amount cannot exceed pending balance.");
       return;
     }
@@ -179,6 +186,7 @@ const PayPendingBalanceModal: React.FC<PayPendingBalanceModalProps> = ({
           amount: Number(amount),
           paymentMethod,
           notes: notes || `Payment towards pending balance of ${pendingBalance}`,
+          advanceUsed: advanceUsed,
         },
         {
           headers: {

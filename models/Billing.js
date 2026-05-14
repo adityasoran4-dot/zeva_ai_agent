@@ -110,6 +110,16 @@ const billingSchema = new mongoose.Schema(
         _id: false,
       },
     ],
+    // Track unpaid packages that were paid in this billing
+    unpaidPackagesPaid: [
+      {
+        packageId: { type: mongoose.Schema.Types.ObjectId, ref: "Package" },
+        packageSubId: { type: mongoose.Schema.Types.ObjectId },
+        packageName: { type: String, trim: true },
+        amount: { type: Number, min: 0, default: 0 },
+        _id: false,
+      },
+    ],
     // Payment details
     amount: {
       type: Number,
@@ -426,6 +436,11 @@ billingSchema.pre("save", function (next) {
       (sum, mp) => sum + Number(mp.amount || 0),
       0,
     );
+  }
+
+  // Check if pending was directly modified, if so skip calculation
+  if (this.isModified('pending')) {
+    return next();
   }
 
   // Effective due after applying previous advance AND insurance claim to this invoice

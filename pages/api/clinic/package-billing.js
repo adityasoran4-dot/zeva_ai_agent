@@ -1,6 +1,7 @@
 import dbConnect from "../../../lib/database";
 import Billing from "../../../models/Billing";
 import PatientRegistration from "../../../models/PatientRegistration";
+import PettyCash from "../../../models/PettyCash";
 import { getUserFromReq } from "../lead-ms/auth";
 import { getClinicIdFromUser } from "../lead-ms/permissions-helper";
 
@@ -51,6 +52,26 @@ export default async function handler(req, res) {
     const patient = await PatientRegistration.findOne({ _id: patientId, clinicId });
     if (!patient) {
       return res.status(404).json({ success: false, message: "Patient not found or does not belong to this clinic" });
+    }
+
+    // Check if billing already exists for this package in last 10 minutes (avoid duplicates)
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+    const existingBilling = await Billing.findOne({
+      clinicId,
+      patientId,
+      package: packageName,
+      amount: totalAmount,
+      paid: paidAmount,
+      invoicedDate: { $gte: tenMinutesAgo }
+    });
+    if (existingBilling) {
+      console.log(`[Package Billing] Skipping duplicate billing for patient ${patientId}, package ${packageName}`);
+      return res.status(200).json({
+        success: true,
+        message: "Package billing already exists (duplicate skipped)",
+        billing: existingBilling,
+        invoiceNumber: existingBilling.invoiceNumber,
+      });
     }
 
     // Calculate pending amount
@@ -113,6 +134,31 @@ export default async function handler(req, res) {
     });
 
     await billingRecord.save();
+
+    // Add to PettyCash if payment method is Cash and paidAmount > 0
+    if (paymentMethod === "Cash" && paidAmount > 0) {
+      try {
+        const pettyCashRecord = await PettyCash.create({
+          clinicId,
+          staffId: user._id,
+          patientName: `${patient.firstName || ''} ${patient.lastName || ''}`.trim(),
+          patientEmail: patient.email || '',
+          patientPhone: patient.mobileNumber || '',
+          note: `Auto-added from package payment - Package: ${packageName}, Invoice: ${finalInvoiceNumber}`,
+          allocatedAmounts: [{
+            amount: paidAmount,
+            receipts: [],
+            date: new Date()
+          }],
+          expenses: []
+        });
+
+        await PettyCash.updateGlobalTotalAmount(clinicId, paidAmount, 'add');
+      } catch (pettyCashError) {
+        console.error('[Package Billing] Error adding to Petty Cash:', pettyCashError);
+        // Swallow petty cash errors to avoid breaking package billing
+      }
+    }
 
     console.log(`[Package Billing] Created billing record for patient ${patientId}, package ${packageName}`);
     console.log(`[Package Billing] Total: ${totalAmount}, Paid: ${paidAmount || 0}, Advance Used: ${advanceBalanceUsed || 0}, Claim Used: ${claimAmountUsed || 0}, Pending: ${pendingAmount}`);

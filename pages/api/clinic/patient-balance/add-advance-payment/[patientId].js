@@ -102,7 +102,7 @@ export default async function handler(req, res) {
       pending: 0, // Explicitly set to 0 to satisfy potentially cached schema requirements
       paymentMethod: paymentMethod || initialMultiplePayments[0].paymentMethod,
       status: "Completed",
-      isAdvanceOnly: true,
+      isAdvanceOnly: false, // Set to false so advance amount is included in balance calculation
       multiplePayments: initialMultiplePayments,
       paymentHistory: [
         {
