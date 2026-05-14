@@ -1,19 +1,27 @@
 "use client";
 import React, { useEffect, useRef, useState, useCallback } from "react";
-import { ChromePicker } from 'react-color';
+import { ChromePicker } from "react-color";
 import { ModalPortal } from "../../lib/modalPortal";
 import { useRouter } from "next/router";
 import axios from "axios";
 import withClinicAuth from "../../components/withClinicAuth";
 import ClinicLayout from "../../components/ClinicLayout";
 import type { NextPageWithLayout } from "../_app";
-import { Loader2, Calendar, Clock, X, Upload, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  Loader2,
+  Calendar,
+  Clock,
+  X,
+  Upload,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import Loader from "../../components/Loader";
 import AppointmentBookingModal from "../../components/AppointmentBookingModal";
 import ImportAppointmentsModal from "../../components/ImportAppointmentsModal";
 import EditAppointmentModal from "../../components/EditAppointmentModal";
 import { toast, Toaster } from "react-hot-toast";
-import { useAgentPermissions } from '../../hooks/useAgentPermissions';
+import { useAgentPermissions } from "../../hooks/useAgentPermissions";
 
 interface DoctorStaff {
   _id: string;
@@ -58,22 +66,24 @@ const SUB_SLOT_HEIGHT_PX = ROW_HEIGHT_PX / 2;
 // Helper function to format date correctly without timezone issues
 function formatDateForDisplay(dateString: string): string {
   // Parse the date string in YYYY-MM-DD format directly
-  const [year, month, day] = dateString.split('-').map(Number);
+  const [year, month, day] = dateString.split("-").map(Number);
   // Create date object using local time to avoid timezone shifts
   const date = new Date(year, month - 1, day);
-  return date.toLocaleDateString("en-GB", {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric'
-  }).replace(/\//g, "-");
+  return date
+    .toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    })
+    .replace(/\//g, "-");
 }
 
 // Helper function to get today's date in local timezone (YYYY-MM-DD format)
 function getLocalTodayDate(): string {
   const now = new Date();
   const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
 
@@ -136,31 +146,39 @@ interface Appointment {
 
 // Helper: convert "HH:MM AM/PM" 12-hour string to "HH:MM" 24-hour string
 function convert12HourTo24(t: string): string {
-  if (!t) return '';
+  if (!t) return "";
   if (!/AM|PM/i.test(t)) return t; // already 24h
   const match = t.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-  if (!match) return '';
+  if (!match) return "";
   let h = parseInt(match[1], 10);
   const m = match[2];
   const period = match[3].toUpperCase();
-  if (period === 'PM' && h !== 12) h += 12;
-  else if (period === 'AM' && h === 12) h = 0;
-  return `${String(h).padStart(2, '0')}:${m}`;
+  if (period === "PM" && h !== 12) h += 12;
+  else if (period === "AM" && h === 12) h = 0;
+  return `${String(h).padStart(2, "0")}:${m}`;
 }
 
 // Parse the new weekly timings array for a specific date.
 // Returns { startTime, endTime } in 24h format, or null if closed/not found.
 function parseTimingsForDay(
   timings: any[],
-  dateStr: string // "YYYY-MM-DD"
+  dateStr: string, // "YYYY-MM-DD"
 ): { startTime: string; endTime: string } | null {
   if (!Array.isArray(timings) || !dateStr) return null;
-  const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-  const dayName = DAYS[new Date(dateStr + 'T00:00:00').getDay()];
+  const DAYS = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ];
+  const dayName = DAYS[new Date(dateStr + "T00:00:00").getDay()];
   const entry = timings.find((t: any) => t.day === dayName);
   if (!entry || !entry.isOpen) return null;
-  const start = convert12HourTo24(entry.openingTime || '');
-  const end   = convert12HourTo24(entry.closingTime || '');
+  const start = convert12HourTo24(entry.openingTime || "");
+  const end = convert12HourTo24(entry.closingTime || "");
   if (!start || !end) return null;
   return { startTime: start, endTime: end };
 }
@@ -168,15 +186,24 @@ function parseTimingsForDay(
 // Parse clinic timings string and generate time slots
 // Custom time slots format: "HH:MM-HH:MM" (24-hour format, no spaces, exact match)
 // Regular timings format: "9:00 AM - 5:00 PM" or "09:00-17:00" etc.
-function parseTimings(timings: string | any): { startTime: string; endTime: string; isCustom: boolean } | null {
+function parseTimings(
+  timings: string | any,
+): { startTime: string; endTime: string; isCustom: boolean } | null {
   // Guard: if timings is an array (new weekly schedule schema), not a legacy string
-  if (!timings || Array.isArray(timings) || typeof timings !== 'string' || !timings.trim()) {
+  if (
+    !timings ||
+    Array.isArray(timings) ||
+    typeof timings !== "string" ||
+    !timings.trim()
+  ) {
     return null;
   }
 
   // Check for custom time slots format first: "H:MM AM - H:MM PM" or "HH:MM AM - HH:MM PM"
   // Examples: "8:00 AM - 11:00 PM", "08:00 AM - 11:00 PM"
-  const customFormatMatch = timings.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)\s*-\s*(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  const customFormatMatch = timings
+    .trim()
+    .match(/^(\d{1,2}):(\d{2})\s*(AM|PM)\s*-\s*(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
   if (customFormatMatch) {
     // Convert 12-hour format to 24-hour format for internal use
     const startHour = parseInt(customFormatMatch[1]);
@@ -185,12 +212,12 @@ function parseTimings(timings: string | any): { startTime: string; endTime: stri
     const endHour = parseInt(customFormatMatch[4]);
     const endMin = customFormatMatch[5];
     const endPeriod = customFormatMatch[6].toUpperCase();
-   
+
     let start24Hour = startHour === 12 ? 0 : startHour;
     if (startPeriod === "PM") start24Hour += 12;
     let end24Hour = endHour === 12 ? 0 : endHour;
     if (endPeriod === "PM") end24Hour += 12;
-   
+
     return {
       startTime: `${String(start24Hour).padStart(2, "0")}:${startMin}`,
       endTime: `${String(end24Hour).padStart(2, "0")}:${endMin}`,
@@ -268,7 +295,11 @@ function generateTimeSlots(startTime: string, endTime: string): TimeSlot[] {
   const startMinutes = timeStringToMinutes(startTime);
   const endMinutes = timeStringToMinutes(endTime);
 
-  for (let current = startMinutes; current < endMinutes; current += ROW_INTERVAL_MINUTES) {
+  for (
+    let current = startMinutes;
+    current < endMinutes;
+    current += ROW_INTERVAL_MINUTES
+  ) {
     const hours = Math.floor(current / 60);
     const minutes = current % 60;
     const time24 = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
@@ -292,17 +323,17 @@ function convert12To24(time12: string): string {
   // Handle formats like "10:00 PM", "10:00PM", "10:00 pm"
   const match = time12.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
   if (!match) return time12; // Return as-is if not in expected format
- 
+
   let hour = parseInt(match[1]);
   const min = match[2];
   const period = match[3].toUpperCase();
- 
+
   if (period === "PM" && hour !== 12) {
     hour += 12;
   } else if (period === "AM" && hour === 12) {
     hour = 0;
   }
- 
+
   return `${String(hour).padStart(2, "0")}:${min}`;
 }
 
@@ -319,17 +350,20 @@ const getStoredToken = () => {
   if (typeof window === "undefined") return null;
   for (const key of TOKEN_PRIORITY) {
     const value =
-      window.localStorage.getItem(key) ||
-      window.sessionStorage.getItem(key);
+      window.localStorage.getItem(key) || window.sessionStorage.getItem(key);
     if (value) return value;
   }
   return null;
 };
 
-function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic" | "agent" | null }) {
+function AppointmentPage({
+  contextOverride = null,
+}: {
+  contextOverride?: "clinic" | "agent" | null;
+}) {
   const router = useRouter();
   const [routeContext, setRouteContext] = useState<"clinic" | "agent">(
-    contextOverride || "clinic"
+    contextOverride || "clinic",
   );
   const [permissions, setPermissions] = useState({
     canRead: false,
@@ -352,16 +386,23 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
   const [useCustomTimeSlots, setUseCustomTimeSlots] = useState<boolean>(false);
   const [customStartTime, setCustomStartTime] = useState<string>("");
   const [customEndTime, setCustomEndTime] = useState<string>("");
-  const [customTimeSlotsLoading, setCustomTimeSlotsLoading] = useState<boolean>(true);
+  const [customTimeSlotsLoading, setCustomTimeSlotsLoading] =
+    useState<boolean>(true);
   // Refs to prevent infinite API calls
   const hasLoadedTimingsRef = useRef<boolean>(false);
-  const lastSavedValuesRef = useRef<{ useCustomTimeSlots: boolean; customStartTime: string; customEndTime: string } | null>(null);
-  const [customTimeSlotModalOpen, setCustomTimeSlotModalOpen] = useState<boolean>(false);
+  const lastSavedValuesRef = useRef<{
+    useCustomTimeSlots: boolean;
+    customStartTime: string;
+    customEndTime: string;
+  } | null>(null);
+  const [customTimeSlotModalOpen, setCustomTimeSlotModalOpen] =
+    useState<boolean>(false);
   const [importModalOpen, setImportModalOpen] = useState<boolean>(false);
   const [editModalOpen, setEditModalOpen] = useState<boolean>(false);
-  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [selectedAppointment, setSelectedAppointment] =
+    useState<Appointment | null>(null);
   const appointmentRef = useRef<Appointment | null>(null);
- 
+
   // Sync ref with state
   useEffect(() => {
     if (selectedAppointment) {
@@ -391,7 +432,7 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
     selectedDate: new Date().toISOString().split("T")[0],
     bookedFrom: "doctor",
   });
- 
+
   // Drag selection state for time slots (doctors)
   const [timeDragSelection, setTimeDragSelection] = useState<{
     isDragging: boolean;
@@ -422,7 +463,7 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("appointmentSelectedDate");
       const today = getLocalTodayDate();
-     
+
       if (saved) {
         try {
           // Validate the saved date format
@@ -445,12 +486,24 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
     // Default to today's date if no saved date (using local timezone)
     return getLocalTodayDate();
   });
-  const [doctorTreatmentsMap, setDoctorTreatmentsMap] = useState<Record<string, DoctorTreatmentSummary[]>>({});
-  const [doctorTreatmentsLoading, setDoctorTreatmentsLoading] = useState<Record<string, boolean>>({});
-  const [doctorTreatmentsError, setDoctorTreatmentsError] = useState<Record<string, string>>({});
-  const [doctorDepartmentsMap, setDoctorDepartmentsMap] = useState<Record<string, DoctorDepartmentSummary[]>>({});
-  const [doctorDepartmentsLoading, setDoctorDepartmentsLoading] = useState<Record<string, boolean>>({});
-  const [doctorDepartmentsError, setDoctorDepartmentsError] = useState<Record<string, string>>({});
+  const [doctorTreatmentsMap, setDoctorTreatmentsMap] = useState<
+    Record<string, DoctorTreatmentSummary[]>
+  >({});
+  const [doctorTreatmentsLoading, setDoctorTreatmentsLoading] = useState<
+    Record<string, boolean>
+  >({});
+  const [doctorTreatmentsError, setDoctorTreatmentsError] = useState<
+    Record<string, string>
+  >({});
+  const [doctorDepartmentsMap, setDoctorDepartmentsMap] = useState<
+    Record<string, DoctorDepartmentSummary[]>
+  >({});
+  const [doctorDepartmentsLoading, setDoctorDepartmentsLoading] = useState<
+    Record<string, boolean>
+  >({});
+  const [doctorDepartmentsError, setDoctorDepartmentsError] = useState<
+    Record<string, string>
+  >({});
   const [activeDoctorTooltip, setActiveDoctorTooltip] = useState<{
     doctorId: string;
     doctorName: string;
@@ -474,7 +527,7 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
     }
     return [];
   });
- 
+
   // Initialize visibleRoomIds from localStorage if available
   const [visibleRoomIds, setVisibleRoomIds] = useState<string[]>(() => {
     if (typeof window !== "undefined") {
@@ -509,11 +562,14 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
     return [];
   });
   const [draggedColumnId, setDraggedColumnId] = useState<string | null>(null); // Format: "doctor:id" or "room:id"
- 
+
   // Save columnOrder to localStorage whenever it changes
   useEffect(() => {
     if (typeof window !== "undefined" && columnOrder.length > 0) {
-      localStorage.setItem("appointmentColumnOrder", JSON.stringify(columnOrder));
+      localStorage.setItem(
+        "appointmentColumnOrder",
+        JSON.stringify(columnOrder),
+      );
     }
   }, [columnOrder]);
 
@@ -521,7 +577,10 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
   useEffect(() => {
     if (typeof window !== "undefined") {
       if (visibleDoctorIds.length > 0) {
-        localStorage.setItem("appointmentVisibleDoctorIds", JSON.stringify(visibleDoctorIds));
+        localStorage.setItem(
+          "appointmentVisibleDoctorIds",
+          JSON.stringify(visibleDoctorIds),
+        );
       } else {
         // If empty, clear the saved value to persist the cleared state
         localStorage.removeItem("appointmentVisibleDoctorIds");
@@ -533,7 +592,10 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
   useEffect(() => {
     if (typeof window !== "undefined") {
       if (visibleRoomIds.length > 0) {
-        localStorage.setItem("appointmentVisibleRoomIds", JSON.stringify(visibleRoomIds));
+        localStorage.setItem(
+          "appointmentVisibleRoomIds",
+          JSON.stringify(visibleRoomIds),
+        );
       } else {
         // If empty, clear the saved value to persist the cleared state
         localStorage.removeItem("appointmentVisibleRoomIds");
@@ -545,7 +607,7 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
   const getAuthHeaders = useCallback((): Record<string, string> => {
     if (typeof window === "undefined") return {};
     let token = null;
-   
+
     // Check tokens based on route context first
     if (routeContext === "agent") {
       token =
@@ -556,14 +618,18 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
         localStorage.getItem("userToken") ||
         sessionStorage.getItem("userToken");
     } else {
-      token = localStorage.getItem("clinicToken") || sessionStorage.getItem("clinicToken");
+      token =
+        localStorage.getItem("clinicToken") ||
+        sessionStorage.getItem("clinicToken");
     }
-   
+
     // Fallback to userToken if no token found
     if (!token) {
-      token = localStorage.getItem("userToken") || sessionStorage.getItem("userToken");
+      token =
+        localStorage.getItem("userToken") ||
+        sessionStorage.getItem("userToken");
     }
-   
+
     if (!token) return {};
     return { Authorization: `Bearer ${token}` };
   }, [routeContext]);
@@ -584,8 +650,12 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
           // Use 24-hour format for UI time inputs (customStartTime24/customEndTime24 if available, otherwise convert from 12-hour)
           let startTime24 = "";
           let endTime24 = "";
-         
-          if (slots.useCustomTimeSlots && slots.customStartTime && slots.customEndTime) {
+
+          if (
+            slots.useCustomTimeSlots &&
+            slots.customStartTime &&
+            slots.customEndTime
+          ) {
             // If 24-hour format is provided, use it directly
             if (slots.customStartTime24 && slots.customEndTime24) {
               startTime24 = slots.customStartTime24;
@@ -596,7 +666,7 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
               endTime24 = convert12To24(slots.customEndTime);
             }
           }
-         
+
           const loadedValues = {
             useCustomTimeSlots: slots.useCustomTimeSlots || false,
             customStartTime: startTime24, // Store in 24-hour format for UI
@@ -604,7 +674,11 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
           };
           setUseCustomTimeSlots(loadedValues.useCustomTimeSlots);
           // Set custom times from loaded values
-          if (loadedValues.useCustomTimeSlots && loadedValues.customStartTime && loadedValues.customEndTime) {
+          if (
+            loadedValues.useCustomTimeSlots &&
+            loadedValues.customStartTime &&
+            loadedValues.customEndTime
+          ) {
             // Custom time slots are enabled - use them
             setCustomStartTime(loadedValues.customStartTime);
             setCustomEndTime(loadedValues.customEndTime);
@@ -679,7 +753,10 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
         // New weekly schedule schema — pick the entry for the selected day
         const dayTiming = parseTimingsForDay(clinic.timings, selectedDate);
         if (dayTiming) {
-          const slots = generateTimeSlots(dayTiming.startTime, dayTiming.endTime);
+          const slots = generateTimeSlots(
+            dayTiming.startTime,
+            dayTiming.endTime,
+          );
           setTimeSlots(slots);
           setClosingMinutes(timeStringToMinutes(dayTiming.endTime));
         } else {
@@ -698,7 +775,14 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
       }
       // If parsed is null or isCustom is true, don't set anything - wait for custom time slots
     }
-  }, [useCustomTimeSlots, customStartTime, customEndTime, clinic?.timings, customTimeSlotsLoading, selectedDate]);
+  }, [
+    useCustomTimeSlots,
+    customStartTime,
+    customEndTime,
+    clinic?.timings,
+    customTimeSlotsLoading,
+    selectedDate,
+  ]);
 
   // Helper exposed to re-apply day timings when selectedDate changes
   // (already covered by the dependency array above)
@@ -712,14 +796,14 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
   const timeDragSelectionRef = useRef(timeDragSelection);
   const dateInputRef = useRef<HTMLInputElement | null>(null);
   const dataScrollRef = useRef<HTMLDivElement | null>(null);
- 
+
   // Keep ref in sync with state
   useEffect(() => {
     timeDragSelectionRef.current = timeDragSelection;
   }, [timeDragSelection]);
 
   const roomDragSelectionRef = useRef(roomDragSelection);
- 
+
   // Keep ref in sync with state
   useEffect(() => {
     roomDragSelectionRef.current = roomDragSelection;
@@ -728,30 +812,46 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
     appointment: Appointment;
     position: { top: number; left: number };
   } | null>(null);
- 
+
   // Drag and drop state for appointments
-  const [draggedAppointmentId, setDraggedAppointmentId] = useState<string | null>(null);
+  const [draggedAppointmentId, setDraggedAppointmentId] = useState<
+    string | null
+  >(null);
   const [dragOverDoctorId, setDragOverDoctorId] = useState<string | null>(null);
-  const [dragOverTimeSlot, setDragOverTimeSlot] = useState<{ doctorId: string; minutes: number } | null>(null);
+  const [dragOverTimeSlot, setDragOverTimeSlot] = useState<{
+    doctorId: string;
+    minutes: number;
+  } | null>(null);
 
   // Central helper: show errors in toast for debugging permissions
   const showErrorToast = (message: string) => {
     // Show toast for permission related errors or debugging
-    if (message.toLowerCase().includes("permission") || message.toLowerCase().includes("error")) {
+    if (
+      message.toLowerCase().includes("permission") ||
+      message.toLowerCase().includes("error")
+    ) {
       toast.error(message, { duration: 3000 });
     }
     console.error("Appointment Page Error:", message);
   };
-
 
   // Detect agent route and token
   useEffect(() => {
     if (typeof window === "undefined") return;
     const syncTokens = () => {
       const hasAgent =
-        Boolean(localStorage.getItem("agentToken") || sessionStorage.getItem("agentToken")) ||
-        Boolean(localStorage.getItem("staffToken") || sessionStorage.getItem("staffToken")) ||
-        Boolean(localStorage.getItem("userToken") || sessionStorage.getItem("userToken"));
+        Boolean(
+          localStorage.getItem("agentToken") ||
+          sessionStorage.getItem("agentToken"),
+        ) ||
+        Boolean(
+          localStorage.getItem("staffToken") ||
+          sessionStorage.getItem("staffToken"),
+        ) ||
+        Boolean(
+          localStorage.getItem("userToken") ||
+          sessionStorage.getItem("userToken"),
+        );
       setHasAgentToken(hasAgent);
     };
     syncTokens();
@@ -782,7 +882,9 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
   }, [contextOverride]);
 
   // Use agent permissions hook for agent routes
-  const agentPermissionsHook: any = useAgentPermissions(isAgentRoute ? "clinic_Appointment" : null);
+  const agentPermissionsHook: any = useAgentPermissions(
+    isAgentRoute ? "clinic_Appointment" : null,
+  );
   const agentPermissions = agentPermissionsHook?.permissions || {
     canRead: false,
     canCreate: false,
@@ -796,14 +898,14 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
   useEffect(() => {
     if (!isAgentRoute) return;
     if (agentPermissionsLoading) return;
-   
+
     const newPermissions = {
       canRead: Boolean(agentPermissions.canAll || agentPermissions.canRead),
       canCreate: Boolean(agentPermissions.canAll || agentPermissions.canCreate),
       canUpdate: Boolean(agentPermissions.canAll || agentPermissions.canUpdate),
       canDelete: Boolean(agentPermissions.canAll || agentPermissions.canDelete),
     };
-   
+
     setPermissions(newPermissions);
     setPermissionsLoaded(true);
   }, [isAgentRoute, agentPermissions, agentPermissionsLoading]);
@@ -813,21 +915,25 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
     if (typeof window === "undefined") return { role: null, id: null };
     try {
       for (const key of TOKEN_PRIORITY) {
-        const token = window.localStorage.getItem(key) || window.sessionStorage.getItem(key);
+        const token =
+          window.localStorage.getItem(key) ||
+          window.sessionStorage.getItem(key);
         if (token) {
           try {
-            const base64Url = token.split('.')[1];
-            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            const base64Url = token.split(".")[1];
+            const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
             const jsonPayload = decodeURIComponent(
               atob(base64)
-                .split('')
-                .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-                .join('')
+                .split("")
+                .map(
+                  (c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2),
+                )
+                .join(""),
             );
             const decoded = JSON.parse(jsonPayload);
             return {
               role: decoded.role || decoded.userRole || null,
-              id: decoded.userId || decoded.id || null
+              id: decoded.userId || decoded.id || null,
             };
           } catch (e) {
             continue;
@@ -849,31 +955,47 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
   useEffect(() => {
     if (isAgentRoute) return;
     let isMounted = true;
-   
+
     // Check which token type is being used
-    const clinicToken = typeof window !== "undefined"
-      ? (localStorage.getItem("clinicToken") || sessionStorage.getItem("clinicToken"))
-      : null;
-    const doctorToken = typeof window !== "undefined"
-      ? (localStorage.getItem("doctorToken") || sessionStorage.getItem("doctorToken"))
-      : null;
-    const agentToken = typeof window !== "undefined"
-      ? (localStorage.getItem("agentToken") || sessionStorage.getItem("agentToken"))
-      : null;
-    const staffToken = typeof window !== "undefined"
-      ? (localStorage.getItem("staffToken") || sessionStorage.getItem("staffToken"))
-      : null;
-    const userToken = typeof window !== "undefined"
-      ? (localStorage.getItem("userToken") || sessionStorage.getItem("userToken"))
-      : null;
+    const clinicToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("clinicToken") ||
+          sessionStorage.getItem("clinicToken")
+        : null;
+    const doctorToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("doctorToken") ||
+          sessionStorage.getItem("doctorToken")
+        : null;
+    const agentToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("agentToken") ||
+          sessionStorage.getItem("agentToken")
+        : null;
+    const staffToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("staffToken") ||
+          sessionStorage.getItem("staffToken")
+        : null;
+    const userToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("userToken") ||
+          sessionStorage.getItem("userToken")
+        : null;
 
     const userRole = getUserRole();
-    const authToken = clinicToken || doctorToken || agentToken || staffToken || userToken;
+    const authToken =
+      clinicToken || doctorToken || agentToken || staffToken || userToken;
 
     // âœ… For admin role, grant full access (bypass permission checks)
     if (userRole === "admin") {
       if (!isMounted) return;
-      setPermissions({ canRead: true, canCreate: true, canUpdate: true, canDelete: true });
+      setPermissions({
+        canRead: true,
+        canCreate: true,
+        canUpdate: true,
+        canDelete: true,
+      });
       setPermissionsLoaded(true);
       return;
     }
@@ -903,7 +1025,11 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
           if (res.data.success) {
             // Check if permissions array exists and is not null
             // If permissions is null, admin hasn't set any restrictions yet - allow full access (backward compatibility)
-            if (res.data.permissions === null || !Array.isArray(res.data.permissions) || res.data.permissions.length === 0) {
+            if (
+              res.data.permissions === null ||
+              !Array.isArray(res.data.permissions) ||
+              res.data.permissions.length === 0
+            ) {
               // No admin restrictions set yet - default to full access for backward compatibility
               setPermissions({
                 canRead: true,
@@ -924,13 +1050,28 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
 
               if (modulePermission) {
                 const actions = modulePermission.actions || {};
-               
+
                 // Check if "all" is true, which grants all permissions
-                const moduleAll = actions.all === true || actions.all === "true" || String(actions.all).toLowerCase() === "true";
-                const moduleCreate = actions.create === true || actions.create === "true" || String(actions.create).toLowerCase() === "true";
-                const moduleRead = actions.read === true || actions.read === "true" || String(actions.read).toLowerCase() === "true";
-                const moduleUpdate = actions.update === true || actions.update === "true" || String(actions.update).toLowerCase() === "true";
-                const moduleDelete = actions.delete === true || actions.delete === "true" || String(actions.delete).toLowerCase() === "true";
+                const moduleAll =
+                  actions.all === true ||
+                  actions.all === "true" ||
+                  String(actions.all).toLowerCase() === "true";
+                const moduleCreate =
+                  actions.create === true ||
+                  actions.create === "true" ||
+                  String(actions.create).toLowerCase() === "true";
+                const moduleRead =
+                  actions.read === true ||
+                  actions.read === "true" ||
+                  String(actions.read).toLowerCase() === "true";
+                const moduleUpdate =
+                  actions.update === true ||
+                  actions.update === "true" ||
+                  String(actions.update).toLowerCase() === "true";
+                const moduleDelete =
+                  actions.delete === true ||
+                  actions.delete === "true" ||
+                  String(actions.delete).toLowerCase() === "true";
 
                 setPermissions({
                   canRead: moduleAll || moduleRead,
@@ -982,7 +1123,12 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
     // For agent/doctorStaff tokens (when not on agent route), check permissions
     const agentStaffToken = getStoredToken();
     if (!agentStaffToken) {
-      setPermissions({ canRead: false, canCreate: false, canUpdate: false, canDelete: false });
+      setPermissions({
+        canRead: false,
+        canCreate: false,
+        canUpdate: false,
+        canDelete: false,
+      });
       setPermissionsLoaded(true);
       return;
     }
@@ -991,21 +1137,28 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
     if (agentToken || staffToken || userToken) {
       const fetchPermissions = async () => {
         try {
-          console.log("Fetching Agent/Staff Permissions for clinic_Appointment...");
+          console.log(
+            "Fetching Agent/Staff Permissions for clinic_Appointment...",
+          );
           setPermissionsLoaded(false);
           // Use agent permissions API for agent/doctorStaff
           const res = await axios.get("/api/agent/get-module-permissions", {
             params: { moduleKey: "clinic_Appointment" },
-            headers: { Authorization: `Bearer ${agentStaffToken}` }
+            headers: { Authorization: `Bearer ${agentStaffToken}` },
           });
           const data = res.data;
           console.log("Agent Permissions API Response:", data);
-         
+
           if (!isMounted) return;
-         
+
           // Default to true if module not found in permissions (matches backend logic)
-          if (!data?.permissions && data?.error?.includes("not found in agent permissions")) {
-            console.log("Module not found in permissions, granting full access by default");
+          if (
+            !data?.permissions &&
+            data?.error?.includes("not found in agent permissions")
+          ) {
+            console.log(
+              "Module not found in permissions, granting full access by default",
+            );
             setPermissions({
               canRead: true,
               canCreate: true,
@@ -1015,24 +1168,33 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
             return;
           }
 
-          const actions = data?.permissions?.actions || data?.data?.moduleActions || {};
-          const isTrue = (val: any) => val === true || val === "true" || String(val || "").toLowerCase() === "true";
-         
+          const actions =
+            data?.permissions?.actions || data?.data?.moduleActions || {};
+          const isTrue = (val: any) =>
+            val === true ||
+            val === "true" ||
+            String(val || "").toLowerCase() === "true";
+
           const canAll = isTrue(actions.all);
-         
+
           const newPerms = {
             canRead: canAll || isTrue(actions.read),
             canCreate: canAll || isTrue(actions.create),
             canUpdate: canAll || isTrue(actions.update),
             canDelete: canAll || isTrue(actions.delete),
           };
-         
+
           console.log("Final Agent/Staff Permissions:", newPerms);
           setPermissions(newPerms);
         } catch (err: any) {
           console.error("Error fetching agent permissions:", err);
           // Swallow agent permission errors; they will just result in no extra access
-          setPermissions({ canRead: false, canCreate: false, canUpdate: false, canDelete: false });
+          setPermissions({
+            canRead: false,
+            canCreate: false,
+            canUpdate: false,
+            canDelete: false,
+          });
         } finally {
           if (isMounted) {
             setPermissionsLoaded(true);
@@ -1044,22 +1206,35 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
     } else {
       // Unknown token type - default to full access (likely clinic/doctor)
       if (!isMounted) return;
-      setPermissions({ canRead: true, canCreate: true, canUpdate: true, canDelete: true });
+      setPermissions({
+        canRead: true,
+        canCreate: true,
+        canUpdate: true,
+        canDelete: true,
+      });
       setPermissionsLoaded(true);
     }
 
-    return () => { isMounted = false; };
+    return () => {
+      isMounted = false;
+    };
   }, [isAgentRoute]);
 
   const fetchDoctorTreatments = async (doctorId: string) => {
     setDoctorTreatmentsLoading((prev) => ({ ...prev, [doctorId]: true }));
     setDoctorTreatmentsError((prev) => ({ ...prev, [doctorId]: "" }));
     try {
-      const res = await axios.get(`/api/clinic/doctor-treatments?doctorStaffId=${doctorId}`, {
-        headers: getAuthHeaders(),
-      });
+      const res = await axios.get(
+        `/api/clinic/doctor-treatments?doctorStaffId=${doctorId}`,
+        {
+          headers: getAuthHeaders(),
+        },
+      );
       if (res.data.success) {
-        setDoctorTreatmentsMap((prev) => ({ ...prev, [doctorId]: res.data.treatments || [] }));
+        setDoctorTreatmentsMap((prev) => ({
+          ...prev,
+          [doctorId]: res.data.treatments || [],
+        }));
       } else {
         const errorMsg = res.data.message || "Failed to load doctor details";
         setDoctorTreatmentsError((prev) => ({ ...prev, [doctorId]: errorMsg }));
@@ -1067,7 +1242,8 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
       }
     } catch (err: any) {
       // Swallow doctor treatment load errors; tooltip will show generic failure
-      const errorMsg = err.response?.data?.message || "Failed to load doctor details";
+      const errorMsg =
+        err.response?.data?.message || "Failed to load doctor details";
       setDoctorTreatmentsError((prev) => ({ ...prev, [doctorId]: errorMsg }));
       showErrorToast(errorMsg);
     } finally {
@@ -1079,11 +1255,17 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
     setDoctorDepartmentsLoading((prev) => ({ ...prev, [doctorId]: true }));
     setDoctorDepartmentsError((prev) => ({ ...prev, [doctorId]: "" }));
     try {
-      const res = await axios.get(`/api/clinic/doctor-departments?doctorStaffId=${doctorId}`, {
-        headers: getAuthHeaders(),
-      });
+      const res = await axios.get(
+        `/api/clinic/doctor-departments?doctorStaffId=${doctorId}`,
+        {
+          headers: getAuthHeaders(),
+        },
+      );
       if (res.data.success) {
-        setDoctorDepartmentsMap((prev) => ({ ...prev, [doctorId]: res.data.departments || [] }));
+        setDoctorDepartmentsMap((prev) => ({
+          ...prev,
+          [doctorId]: res.data.departments || [],
+        }));
       } else {
         const errorMsg = res.data.message || "Unable to load departments";
         setDoctorTreatmentsError((prev) => ({ ...prev, [doctorId]: errorMsg }));
@@ -1091,7 +1273,8 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
       }
     } catch (err: any) {
       // Swallow doctor department load errors; tooltip will show generic failure
-      const errorMsg = err.response?.data?.message || "Unable to load departments";
+      const errorMsg =
+        err.response?.data?.message || "Unable to load departments";
       setDoctorDepartmentsError((prev) => ({ ...prev, [doctorId]: errorMsg }));
       showErrorToast(errorMsg);
     } finally {
@@ -1099,7 +1282,10 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
     }
   };
 
-  const handleDoctorMouseEnter = (doctor: DoctorStaff, event: React.MouseEvent<HTMLDivElement>) => {
+  const handleDoctorMouseEnter = (
+    doctor: DoctorStaff,
+    event: React.MouseEvent<HTMLDivElement>,
+  ) => {
     const rect = event.currentTarget.getBoundingClientRect();
     setActiveDoctorTooltip({
       doctorId: doctor._id,
@@ -1109,10 +1295,16 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
         left: rect.left + rect.width / 2,
       },
     });
-    if (!doctorTreatmentsMap[doctor._id] && !doctorTreatmentsLoading[doctor._id]) {
+    if (
+      !doctorTreatmentsMap[doctor._id] &&
+      !doctorTreatmentsLoading[doctor._id]
+    ) {
       fetchDoctorTreatments(doctor._id);
     }
-    if (!doctorDepartmentsMap[doctor._id] && !doctorDepartmentsLoading[doctor._id]) {
+    if (
+      !doctorDepartmentsMap[doctor._id] &&
+      !doctorDepartmentsLoading[doctor._id]
+    ) {
       fetchDoctorDepartments(doctor._id);
     }
   };
@@ -1123,7 +1315,7 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
 
   useEffect(() => {
     if (!permissionsLoaded) return;
-   
+
     // âœ… Only fetch appointment data if user has read permission
     if (!permissions.canRead) {
       setLoading(false);
@@ -1144,14 +1336,16 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
           setClinic(res.data.clinic);
           let fetchedDoctorStaff = res.data.doctorStaff || [];
           const userInfo = getUserInfo();
-         
+
           // If the user is a doctorStaff, filter to show only their column
           if (userInfo.role === "doctorStaff" && userInfo.id) {
-            fetchedDoctorStaff = fetchedDoctorStaff.filter((doc: any) => doc._id === userInfo.id);
+            fetchedDoctorStaff = fetchedDoctorStaff.filter(
+              (doc: any) => doc._id === userInfo.id,
+            );
             // Don't hide rooms from state entirely, as they are needed for the booking modal
             // But hide room filters and room columns (handled in visibility logic)
           }
-         
+
           setDoctorStaff(fetchedDoctorStaff);
           setRooms(res.data.rooms || []);
 
@@ -1169,16 +1363,20 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
           }
           // Don't set time slots here - they will be set by the useEffect that depends on useCustomTimeSlots
           // This ensures custom time slots are loaded first before applying any time slots
-          toast.success("Appointment schedule loaded successfully", { duration: 2000 });
+          toast.success("Appointment schedule loaded successfully", {
+            duration: 2000,
+          });
         } else {
-          const errorMsg = res.data.message || "Failed to load appointment data";
+          const errorMsg =
+            res.data.message || "Failed to load appointment data";
           setError(errorMsg);
           showErrorToast(errorMsg);
         }
       } catch (err: any) {
         // Swallow appointment data load errors; page will show generic error state
         const status = err.response?.status;
-        const errorMsg = err.response?.data?.message || "Failed to load appointment data";
+        const errorMsg =
+          err.response?.data?.message || "Failed to load appointment data";
         // Friendly message for permission denied
         if (status === 403) {
           setError("You do not have permission to view appointment data.");
@@ -1197,10 +1395,12 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
   useEffect(() => {
     setVisibleDoctorIds((prev) => {
       if (doctorStaff.length === 0) return [];
-     
+
       // Check if there's a saved filter state in localStorage
-      const hasSavedFilter = typeof window !== "undefined" && localStorage.getItem("appointmentVisibleDoctorIds");
-     
+      const hasSavedFilter =
+        typeof window !== "undefined" &&
+        localStorage.getItem("appointmentVisibleDoctorIds");
+
       // Only auto-populate if:
       // 1. Filter was never touched AND
       // 2. No saved filter exists in localStorage
@@ -1225,11 +1425,11 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
               }
             }
           }
-         
+
           // If we have a saved order, try to preserve it
           if (currentOrder.length > 0) {
             // Filter out invalid doctor IDs and add new ones
-            const validDoctorColumns = currentOrder.filter(item => {
+            const validDoctorColumns = currentOrder.filter((item) => {
               if (item.startsWith("doctor:")) {
                 const id = item.replace("doctor:", "");
                 return allIds.includes(id);
@@ -1238,24 +1438,34 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
             });
             // Add any new doctors that weren't in the saved order
             const existingDoctorIds = validDoctorColumns
-              .filter(item => item.startsWith("doctor:"))
-              .map(item => item.replace("doctor:", ""));
-            const newDoctorIds = allIds.filter(id => !existingDoctorIds.includes(id));
-            const newDoctorColumns = newDoctorIds.map(id => `doctor:${id}`);
+              .filter((item) => item.startsWith("doctor:"))
+              .map((item) => item.replace("doctor:", ""));
+            const newDoctorIds = allIds.filter(
+              (id) => !existingDoctorIds.includes(id),
+            );
+            const newDoctorColumns = newDoctorIds.map((id) => `doctor:${id}`);
             const mergedOrder = [...validDoctorColumns, ...newDoctorColumns];
             // Save merged order
             if (typeof window !== "undefined") {
-              localStorage.setItem("appointmentColumnOrder", JSON.stringify(mergedOrder));
+              localStorage.setItem(
+                "appointmentColumnOrder",
+                JSON.stringify(mergedOrder),
+              );
             }
             return mergedOrder;
           } else {
             // No saved order, add doctor columns at the end
-            const roomColumns = currentOrder.filter(item => item.startsWith("room:"));
-            const newDoctorColumns = allIds.map(id => `doctor:${id}`);
+            const roomColumns = currentOrder.filter((item) =>
+              item.startsWith("room:"),
+            );
+            const newDoctorColumns = allIds.map((id) => `doctor:${id}`);
             const newOrder = [...roomColumns, ...newDoctorColumns];
             // Save new order
             if (typeof window !== "undefined") {
-              localStorage.setItem("appointmentColumnOrder", JSON.stringify(newOrder));
+              localStorage.setItem(
+                "appointmentColumnOrder",
+                JSON.stringify(newOrder),
+              );
             }
             return newOrder;
           }
@@ -1264,22 +1474,25 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
       }
       const doctorIdSet = new Set(doctorStaff.map((doc) => doc._id));
       const filtered = prev.filter((id) => doctorIdSet.has(id));
-     
+
       // If filtered result is different from prev, it means some IDs were removed (old/deleted doctors)
       // In this case, update localStorage with the cleaned filtered list
       if (filtered.length !== prev.length && typeof window !== "undefined") {
         if (filtered.length > 0) {
-          localStorage.setItem("appointmentVisibleDoctorIds", JSON.stringify(filtered));
+          localStorage.setItem(
+            "appointmentVisibleDoctorIds",
+            JSON.stringify(filtered),
+          );
         } else {
           localStorage.removeItem("appointmentVisibleDoctorIds");
         }
       }
-     
+
       // Update unified order to match filtered list, preserving existing order where possible
       setColumnOrder((order) => {
-        const filteredSet = new Set(filtered.map(id => `doctor:${id}`));
+        const filteredSet = new Set(filtered.map((id) => `doctor:${id}`));
         // Keep existing order for items that are still visible
-        const preserved = order.filter(item => {
+        const preserved = order.filter((item) => {
           if (item.startsWith("doctor:")) {
             const id = item.replace("doctor:", "");
             return filteredSet.has(item) && filtered.includes(id);
@@ -1287,8 +1500,12 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
           return true; // Keep all room columns
         });
         // Add new doctor items that weren't in order
-        const existingDoctorIds = preserved.filter(item => item.startsWith("doctor:")).map(item => item.replace("doctor:", ""));
-        const newDoctorItems = filtered.filter(id => !existingDoctorIds.includes(id)).map(id => `doctor:${id}`);
+        const existingDoctorIds = preserved
+          .filter((item) => item.startsWith("doctor:"))
+          .map((item) => item.replace("doctor:", ""));
+        const newDoctorItems = filtered
+          .filter((id) => !existingDoctorIds.includes(id))
+          .map((id) => `doctor:${id}`);
         return [...preserved, ...newDoctorItems];
       });
       return filtered;
@@ -1304,10 +1521,12 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
       if (userInfo.role === "doctorStaff") {
         return [];
       }
-     
+
       // Check if there's a saved filter state in localStorage
-      const hasSavedFilter = typeof window !== "undefined" && localStorage.getItem("appointmentVisibleRoomIds");
-     
+      const hasSavedFilter =
+        typeof window !== "undefined" &&
+        localStorage.getItem("appointmentVisibleRoomIds");
+
       // Only auto-populate if:
       // 1. Filter was never touched AND
       // 2. No saved filter exists in localStorage
@@ -1332,11 +1551,11 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
               }
             }
           }
-         
+
           // If we have a saved order, try to preserve it
           if (currentOrder.length > 0) {
             // Filter out invalid room IDs and add new ones
-            const validRoomColumns = currentOrder.filter(item => {
+            const validRoomColumns = currentOrder.filter((item) => {
               if (item.startsWith("room:")) {
                 const id = item.replace("room:", "");
                 return allIds.includes(id);
@@ -1345,24 +1564,34 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
             });
             // Add any new rooms that weren't in the saved order
             const existingRoomIds = validRoomColumns
-              .filter(item => item.startsWith("room:"))
-              .map(item => item.replace("room:", ""));
-            const newRoomIds = allIds.filter(id => !existingRoomIds.includes(id));
-            const newRoomColumns = newRoomIds.map(id => `room:${id}`);
+              .filter((item) => item.startsWith("room:"))
+              .map((item) => item.replace("room:", ""));
+            const newRoomIds = allIds.filter(
+              (id) => !existingRoomIds.includes(id),
+            );
+            const newRoomColumns = newRoomIds.map((id) => `room:${id}`);
             const mergedOrder = [...validRoomColumns, ...newRoomColumns];
             // Save merged order
             if (typeof window !== "undefined") {
-              localStorage.setItem("appointmentColumnOrder", JSON.stringify(mergedOrder));
+              localStorage.setItem(
+                "appointmentColumnOrder",
+                JSON.stringify(mergedOrder),
+              );
             }
             return mergedOrder;
           } else {
             // No saved order, add room columns at the end
-            const doctorColumns = currentOrder.filter(item => item.startsWith("doctor:"));
-            const newRoomColumns = allIds.map(id => `room:${id}`);
+            const doctorColumns = currentOrder.filter((item) =>
+              item.startsWith("doctor:"),
+            );
+            const newRoomColumns = allIds.map((id) => `room:${id}`);
             const newOrder = [...doctorColumns, ...newRoomColumns];
             // Save new order
             if (typeof window !== "undefined") {
-              localStorage.setItem("appointmentColumnOrder", JSON.stringify(newOrder));
+              localStorage.setItem(
+                "appointmentColumnOrder",
+                JSON.stringify(newOrder),
+              );
             }
             return newOrder;
           }
@@ -1371,22 +1600,25 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
       }
       const roomIdSet = new Set(rooms.map((room) => room._id));
       const filtered = prev.filter((id) => roomIdSet.has(id));
-     
+
       // If filtered result is different from prev, it means some IDs were removed (old/deleted rooms)
       // In this case, update localStorage with the cleaned filtered list
       if (filtered.length !== prev.length && typeof window !== "undefined") {
         if (filtered.length > 0) {
-          localStorage.setItem("appointmentVisibleRoomIds", JSON.stringify(filtered));
+          localStorage.setItem(
+            "appointmentVisibleRoomIds",
+            JSON.stringify(filtered),
+          );
         } else {
           localStorage.removeItem("appointmentVisibleRoomIds");
         }
       }
-     
+
       // Update unified order to match filtered list, preserving existing order where possible
       setColumnOrder((order) => {
-        const filteredSet = new Set(filtered.map(id => `room:${id}`));
+        const filteredSet = new Set(filtered.map((id) => `room:${id}`));
         // Keep existing order for items that are still visible
-        const preserved = order.filter(item => {
+        const preserved = order.filter((item) => {
           if (item.startsWith("room:")) {
             const id = item.replace("room:", "");
             return filteredSet.has(item) && filtered.includes(id);
@@ -1394,8 +1626,12 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
           return true; // Keep all doctor columns
         });
         // Add new room items that weren't in order
-        const existingRoomIds = preserved.filter(item => item.startsWith("room:")).map(item => item.replace("room:", ""));
-        const newRoomItems = filtered.filter(id => !existingRoomIds.includes(id)).map(id => `room:${id}`);
+        const existingRoomIds = preserved
+          .filter((item) => item.startsWith("room:"))
+          .map((item) => item.replace("room:", ""));
+        const newRoomItems = filtered
+          .filter((id) => !existingRoomIds.includes(id))
+          .map((id) => `room:${id}`);
         return [...preserved, ...newRoomItems];
       });
       return filtered;
@@ -1404,10 +1640,16 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (doctorFilterRef.current && !doctorFilterRef.current.contains(event.target as Node)) {
+      if (
+        doctorFilterRef.current &&
+        !doctorFilterRef.current.contains(event.target as Node)
+      ) {
         setDoctorFilterOpen(false);
       }
-      if (roomFilterRef.current && !roomFilterRef.current.contains(event.target as Node)) {
+      if (
+        roomFilterRef.current &&
+        !roomFilterRef.current.contains(event.target as Node)
+      ) {
         setRoomFilterOpen(false);
       }
     };
@@ -1416,7 +1658,6 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
-
 
   // Fetch appointments when date changes
   const loadAppointments = useCallback(async () => {
@@ -1429,7 +1670,10 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
     // Debug logging
     console.log("[FRONTEND] Loading appointments for date:", selectedDate);
     console.log("[FRONTEND] Date type:", typeof selectedDate);
-    console.log("[FRONTEND] Date format validation:", /^\d{4}-\d{2}-\d{2}$/.test(selectedDate));
+    console.log(
+      "[FRONTEND] Date format validation:",
+      /^\d{4}-\d{2}-\d{2}$/.test(selectedDate),
+    );
 
     try {
       const apiUrl = `/api/clinic/appointments?date=${selectedDate}`;
@@ -1440,14 +1684,22 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
 
       if (res.data.success) {
         const appointmentsData = res.data.appointments || [];
-        console.log(`[FRONTEND] Received ${appointmentsData.length} appointment(s) from API`);
+        console.log(
+          `[FRONTEND] Received ${appointmentsData.length} appointment(s) from API`,
+        );
         // Show ALL appointments regardless of status (booked, Arrived, Consultation, etc.)
         setAppointments(appointmentsData);
         // Removed toast notification for loading appointments - only show on booking success
         if (appointmentsData.length > 0) {
-          console.log(`[FRONTEND] Loaded ${appointmentsData.length} appointment(s) for date:`, selectedDate);
+          console.log(
+            `[FRONTEND] Loaded ${appointmentsData.length} appointment(s) for date:`,
+            selectedDate,
+          );
         } else {
-          console.log("[FRONTEND] No appointments returned for date:", selectedDate);
+          console.log(
+            "[FRONTEND] No appointments returned for date:",
+            selectedDate,
+          );
         }
       } else {
         console.error("[FRONTEND] API returned error:", res.data.message);
@@ -1456,17 +1708,18 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
     } catch (err: any) {
       // Swallow appointment list load errors; generic error message is enough
       const status = err.response?.status;
-      const errorMsg = err.response?.data?.message || "Failed to load appointments";
+      const errorMsg =
+        err.response?.data?.message || "Failed to load appointments";
       if (status === 403) {
         setAppointments([]);
         toast.error("Session expired. Please login again.", {
           duration: 4000,
           style: {
-            background: '#fef2f2',
-            color: '#991b1b',
-            border: '1px solid #fecaca',
-            fontSize: '13px',
-            fontWeight: '500',
+            background: "#fef2f2",
+            color: "#991b1b",
+            border: "1px solid #fecaca",
+            fontSize: "13px",
+            fontWeight: "500",
           },
         });
         setError("You do not have permission to view appointments.");
@@ -1491,91 +1744,102 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
   }, [selectedDate, loadAppointments]);
 
   // Update appointment function
-  const updateAppointment = useCallback(async (
-    appointmentId: string,
-    updates: {
-      doctorId?: string;
-      fromTime?: string;
-      toTime?: string;
-      roomId?: string;
-    }
-  ) => {
-    // âœ… Check permission before updating
-    if (!permissions.canUpdate) {
-      showErrorToast("You do not have permission to update appointments");
-      return;
-    }
-
-    try {
-      const appointment = appointments.find(apt => apt._id === appointmentId);
-      if (!appointment) {
-        showErrorToast("Appointment not found");
+  const updateAppointment = useCallback(
+    async (
+      appointmentId: string,
+      updates: {
+        doctorId?: string;
+        fromTime?: string;
+        toTime?: string;
+        roomId?: string;
+      },
+    ) => {
+      // âœ… Check permission before updating
+      if (!permissions.canUpdate) {
+        showErrorToast("You do not have permission to update appointments");
         return;
       }
 
-      // Calculate new times if needed
-      let newFromTime = updates.fromTime || appointment.fromTime;
-      let newToTime = updates.toTime || appointment.toTime;
-     
-      // If only time is changed, preserve duration
-      if (updates.fromTime && !updates.toTime) {
-        const oldDuration = timeStringToMinutes(appointment.toTime) - timeStringToMinutes(appointment.fromTime);
-        const newFromMinutes = timeStringToMinutes(updates.fromTime);
-        const newToMinutes = newFromMinutes + oldDuration;
-        newToTime = `${String(Math.floor(newToMinutes / 60)).padStart(2, "0")}:${String(newToMinutes % 60).padStart(2, "0")}`;
-      }
+      try {
+        const appointment = appointments.find(
+          (apt) => apt._id === appointmentId,
+        );
+        if (!appointment) {
+          showErrorToast("Appointment not found");
+          return;
+        }
 
-      const updateData = {
-        patientId: appointment.patientId,
-        doctorId: updates.doctorId || appointment.doctorId,
-        roomId: updates.roomId || appointment.roomId,
-        status: appointment.status,
-        followType: appointment.followType,
-        startDate: appointment.startDate,
-        fromTime: newFromTime,
-        toTime: newToTime,
-        referral: appointment.referral,
-        emergency: appointment.emergency,
-        notes: appointment.notes,
-      };
+        // Calculate new times if needed
+        let newFromTime = updates.fromTime || appointment.fromTime;
+        let newToTime = updates.toTime || appointment.toTime;
 
-      const res = await axios.put(
-        `/api/clinic/update-appointment/${appointmentId}`,
-        updateData,
-        { headers: getAuthHeaders() }
-      );
+        // If only time is changed, preserve duration
+        if (updates.fromTime && !updates.toTime) {
+          const oldDuration =
+            timeStringToMinutes(appointment.toTime) -
+            timeStringToMinutes(appointment.fromTime);
+          const newFromMinutes = timeStringToMinutes(updates.fromTime);
+          const newToMinutes = newFromMinutes + oldDuration;
+          newToTime = `${String(Math.floor(newToMinutes / 60)).padStart(2, "0")}:${String(newToMinutes % 60).padStart(2, "0")}`;
+        }
 
-      if (res.data.success) {
-        toast.success("Appointment updated successfully", { duration: 2000 });
-        // Refresh appointments
-        await loadAppointments();
-      } else {
-        showErrorToast(res.data.message || "Failed to update appointment");
+        const updateData = {
+          patientId: appointment.patientId,
+          doctorId: updates.doctorId || appointment.doctorId,
+          roomId: updates.roomId || appointment.roomId,
+          status: appointment.status,
+          followType: appointment.followType,
+          startDate: appointment.startDate,
+          fromTime: newFromTime,
+          toTime: newToTime,
+          referral: appointment.referral,
+          emergency: appointment.emergency,
+          notes: appointment.notes,
+        };
+
+        const res = await axios.put(
+          `/api/clinic/update-appointment/${appointmentId}`,
+          updateData,
+          { headers: getAuthHeaders() },
+        );
+
+        if (res.data.success) {
+          toast.success("Appointment updated successfully", { duration: 2000 });
+          // Refresh appointments
+          await loadAppointments();
+        } else {
+          showErrorToast(res.data.message || "Failed to update appointment");
+        }
+      } catch (err: any) {
+        // Handle 403 authentication error
+        const status = err.response?.status;
+        if (status === 403) {
+          toast.error("Session expired. Please login again.", {
+            duration: 4000,
+            style: {
+              background: "#fef2f2",
+              color: "#991b1b",
+              border: "1px solid #fecaca",
+              fontSize: "13px",
+              fontWeight: "500",
+            },
+          });
+          return;
+        }
+        // Swallow update errors; generic message already set
+        const errorMsg =
+          err.response?.data?.message || "Failed to update appointment";
+        showErrorToast(errorMsg);
       }
-    } catch (err: any) {
-      // Handle 403 authentication error
-      const status = err.response?.status;
-      if (status === 403) {
-        toast.error("Session expired. Please login again.", {
-          duration: 4000,
-          style: {
-            background: '#fef2f2',
-            color: '#991b1b',
-            border: '1px solid #fecaca',
-            fontSize: '13px',
-            fontWeight: '500',
-          },
-        });
-        return;
-      }
-      // Swallow update errors; generic message already set
-      const errorMsg = err.response?.data?.message || "Failed to update appointment";
-      showErrorToast(errorMsg);
-    }
-  }, [appointments, loadAppointments, routeContext]);
+    },
+    [appointments, loadAppointments, routeContext],
+  );
 
   // Drag handlers for appointments
-  const handleAppointmentDragStart = (e: React.DragEvent, appointmentId: string) => {
+  const handleAppointmentDragStart = (
+    e: React.DragEvent,
+    appointmentId: string,
+  ) => {
     // âœ… Check permission before allowing drag
     if (!permissions.canUpdate) {
       e.preventDefault();
@@ -1598,19 +1862,24 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
   };
 
   // Drop handler for doctor columns
-  const handleDoctorColumnDrop = async (e: React.DragEvent, doctorId: string) => {
+  const handleDoctorColumnDrop = async (
+    e: React.DragEvent,
+    doctorId: string,
+  ) => {
     e.preventDefault();
     e.stopPropagation();
-   
+
     // âœ… Check permission before allowing drop
     if (!permissions.canUpdate) {
       showErrorToast("You do not have permission to move appointments");
       return;
     }
-   
+
     if (!draggedAppointmentId) return;
 
-    const appointment = appointments.find(apt => apt._id === draggedAppointmentId);
+    const appointment = appointments.find(
+      (apt) => apt._id === draggedAppointmentId,
+    );
     if (!appointment) return;
 
     // If dropped on same doctor, do nothing
@@ -1622,7 +1891,7 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
 
     // Update doctor
     await updateAppointment(draggedAppointmentId, { doctorId });
-   
+
     setDraggedAppointmentId(null);
     setDragOverDoctorId(null);
   };
@@ -1631,16 +1900,18 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
   const handleRoomColumnDrop = async (e: React.DragEvent, roomId: string) => {
     e.preventDefault();
     e.stopPropagation();
-   
+
     // âœ… Check permission before allowing drop
     if (!permissions.canUpdate) {
       showErrorToast("You do not have permission to move appointments");
       return;
     }
-   
+
     if (!draggedAppointmentId) return;
 
-    const appointment = appointments.find(apt => apt._id === draggedAppointmentId);
+    const appointment = appointments.find(
+      (apt) => apt._id === draggedAppointmentId,
+    );
     if (!appointment) return;
 
     // If dropped on same room, do nothing
@@ -1651,46 +1922,51 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
 
     // Update room
     await updateAppointment(draggedAppointmentId, { roomId });
-   
+
     setDraggedAppointmentId(null);
   };
 
   // Drop handler for time slots
   const handleTimeSlotDrop = async (
     e: React.DragEvent,
-    targetId: string,  // Could be doctorId or roomId
+    targetId: string, // Could be doctorId or roomId
     slotMinutes: number,
-    isRoomDrop: boolean = false  // Flag to indicate if this is a room drop
+    isRoomDrop: boolean = false, // Flag to indicate if this is a room drop
   ) => {
     e.preventDefault();
     e.stopPropagation();
-   
+
     // âœ… Check permission before allowing drop
     if (!permissions.canUpdate) {
       showErrorToast("You do not have permission to move appointments");
       return;
     }
-   
+
     if (!draggedAppointmentId) return;
 
-    const appointment = appointments.find(apt => apt._id === draggedAppointmentId);
+    const appointment = appointments.find(
+      (apt) => apt._id === draggedAppointmentId,
+    );
     if (!appointment) return;
 
     // Calculate new time
     const newFromTime = `${String(Math.floor(slotMinutes / 60)).padStart(2, "0")}:${String(slotMinutes % 60).padStart(2, "0")}`;
-   
+
     // Determine what to update based on the type of drop
     const updates: {
       doctorId?: string;
       roomId?: string;
       fromTime?: string;
     } = {
-      fromTime: newFromTime
+      fromTime: newFromTime,
     };
 
     if (isRoomDrop) {
       // This is a room time slot drop
-      if (appointment.roomId === targetId && timeStringToMinutes(appointment.fromTime) === slotMinutes) {
+      if (
+        appointment.roomId === targetId &&
+        timeStringToMinutes(appointment.fromTime) === slotMinutes
+      ) {
         setDraggedAppointmentId(null);
         setDragOverTimeSlot(null);
         return;
@@ -1698,17 +1974,20 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
       updates.roomId = targetId;
     } else {
       // This is a doctor time slot drop
-      if (appointment.doctorId === targetId && timeStringToMinutes(appointment.fromTime) === slotMinutes) {
+      if (
+        appointment.doctorId === targetId &&
+        timeStringToMinutes(appointment.fromTime) === slotMinutes
+      ) {
         setDraggedAppointmentId(null);
         setDragOverTimeSlot(null);
         return;
       }
       updates.doctorId = targetId;
     }
-   
+
     // Update the appointment
     await updateAppointment(draggedAppointmentId, updates);
-   
+
     setDraggedAppointmentId(null);
     setDragOverTimeSlot(null);
   };
@@ -1728,7 +2007,7 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
   const handleTimeSlotDragOver = (
     e: React.DragEvent,
     doctorId: string,
-    slotMinutes: number
+    slotMinutes: number,
   ) => {
     e.preventDefault();
     e.stopPropagation();
@@ -1743,7 +2022,7 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
   const handleRoomTimeSlotDragOver = (
     e: React.DragEvent,
     roomId: string,
-    slotMinutes: number
+    slotMinutes: number,
   ) => {
     e.preventDefault();
     e.stopPropagation();
@@ -1847,25 +2126,28 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
 
   // Helper function to format date as YYYY-MM-DD in local timezone
   const formatDateLocal = (date: Date | string): string => {
-    const d = typeof date === 'string' ? new Date(date) : date;
+    const d = typeof date === "string" ? new Date(date) : date;
     const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
     return `${year}-${month}-${day}`;
   };
 
   // Get appointments for a specific doctor and row
   // IMPORTANT: Show ALL appointments regardless of status (booked, Arrived, Consultation, Cancelled, etc.)
   // Show appointments in doctor column if they match the doctor AND were not booked specifically from room view
-  const getAppointmentsForRow = (doctorId: string, slotTime: string): Appointment[] => {
+  const getAppointmentsForRow = (
+    doctorId: string,
+    slotTime: string,
+  ): Appointment[] => {
     return appointments.filter((apt) => {
       if (apt.doctorId !== doctorId) return false;
-     
+
       // Filter out appointments booked from the room view
-      if (apt.bookedFrom === 'room') return false;
+      if (apt.bookedFrom === "room") return false;
 
       // Filter out cancelled appointments so cancelled slots can be re-booked
-      if (apt.status === 'Cancelled') return false;
+      if (apt.status === "Cancelled") return false;
 
       // Compare dates in local timezone to match the selectedDate
       const aptDate = formatDateLocal(apt.startDate);
@@ -1873,12 +2155,12 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
         return false;
       }
       // NOTE: All non-cancelled statuses (booked, Arrived, Consultation, etc.) are shown
-     
+
       const rowStart = timeStringToMinutes(slotTime);
       const rowEnd = rowStart + ROW_INTERVAL_MINUTES;
       const fromTotal = timeStringToMinutes(apt.fromTime);
       const toTotal = timeStringToMinutes(apt.toTime);
-     
+
       return fromTotal < rowEnd && toTotal > rowStart;
     });
   };
@@ -1886,15 +2168,18 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
   // Get appointments for a specific room and row
   // Show appointments in room column if they match the room AND were not booked specifically from doctor view
   // Cancelled appointments are excluded so their slots can be re-booked
-  const getRoomAppointmentsForRow = (roomId: string, slotTime: string): Appointment[] => {
+  const getRoomAppointmentsForRow = (
+    roomId: string,
+    slotTime: string,
+  ): Appointment[] => {
     return appointments.filter((apt) => {
       if (apt.roomId !== roomId) return false;
 
       // Filter out appointments booked from the doctor view
-      if (apt.bookedFrom === 'doctor') return false;
+      if (apt.bookedFrom === "doctor") return false;
 
       // Filter out cancelled appointments so cancelled slots can be re-booked
-      if (apt.status === 'Cancelled') return false;
+      if (apt.status === "Cancelled") return false;
 
       // Compare dates in local timezone to match the selectedDate
       const aptDate = formatDateLocal(apt.startDate);
@@ -1924,153 +2209,168 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
   // All columns maintain consistent width regardless of number of patients
 
   // Helper function to open modal with selected time range (doctors)
-  const openModalWithSelection = useCallback((startMinutes: number, endMinutes: number, doctorId: string) => {
-    // âœ… Check permission before opening booking modal
-    if (!permissions.canCreate) {
-      showErrorToast("You do not have permission to book appointments");
+  const openModalWithSelection = useCallback(
+    (startMinutes: number, endMinutes: number, doctorId: string) => {
+      // âœ… Check permission before opening booking modal
+      if (!permissions.canCreate) {
+        showErrorToast("You do not have permission to book appointments");
+        setTimeDragSelection({
+          isDragging: false,
+          startMinutes: null,
+          endMinutes: null,
+          doctorId: null,
+        });
+        return;
+      }
+
+      const minStart = Math.min(startMinutes, endMinutes);
+      const maxEnd = Math.max(startMinutes, endMinutes);
+
+      // Only open modal if there's a valid selection (at least one slot)
+      if (maxEnd > minStart) {
+        const fromTime = `${String(Math.floor(minStart / 60)).padStart(2, "0")}:${String(minStart % 60).padStart(2, "0")}`;
+        const toTime = `${String(Math.floor(maxEnd / 60)).padStart(2, "0")}:${String(maxEnd % 60).padStart(2, "0")}`;
+
+        const doctor = doctorStaff.find((doc) => doc._id === doctorId);
+        if (doctor) {
+          setBookingModal({
+            isOpen: true,
+            doctorId: doctor._id,
+            doctorName: doctor.name,
+            roomId: "",
+            roomName: "",
+            slotTime: fromTime,
+            slotDisplayTime: minutesToDisplay(minStart),
+            selectedDate,
+            bookedFrom: "doctor",
+            fromTime,
+            toTime,
+          });
+        }
+      }
+
       setTimeDragSelection({
         isDragging: false,
         startMinutes: null,
         endMinutes: null,
         doctorId: null,
       });
-      return;
-    }
-   
-    const minStart = Math.min(startMinutes, endMinutes);
-    const maxEnd = Math.max(startMinutes, endMinutes);
-   
-    // Only open modal if there's a valid selection (at least one slot)
-    if (maxEnd > minStart) {
-      const fromTime = `${String(Math.floor(minStart / 60)).padStart(2, "0")}:${String(minStart % 60).padStart(2, "0")}`;
-      const toTime = `${String(Math.floor(maxEnd / 60)).padStart(2, "0")}:${String(maxEnd % 60).padStart(2, "0")}`;
-     
-      const doctor = doctorStaff.find((doc) => doc._id === doctorId);
-      if (doctor) {
-        setBookingModal({
-          isOpen: true,
-          doctorId: doctor._id,
-          doctorName: doctor.name,
-          roomId: "",
-          roomName: "",
-          slotTime: fromTime,
-          slotDisplayTime: minutesToDisplay(minStart),
-          selectedDate,
-          bookedFrom: "doctor",
-          fromTime,
-          toTime,
-        });
-      }
-    }
-   
-    setTimeDragSelection({
-      isDragging: false,
-      startMinutes: null,
-      endMinutes: null,
-      doctorId: null,
-    });
-  }, [doctorStaff, selectedDate, minutesToDisplay, permissions.canCreate]);
+    },
+    [doctorStaff, selectedDate, minutesToDisplay, permissions.canCreate],
+  );
 
   // Helper function to open modal with selected time range (rooms)
-  const openModalWithRoomSelection = useCallback((startMinutes: number, endMinutes: number, roomId: string) => {
-    // âœ… Check permission before opening booking modal
-    if (!permissions.canCreate) {
-      showErrorToast("You do not have permission to book appointments");
+  const openModalWithRoomSelection = useCallback(
+    (startMinutes: number, endMinutes: number, roomId: string) => {
+      // âœ… Check permission before opening booking modal
+      if (!permissions.canCreate) {
+        showErrorToast("You do not have permission to book appointments");
+        setRoomDragSelection({
+          isDragging: false,
+          startMinutes: null,
+          endMinutes: null,
+          roomId: null,
+        });
+        return;
+      }
+
+      const minStart = Math.min(startMinutes, endMinutes);
+      const maxEnd = Math.max(startMinutes, endMinutes);
+
+      // Only open modal if there's a valid selection (at least one slot)
+      if (maxEnd > minStart) {
+        const fromTime = `${String(Math.floor(minStart / 60)).padStart(2, "0")}:${String(minStart % 60).padStart(2, "0")}`;
+        const toTime = `${String(Math.floor(maxEnd / 60)).padStart(2, "0")}:${String(maxEnd % 60).padStart(2, "0")}`;
+
+        const room = rooms.find((r) => r._id === roomId);
+        if (room) {
+          setBookingModal({
+            isOpen: true,
+            doctorId: "",
+            doctorName: "",
+            roomId: room._id,
+            roomName: room.name,
+            slotTime: fromTime,
+            slotDisplayTime: minutesToDisplay(minStart),
+            selectedDate,
+            bookedFrom: "room",
+            fromTime,
+            toTime,
+          });
+        }
+      }
+
       setRoomDragSelection({
         isDragging: false,
         startMinutes: null,
         endMinutes: null,
         roomId: null,
       });
-      return;
-    }
-   
-    const minStart = Math.min(startMinutes, endMinutes);
-    const maxEnd = Math.max(startMinutes, endMinutes);
-   
-    // Only open modal if there's a valid selection (at least one slot)
-    if (maxEnd > minStart) {
-      const fromTime = `${String(Math.floor(minStart / 60)).padStart(2, "0")}:${String(minStart % 60).padStart(2, "0")}`;
-      const toTime = `${String(Math.floor(maxEnd / 60)).padStart(2, "0")}:${String(maxEnd % 60).padStart(2, "0")}`;
-     
-      const room = rooms.find((r) => r._id === roomId);
-      if (room) {
-        setBookingModal({
-          isOpen: true,
-          doctorId: "",
-          doctorName: "",
-          roomId: room._id,
-          roomName: room.name,
-          slotTime: fromTime,
-          slotDisplayTime: minutesToDisplay(minStart),
-          selectedDate,
-          bookedFrom: "room",
-          fromTime,
-          toTime,
-        });
-      }
-    }
-   
-    setRoomDragSelection({
-      isDragging: false,
-      startMinutes: null,
-      endMinutes: null,
-      roomId: null,
-    });
-  }, [rooms, selectedDate, minutesToDisplay, permissions.canCreate]);
+    },
+    [rooms, selectedDate, minutesToDisplay, permissions.canCreate],
+  );
 
   // Global mouse event handlers for time slot drag selection (doctors)
   useEffect(() => {
     const handleGlobalMouseMove = (e: MouseEvent) => {
       if (!timeDragSelection.isDragging || !timeDragSelection.doctorId) return;
-     
+
       // Clear previous timeout
       if (dragStopTimeoutRef.current) {
         clearTimeout(dragStopTimeoutRef.current);
         dragStopTimeoutRef.current = null;
       }
-     
+
       // Find the doctor column element
-      const doctorColumn = document.querySelector(`[data-doctor-id="${timeDragSelection.doctorId}"]`);
+      const doctorColumn = document.querySelector(
+        `[data-doctor-id="${timeDragSelection.doctorId}"]`,
+      );
       if (!doctorColumn) return;
-     
+
       const rect = doctorColumn.getBoundingClientRect();
       const y = e.clientY - rect.top;
-     
+
       // Calculate which time slot the mouse is over
       const slotIndex = Math.floor(y / ROW_HEIGHT_PX);
       if (slotIndex < 0 || slotIndex >= timeSlots.length) return;
-     
+
       const slot = timeSlots[slotIndex];
       const rowStartMinutes = timeStringToMinutes(slot.time);
-     
+
       // Calculate offset within the row (0 or 15 minutes)
-      const offsetInRow = y - (slotIndex * ROW_HEIGHT_PX);
-      const subSlotOffset = offsetInRow < ROW_HEIGHT_PX / 2 ? 0 : SLOT_INTERVAL_MINUTES;
+      const offsetInRow = y - slotIndex * ROW_HEIGHT_PX;
+      const subSlotOffset =
+        offsetInRow < ROW_HEIGHT_PX / 2 ? 0 : SLOT_INTERVAL_MINUTES;
       const currentMinutes = rowStartMinutes + subSlotOffset;
-     
-      const slotWithinClosing = lastBookableMinutes === null || currentMinutes <= lastBookableMinutes;
+
+      const slotWithinClosing =
+        lastBookableMinutes === null || currentMinutes <= lastBookableMinutes;
       const now = new Date();
       const currentTimeMinutes = now.getHours() * 60 + now.getMinutes();
-      const canBookSlot = !isPastDay && (!isToday || currentMinutes >= currentTimeMinutes) && slotWithinClosing;
-     
+      const canBookSlot =
+        !isPastDay &&
+        (!isToday || currentMinutes >= currentTimeMinutes) &&
+        slotWithinClosing;
+
       if (canBookSlot) {
         setTimeDragSelection((prev) => ({
           ...prev,
           endMinutes: currentMinutes,
         }));
-       
+
         // Set timeout to open modal when mouse stops moving (500ms delay)
         dragStopTimeoutRef.current = setTimeout(() => {
           const currentSelection = timeDragSelectionRef.current;
-          if (currentSelection.isDragging &&
-              currentSelection.startMinutes !== null &&
-              currentSelection.endMinutes !== null &&
-              currentSelection.doctorId) {
+          if (
+            currentSelection.isDragging &&
+            currentSelection.startMinutes !== null &&
+            currentSelection.endMinutes !== null &&
+            currentSelection.doctorId
+          ) {
             openModalWithSelection(
               currentSelection.startMinutes,
               currentSelection.endMinutes,
-              currentSelection.doctorId
+              currentSelection.doctorId,
             );
           }
         }, 500);
@@ -2079,13 +2379,13 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
 
     const handleGlobalMouseUp = () => {
       if (!timeDragSelection.isDragging) return;
-     
+
       // Clear the timeout if mouse is released
       if (dragStopTimeoutRef.current) {
         clearTimeout(dragStopTimeoutRef.current);
         dragStopTimeoutRef.current = null;
       }
-     
+
       const { startMinutes, endMinutes, doctorId } = timeDragSelection;
       if (startMinutes !== null && endMinutes !== null && doctorId) {
         openModalWithSelection(startMinutes, endMinutes, doctorId);
@@ -2113,60 +2413,83 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
         }
       };
     }
-  }, [timeDragSelection.isDragging, timeDragSelection.doctorId, timeDragSelection.startMinutes, timeDragSelection.endMinutes, timeSlots, lastBookableMinutes, isPastDay, isToday, currentMinutes, doctorStaff, selectedDate, minutesToDisplay, openModalWithSelection]);
+  }, [
+    timeDragSelection.isDragging,
+    timeDragSelection.doctorId,
+    timeDragSelection.startMinutes,
+    timeDragSelection.endMinutes,
+    timeSlots,
+    lastBookableMinutes,
+    isPastDay,
+    isToday,
+    currentMinutes,
+    doctorStaff,
+    selectedDate,
+    minutesToDisplay,
+    openModalWithSelection,
+  ]);
 
   // Global mouse event handlers for time slot drag selection (rooms)
   useEffect(() => {
     const handleGlobalMouseMove = (e: MouseEvent) => {
       if (!roomDragSelection.isDragging || !roomDragSelection.roomId) return;
-     
+
       // Clear previous timeout
       if (dragStopTimeoutRef.current) {
         clearTimeout(dragStopTimeoutRef.current);
         dragStopTimeoutRef.current = null;
       }
-     
+
       // Find the room column element
-      const roomColumn = document.querySelector(`[data-room-id="${roomDragSelection.roomId}"]`);
+      const roomColumn = document.querySelector(
+        `[data-room-id="${roomDragSelection.roomId}"]`,
+      );
       if (!roomColumn) return;
-     
+
       const rect = roomColumn.getBoundingClientRect();
       const y = e.clientY - rect.top;
-     
+
       // Calculate which time slot the mouse is over
       const slotIndex = Math.floor(y / ROW_HEIGHT_PX);
       if (slotIndex < 0 || slotIndex >= timeSlots.length) return;
-     
+
       const slot = timeSlots[slotIndex];
       const rowStartMinutes = timeStringToMinutes(slot.time);
-     
+
       // Calculate offset within the row (0 or 15 minutes)
-      const offsetInRow = y - (slotIndex * ROW_HEIGHT_PX);
-      const subSlotOffset = offsetInRow < ROW_HEIGHT_PX / 2 ? 0 : SLOT_INTERVAL_MINUTES;
+      const offsetInRow = y - slotIndex * ROW_HEIGHT_PX;
+      const subSlotOffset =
+        offsetInRow < ROW_HEIGHT_PX / 2 ? 0 : SLOT_INTERVAL_MINUTES;
       const currentMinutes = rowStartMinutes + subSlotOffset;
-     
-      const slotWithinClosing = lastBookableMinutes === null || currentMinutes <= lastBookableMinutes;
+
+      const slotWithinClosing =
+        lastBookableMinutes === null || currentMinutes <= lastBookableMinutes;
       const now = new Date();
       const currentTimeMinutes = now.getHours() * 60 + now.getMinutes();
-      const canBookSlot = !isPastDay && (!isToday || currentMinutes >= currentTimeMinutes) && slotWithinClosing;
-     
+      const canBookSlot =
+        !isPastDay &&
+        (!isToday || currentMinutes >= currentTimeMinutes) &&
+        slotWithinClosing;
+
       if (canBookSlot) {
         setRoomDragSelection((prev) => ({
           ...prev,
           endMinutes: currentMinutes,
         }));
-       
+
         // Set timeout to open modal when mouse stops moving (500ms delay)
         dragStopTimeoutRef.current = setTimeout(() => {
           const currentSelection = roomDragSelectionRef.current;
-          if (currentSelection.isDragging &&
-              currentSelection.startMinutes !== null &&
-              currentSelection.endMinutes !== null &&
-              currentSelection.roomId) {
+          if (
+            currentSelection.isDragging &&
+            currentSelection.startMinutes !== null &&
+            currentSelection.endMinutes !== null &&
+            currentSelection.roomId
+          ) {
             openModalWithRoomSelection(
               currentSelection.startMinutes,
               currentSelection.endMinutes,
-              currentSelection.roomId
+              currentSelection.roomId,
             );
           }
         }, 500);
@@ -2175,13 +2498,13 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
 
     const handleGlobalMouseUp = () => {
       if (!roomDragSelection.isDragging) return;
-     
+
       // Clear the timeout if mouse is released
       if (dragStopTimeoutRef.current) {
         clearTimeout(dragStopTimeoutRef.current);
         dragStopTimeoutRef.current = null;
       }
-     
+
       const { startMinutes, endMinutes, roomId } = roomDragSelection;
       if (startMinutes !== null && endMinutes !== null && roomId) {
         openModalWithRoomSelection(startMinutes, endMinutes, roomId);
@@ -2209,21 +2532,41 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
         }
       };
     }
-  }, [roomDragSelection.isDragging, roomDragSelection.roomId, roomDragSelection.startMinutes, roomDragSelection.endMinutes, timeSlots, lastBookableMinutes, isPastDay, isToday, currentMinutes, rooms, selectedDate, minutesToDisplay, openModalWithRoomSelection]);
+  }, [
+    roomDragSelection.isDragging,
+    roomDragSelection.roomId,
+    roomDragSelection.startMinutes,
+    roomDragSelection.endMinutes,
+    timeSlots,
+    lastBookableMinutes,
+    isPastDay,
+    isToday,
+    currentMinutes,
+    rooms,
+    selectedDate,
+    minutesToDisplay,
+    openModalWithRoomSelection,
+  ]);
 
   const tooltipDoctor = activeDoctorTooltip
     ? doctorStaff.find((doc) => doc._id === activeDoctorTooltip.doctorId)
     : null;
   const tooltipTreatments =
-    (activeDoctorTooltip && doctorTreatmentsMap[activeDoctorTooltip.doctorId]) || [];
+    (activeDoctorTooltip &&
+      doctorTreatmentsMap[activeDoctorTooltip.doctorId]) ||
+    [];
   const tooltipLoading =
-    activeDoctorTooltip && doctorTreatmentsLoading[activeDoctorTooltip.doctorId];
+    activeDoctorTooltip &&
+    doctorTreatmentsLoading[activeDoctorTooltip.doctorId];
   const tooltipError =
     activeDoctorTooltip && doctorTreatmentsError[activeDoctorTooltip.doctorId];
   const tooltipDeptList =
-    (activeDoctorTooltip && doctorDepartmentsMap[activeDoctorTooltip.doctorId]) || [];
+    (activeDoctorTooltip &&
+      doctorDepartmentsMap[activeDoctorTooltip.doctorId]) ||
+    [];
   const tooltipDeptLoading =
-    activeDoctorTooltip && doctorDepartmentsLoading[activeDoctorTooltip.doctorId];
+    activeDoctorTooltip &&
+    doctorDepartmentsLoading[activeDoctorTooltip.doctorId];
   const tooltipDeptError =
     activeDoctorTooltip && doctorDepartmentsError[activeDoctorTooltip.doctorId];
   // Get ordered columns (doctors and rooms) from unified columnOrder
@@ -2244,11 +2587,21 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
       }
       return null;
     })
-    .filter((col): col is { type: "doctor"; data: DoctorStaff } | { type: "room"; data: Room } => col !== null);
+    .filter(
+      (
+        col,
+      ): col is
+        | { type: "doctor"; data: DoctorStaff }
+        | { type: "room"; data: Room } => col !== null,
+    );
 
   // Separate for backward compatibility (used in some places)
-  const visibleDoctors = orderedColumns.filter(col => col.type === "doctor").map(col => col.data);
-  const visibleRooms = orderedColumns.filter(col => col.type === "room").map(col => col.data);
+  const visibleDoctors = orderedColumns
+    .filter((col) => col.type === "doctor")
+    .map((col) => col.data);
+  const visibleRooms = orderedColumns
+    .filter((col) => col.type === "room")
+    .map((col) => col.data);
 
   // Unified drag and drop handlers for both doctor and room columns
   const handleColumnDragStart = (e: React.DragEvent, columnKey: string) => {
@@ -2258,7 +2611,7 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
       e.preventDefault();
       return;
     }
-   
+
     setDraggedColumnId(columnKey);
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("text/plain", columnKey);
@@ -2291,20 +2644,25 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
   const handleColumnDragLeave = (e: React.DragEvent) => {
     // Remove visual feedback when leaving
     if (e.currentTarget instanceof HTMLElement) {
-      e.currentTarget.classList.remove("border-blue-400", "bg-blue-50", "border-emerald-400", "bg-emerald-50");
+      e.currentTarget.classList.remove(
+        "border-blue-400",
+        "bg-blue-50",
+        "border-emerald-400",
+        "bg-emerald-50",
+      );
     }
   };
 
   const handleColumnDrop = (e: React.DragEvent, targetColumnKey: string) => {
     e.preventDefault();
-   
+
     // âœ… Check permission before allowing column swap
     if (!permissions.canUpdate) {
       showErrorToast("You do not have permission to reorder columns");
       setDraggedColumnId(null);
       return;
     }
-   
+
     if (!draggedColumnId || draggedColumnId === targetColumnKey) return;
 
     setColumnOrder((prevOrder) => {
@@ -2321,7 +2679,10 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
 
       // Save to localStorage immediately
       if (typeof window !== "undefined") {
-        localStorage.setItem("appointmentColumnOrder", JSON.stringify(newOrder));
+        localStorage.setItem(
+          "appointmentColumnOrder",
+          JSON.stringify(newOrder),
+        );
       }
 
       return newOrder;
@@ -2330,24 +2691,32 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
   };
 
   // Time slot drag selection handlers (doctors)
-  const handleTimeSlotMouseDown = (e: React.MouseEvent, doctorId: string, startMinutes: number) => {
+  const handleTimeSlotMouseDown = (
+    e: React.MouseEvent,
+    doctorId: string,
+    startMinutes: number,
+  ) => {
     // âœ… Check permission before allowing time slot selection
     if (!permissions.canCreate) {
       showErrorToast("You do not have permission to book appointments");
       return;
     }
-   
+
     // Only start drag on left mouse button and if slot is bookable
     if (e.button !== 0) return;
-   
+
     // Prevent starting doctor drag if room drag is active
     if (roomDragSelection.isDragging) return;
-   
-    const slotWithinClosing = lastBookableMinutes === null || startMinutes <= lastBookableMinutes;
-    const canBookSlot = !isPastDay && (!isToday || startMinutes >= currentMinutes) && slotWithinClosing;
-   
+
+    const slotWithinClosing =
+      lastBookableMinutes === null || startMinutes <= lastBookableMinutes;
+    const canBookSlot =
+      !isPastDay &&
+      (!isToday || startMinutes >= currentMinutes) &&
+      slotWithinClosing;
+
     if (!canBookSlot) return;
-   
+
     e.preventDefault();
     setTimeDragSelection({
       isDragging: true,
@@ -2358,24 +2727,32 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
   };
 
   // Time slot drag selection handlers (rooms)
-  const handleRoomSlotMouseDown = (e: React.MouseEvent, roomId: string, startMinutes: number) => {
+  const handleRoomSlotMouseDown = (
+    e: React.MouseEvent,
+    roomId: string,
+    startMinutes: number,
+  ) => {
     // âœ… Check permission before allowing time slot selection
     if (!permissions.canCreate) {
       showErrorToast("You do not have permission to book appointments");
       return;
     }
-   
+
     // Only start drag on left mouse button and if slot is bookable
     if (e.button !== 0) return;
-   
+
     // Prevent starting room drag if doctor drag is active
     if (timeDragSelection.isDragging) return;
-   
-    const slotWithinClosing = lastBookableMinutes === null || startMinutes <= lastBookableMinutes;
-    const canBookSlot = !isPastDay && (!isToday || startMinutes >= currentMinutes) && slotWithinClosing;
-   
+
+    const slotWithinClosing =
+      lastBookableMinutes === null || startMinutes <= lastBookableMinutes;
+    const canBookSlot =
+      !isPastDay &&
+      (!isToday || startMinutes >= currentMinutes) &&
+      slotWithinClosing;
+
     if (!canBookSlot) return;
-   
+
     e.preventDefault();
     setRoomDragSelection({
       isDragging: true,
@@ -2386,27 +2763,40 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
   };
 
   // Check if a time slot is within the drag selection (doctors)
-  const isSlotInSelection = (slotStartMinutes: number, slotEndMinutes: number, doctorId: string): boolean => {
-    if (!timeDragSelection.isDragging || timeDragSelection.doctorId !== doctorId) return false;
+  const isSlotInSelection = (
+    slotStartMinutes: number,
+    slotEndMinutes: number,
+    doctorId: string,
+  ): boolean => {
+    if (
+      !timeDragSelection.isDragging ||
+      timeDragSelection.doctorId !== doctorId
+    )
+      return false;
     const { startMinutes, endMinutes } = timeDragSelection;
     if (startMinutes === null || endMinutes === null) return false;
-   
+
     const minStart = Math.min(startMinutes, endMinutes);
     const maxEnd = Math.max(startMinutes, endMinutes);
-   
+
     // Check if slot overlaps with selection
     return slotStartMinutes < maxEnd && slotEndMinutes > minStart;
   };
 
   // Check if a time slot is within the drag selection (rooms)
-  const isRoomSlotInSelection = (slotStartMinutes: number, slotEndMinutes: number, roomId: string): boolean => {
-    if (!roomDragSelection.isDragging || roomDragSelection.roomId !== roomId) return false;
+  const isRoomSlotInSelection = (
+    slotStartMinutes: number,
+    slotEndMinutes: number,
+    roomId: string,
+  ): boolean => {
+    if (!roomDragSelection.isDragging || roomDragSelection.roomId !== roomId)
+      return false;
     const { startMinutes, endMinutes } = roomDragSelection;
     if (startMinutes === null || endMinutes === null) return false;
-   
+
     const minStart = Math.min(startMinutes, endMinutes);
     const maxEnd = Math.max(startMinutes, endMinutes);
-   
+
     // Check if slot overlaps with selection
     return slotStartMinutes < maxEnd && slotEndMinutes > minStart;
   };
@@ -2431,152 +2821,173 @@ function AppointmentPage({ contextOverride = null }: { contextOverride?: "clinic
         }
         toast.success(
           `Appointments imported! Navigated to ${formatDateForDisplay(firstDate)}.`,
-          { duration: 4000 }
+          { duration: 4000 },
         );
       } else {
         console.error("Invalid date format from import:", firstDate);
         loadAppointments();
-        toast.success("Appointments imported successfully! Refreshing schedule...", { duration: 3000 });
+        toast.success(
+          "Appointments imported successfully! Refreshing schedule...",
+          { duration: 3000 },
+        );
       }
     } else {
       // Reload appointments for the current date
       loadAppointments();
-      toast.success("Appointments imported successfully! Refreshing schedule...", { duration: 3000 });
+      toast.success(
+        "Appointments imported successfully! Refreshing schedule...",
+        { duration: 3000 },
+      );
     }
   };
 
   // Get status color for appointments - Distinct professional colors with good contrast
   // Define default status colors - exact match to original implementation
-const DEFAULT_STATUS_COLORS: Record<string, { bg: string; text: string; border: string }> = {
-  booked: { bg: "#bfdbfe", text: "#111827", border: "#3b82f6" },         // sky-300 equivalent - Only Blue
-  arrived: { bg: "#a7f3d0", text: "#111827", border: "#10b981" },       // emerald-300 equivalent - Only Green
-  cancelled: { bg: "#fbcfe8", text: "#111827", border: "#ec4899" },     // rose-400 equivalent - Red
-  rescheduled: { bg: "#fed1aa", text: "#111827", border: "#f97316" },   // orange-400 equivalent - Orange
-  waiting: { bg: "#fde68a", text: "#111827", border: "#f59e0b" },       // amber-300 equivalent - Yellow
-  approved: { bg: "#d9f99d", text: "#111827", border: "#84cc16" },      // lime-300 equivalent - Deep Green
-  enquiry: { bg: "#ddd6fe", text: "#111827", border: "#7c3aed" },       // violet-300 equivalent - Purple
-  consultation: { bg: "#f0abfc", text: "#111827", border: "#d946ef" },   // fuchsia-300 equivalent - Fuchsia
-  completed: { bg: "#a5f3fc", text: "#111827", border: "#06b6d4" },     // cyan-300 equivalent - Cyan
-  invoice: { bg: "#c7d2fe", text: "#111827", border: "#6366f1" },       // indigo-400 equivalent - Indigo
-  discharge: { bg: "#f9a8d4", text: "#111827", border: "#ec4899" },     // pink-300 equivalent - Pink
-  rejected: { bg: "#cbd5e1", text: "#111827", border: "#64748b" },      // slate-300 equivalent - Slate
-  default: { bg: "#d1d5db", text: "#111827", border: "#6b7280" },       // gray-300 equivalent
-};
-
-// Get custom status colors from localStorage
-const getCustomStatusColors = (): Record<string, { bg: string; text: string; border: string }> => {
-  if (typeof window !== 'undefined') {
-    const stored = localStorage.getItem('appointmentStatusColors');
-    return stored ? JSON.parse(stored) : {};
-  }
-  return {};
-};
-
-// Save custom status colors to localStorage
-const saveCustomStatusColors = (colors: Record<string, { bg: string; text: string; border: string }>) => {
-  if (typeof window !== 'undefined') {
-    localStorage.setItem('appointmentStatusColors', JSON.stringify(colors));
-  }
-};
-
-// Hook to manage custom status colors state
-const [customStatusColors, setCustomStatusColors] = useState<Record<string, { bg: string; text: string; border: string }>>(() => {
-  const stored = getCustomStatusColors();
-  // Ensure all default statuses have entries (even if using defaults)
-  // This makes sure we have a record of which ones are customized
-  return stored;
-});
-
-// State for showing/hiding the color customization panel
-const [showColorCustomization, setShowColorCustomization] = useState(false);
-
-// State for color picker visibility
-const [openPicker, setOpenPicker] = useState<string | null>(null);
-const [pickerPosition, setPickerPosition] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
-
-const openColorPicker = (e: React.MouseEvent, status: string) => {
-  const target = e.currentTarget as HTMLElement;
-  const rect = target.getBoundingClientRect();
-  const estimatedWidth = 300;
-  const estimatedHeight = 360;
-  const spacing = 8;
-  let left = rect.left;
-  let top = rect.bottom + spacing;
-  if (left + estimatedWidth > window.innerWidth - 10) {
-    left = Math.max(10, rect.right - estimatedWidth);
-  }
-  if (top + estimatedHeight > window.innerHeight - 10) {
-    top = Math.max(10, window.innerHeight - estimatedHeight - 10);
-  }
-  setPickerPosition({ top, left });
-  setOpenPicker(status);
-};
-
-const normalizeStatus = (status: any): string => {
-  if (typeof status !== "string") return "default";
-  const s = status.trim().toLowerCase();
-  const map: Record<string, string> = {
-    booking: "booked",
-    booked: "booked",
-    enquiry: "enquiry",
-    inquiry: "enquiry",
-    discharge: "discharge",
-    discharged: "discharge",
-    arrive: "arrived",
-    arrival: "arrived",
-    arrived: "arrived",
-    consultation: "consultation",
-    consulted: "consultation",
-    cancelled: "cancelled",
-    canceled: "cancelled",
-    approved: "approved",
-    rescheduled: "rescheduled",
-    waiting: "waiting",
-    rejected: "rejected",
-    completed: "completed",
-    invoice: "invoice",
-    invoiced: "invoice",
+  const DEFAULT_STATUS_COLORS: Record<
+    string,
+    { bg: string; text: string; border: string }
+  > = {
+    booked: { bg: "#bfdbfe", text: "#111827", border: "#3b82f6" }, // sky-300 equivalent - Only Blue
+    arrived: { bg: "#a7f3d0", text: "#111827", border: "#10b981" }, // emerald-300 equivalent - Only Green
+    cancelled: { bg: "#fbcfe8", text: "#111827", border: "#ec4899" }, // rose-400 equivalent - Red
+    rescheduled: { bg: "#fed1aa", text: "#111827", border: "#f97316" }, // orange-400 equivalent - Orange
+    waiting: { bg: "#fde68a", text: "#111827", border: "#f59e0b" }, // amber-300 equivalent - Yellow
+    approved: { bg: "#d9f99d", text: "#111827", border: "#84cc16" }, // lime-300 equivalent - Deep Green
+    enquiry: { bg: "#ddd6fe", text: "#111827", border: "#7c3aed" }, // violet-300 equivalent - Purple
+    consultation: { bg: "#f0abfc", text: "#111827", border: "#d946ef" }, // fuchsia-300 equivalent - Fuchsia
+    completed: { bg: "#a5f3fc", text: "#111827", border: "#06b6d4" }, // cyan-300 equivalent - Cyan
+    invoice: { bg: "#c7d2fe", text: "#111827", border: "#6366f1" }, // indigo-400 equivalent - Indigo
+    discharge: { bg: "#f9a8d4", text: "#111827", border: "#ec4899" }, // pink-300 equivalent - Pink
+    rejected: { bg: "#cbd5e1", text: "#111827", border: "#64748b" }, // slate-300 equivalent - Slate
+    default: { bg: "#d1d5db", text: "#111827", border: "#6b7280" }, // gray-300 equivalent
   };
-  return map[s] || s;
-};
 
-const getStatusColor = (status: string): { bg: string; text: string; border: string } => {
-  const key = normalizeStatus(status);
-  const customColor = customStatusColors[key];
-  if (customColor) return customColor;
-  return DEFAULT_STATUS_COLORS[key] || DEFAULT_STATUS_COLORS.default;
-};
-
-// Handler for changing status colors
-const handleColorChange = (status: string, newColor: string) => {
-  const key = normalizeStatus(status);
-  const updatedColors = {
-    ...customStatusColors,
-    [key]: {
-      bg: newColor,
-      text: "#111827", // Keep dark text for readability
-      border: newColor // Use same color for border
+  // Get custom status colors from localStorage
+  const getCustomStatusColors = (): Record<
+    string,
+    { bg: string; text: string; border: string }
+  > => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("appointmentStatusColors");
+      return stored ? JSON.parse(stored) : {};
     }
+    return {};
   };
- 
-  setCustomStatusColors(updatedColors);
-  saveCustomStatusColors(updatedColors);
-};
 
-// Close color picker when clicking outside
-useEffect(() => {
-  const handleClickOutside = (event: MouseEvent) => {
-    const target = event.target as HTMLElement;
-    if (openPicker && !target.closest('.color-picker-wrapper')) {
-      setOpenPicker(null);
+  // Save custom status colors to localStorage
+  const saveCustomStatusColors = (
+    colors: Record<string, { bg: string; text: string; border: string }>,
+  ) => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("appointmentStatusColors", JSON.stringify(colors));
     }
   };
 
-  document.addEventListener('mousedown', handleClickOutside);
-  return () => {
-    document.removeEventListener('mousedown', handleClickOutside);
+  // Hook to manage custom status colors state
+  const [customStatusColors, setCustomStatusColors] = useState<
+    Record<string, { bg: string; text: string; border: string }>
+  >(() => {
+    const stored = getCustomStatusColors();
+    // Ensure all default statuses have entries (even if using defaults)
+    // This makes sure we have a record of which ones are customized
+    return stored;
+  });
+
+  // State for showing/hiding the color customization panel
+  const [showColorCustomization, setShowColorCustomization] = useState(false);
+
+  // State for color picker visibility
+  const [openPicker, setOpenPicker] = useState<string | null>(null);
+  const [pickerPosition, setPickerPosition] = useState<{
+    top: number;
+    left: number;
+  }>({ top: 0, left: 0 });
+
+  const openColorPicker = (e: React.MouseEvent, status: string) => {
+    const target = e.currentTarget as HTMLElement;
+    const rect = target.getBoundingClientRect();
+    const estimatedWidth = 300;
+    const estimatedHeight = 360;
+    const spacing = 8;
+    let left = rect.left;
+    let top = rect.bottom + spacing;
+    if (left + estimatedWidth > window.innerWidth - 10) {
+      left = Math.max(10, rect.right - estimatedWidth);
+    }
+    if (top + estimatedHeight > window.innerHeight - 10) {
+      top = Math.max(10, window.innerHeight - estimatedHeight - 10);
+    }
+    setPickerPosition({ top, left });
+    setOpenPicker(status);
   };
-}, [openPicker]);
+
+  const normalizeStatus = (status: any): string => {
+    if (typeof status !== "string") return "default";
+    const s = status.trim().toLowerCase();
+    const map: Record<string, string> = {
+      booking: "booked",
+      booked: "booked",
+      enquiry: "enquiry",
+      inquiry: "enquiry",
+      discharge: "discharge",
+      discharged: "discharge",
+      arrive: "arrived",
+      arrival: "arrived",
+      arrived: "arrived",
+      consultation: "consultation",
+      consulted: "consultation",
+      cancelled: "cancelled",
+      canceled: "cancelled",
+      approved: "approved",
+      rescheduled: "rescheduled",
+      waiting: "waiting",
+      rejected: "rejected",
+      completed: "completed",
+      invoice: "invoice",
+      invoiced: "invoice",
+    };
+    return map[s] || s;
+  };
+
+  const getStatusColor = (
+    status: string,
+  ): { bg: string; text: string; border: string } => {
+    const key = normalizeStatus(status);
+    const customColor = customStatusColors[key];
+    if (customColor) return customColor;
+    return DEFAULT_STATUS_COLORS[key] || DEFAULT_STATUS_COLORS.default;
+  };
+
+  // Handler for changing status colors
+  const handleColorChange = (status: string, newColor: string) => {
+    const key = normalizeStatus(status);
+    const updatedColors = {
+      ...customStatusColors,
+      [key]: {
+        bg: newColor,
+        text: "#111827", // Keep dark text for readability
+        border: newColor, // Use same color for border
+      },
+    };
+
+    setCustomStatusColors(updatedColors);
+    saveCustomStatusColors(updatedColors);
+  };
+
+  // Close color picker when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (openPicker && !target.closest(".color-picker-wrapper")) {
+        setOpenPicker(null);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [openPicker]);
 
   if (loading || !permissionsLoaded) return <Loader />;
 
@@ -2588,9 +2999,12 @@ useEffect(() => {
           <div className="w-16 h-16 bg-yellow-100 dark:bg-yellow-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
             <Calendar className="w-8 h-8 text-yellow-600 dark:text-yellow-400" />
           </div>
-          <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-2">Access Denied</h3>
+          <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-2">
+            Access Denied
+          </h3>
           <p className="text-sm text-gray-700 dark:text-gray-400">
-            You do not have permission to view appointments. Please contact your administrator.
+            You do not have permission to view appointments. Please contact your
+            administrator.
           </p>
         </div>
       </div>
@@ -2609,1738 +3023,2633 @@ useEffect(() => {
   }
 
   return (
-    <div className="appointment-schedule-page" style={{ fontFamily: "'Inter', sans-serif" }}>
+    <div
+      className="appointment-schedule-page"
+      style={{ fontFamily: "'Inter', sans-serif" }}
+    >
       <div className="min-h-screen bg-gray-50 p-1 sm:p-1 md:p-2 space-y-1 sm:space-y-2">
-
-      <div className="bg-white dark:bg-gray-50 rounded-lg border border-gray-200 dark:border-gray-200 shadow-sm p-1 sm:p-2">
-        {doctorStaff.length === 0 && rooms.length === 0 ? (
-          <div className="flex flex-col items-center justify-center min-h-[60vh] py-12">
-            <div className="bg-gradient-to-br from-gray-50 to-gray-50 dark:from-gray-900/20 dark:to-indigo-900/20 rounded-full p-6 mb-6">
-              <div className="w-20 h-20 mx-auto flex items-center justify-center bg-white dark:bg-gray-800 rounded-full shadow-lg">
-                <Calendar className="w-10 h-10 text-blue-600 dark:text-blue-400" />
-              </div>
-            </div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-3 text-center">
-              Get Started with Appointments
-            </h2>
-            <p className="text-base text-gray-600 dark:text-gray-400 text-center max-w-md leading-relaxed mb-2">
-              First create <span className="font-semibold text-blue-600 dark:text-blue-400">doctors</span> and <span className="font-semibold text-blue-600 dark:text-blue-400">rooms</span> to book appointments
-            </p>
-            <p className="text-sm text-gray-500 dark:text-gray-500 text-center">
-              Once you've added them, you'll be able to manage your appointment schedule here
-            </p>
-          </div>
-        ) : (
-          <>
-            <div className="flex flex-col gap-2">
-              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2">
-                <div>
-                  <h1 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-900">Appointment Schedule</h1>
-                  <p className="text-xs text-gray-700 dark:text-gray-800">
-                    {clinic?.name}
-                  </p>
+        <div className="bg-white dark:bg-gray-50 rounded-lg border border-gray-200 dark:border-gray-200 shadow-sm p-1 sm:p-2">
+          {doctorStaff.length === 0 && rooms.length === 0 ? (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] py-12">
+              <div className="bg-gradient-to-br from-gray-50 to-gray-50 dark:from-gray-900/20 dark:to-indigo-900/20 rounded-full p-6 mb-6">
+                <div className="w-20 h-20 mx-auto flex items-center justify-center bg-white dark:bg-gray-800 rounded-full shadow-lg">
+                  <Calendar className="w-10 h-10 text-blue-600 dark:text-blue-400" />
                 </div>
-                <div className="flex sm:flex-row sm:items-center gap-3">
-                  {permissions.canCreate === true && (
-                    <button
-                      onClick={() => setImportModalOpen(true)}
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded border border-blue-600 dark:border-blue-500 bg-blue-600 dark:bg-blue-500 text-[10px] font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors"
-                      type="button"
-                      title="Import appointments from CSV or Excel"
-                    >
-                      <Upload className="w-3 h-3" />
-                      Import
-                    </button>
-                  )}
-                 
-                  {/* Customize Status Colors Button */}
-                  <div className="relative">
-                    <button
-                      onClick={() => setShowColorCustomization(!showColorCustomization)}
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded border border-purple-600 dark:border-purple-500 bg-purple-600 dark:bg-purple-500 text-[10px] font-medium text-white hover:bg-purple-700 dark:hover:bg-purple-600 transition-colors"
-                      type="button"
-                      title="Customize appointment status colors"
-                    >
-                      <div className="w-3 h-3 rounded-sm bg-gradient-to-r from-blue-400 to-green-400"></div>
-                      Colors
-                    </button>
-                   
-                    {showColorCustomization && (
-                      <div className="color-customization-panel absolute z-50 mt-1 w-80 max-w-[90vw] bg-white dark:bg-gray-50 rounded-lg shadow-xl border border-gray-200 dark:border-gray-300 sm:right-0 max-h-[70vh] overflow-y-auto">
-                        <div className="p-3 border-b border-gray-200 dark:border-gray-300">
-                          <div className="flex items-center justify-between">
-                            <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-900">Appointment Status Colors</h3>
-                            <button
-                              onClick={() => setShowColorCustomization(false)}
-                              className="text-gray-500 hover:text-gray-700"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                       
-                        <div className="p-3 max-h-60 overflow-y-auto">
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            {Object.keys(DEFAULT_STATUS_COLORS).filter(status => status !== 'default').map((status) => {
-                              const currentColor = customStatusColors[status] || DEFAULT_STATUS_COLORS[status];
-                              return (
-                                <div key={status} className="flex items-center gap-2 p-2 bg-white dark:bg-gray-50 rounded border border-gray-200 relative">
-                                  <div
-                                    className="w-6 h-6 rounded border border-gray-300 cursor-pointer flex items-center justify-center text-[8px] font-bold"
-                                    style={{ backgroundColor: currentColor.bg, color: currentColor.text }}
-                                    onClick={(e) => openColorPicker(e, status)}
-                                    title={`${status}: ${currentColor.bg}`}
-                                  >
-                                    {status.charAt(0).toUpperCase()}
-                                  </div>
-                                  <span className="text-xs font-medium text-gray-700 capitalize flex-1">{status}</span>
-                                 
-                                  {openPicker === status && (
-                                    <div className="color-picker-wrapper">
-                                      <div className="fixed inset-0 z-[1000] bg-black/30" onClick={() => setOpenPicker(null)}></div>
-                                      <div
-                                        className="fixed z-[1001] bg-white p-3 rounded-md shadow-xl border border-gray-300 w-[300px] sm:w-[320px] max-w-[92vw]"
-                                        style={{ top: pickerPosition.top, left: pickerPosition.left }}
-                                      >
-                                        <div className="flex items-center justify-between mb-2">
-                                          <span className="text-xs font-semibold capitalize">{status}</span>
-                                          <button
-                                            className="px-2 py-1 text-xs bg-gray-200 rounded hover:bg-gray-300"
-                                            onClick={() => setOpenPicker(null)}
-                                          >
-                                            Close
-                                          </button>
-                                        </div>
-                                        <div className="grid grid-cols-8 gap-1 mb-2">
-                                          {Object.values(DEFAULT_STATUS_COLORS).filter(s => s !== DEFAULT_STATUS_COLORS.default).slice(0, 8).map((c, i) => (
-                                            <button
-                                              key={i}
-                                              className="h-5 rounded border"
-                                              style={{ backgroundColor: c.bg, borderColor: c.border }}
-                                              onClick={() => handleColorChange(status, c.bg)}
-                                              aria-label="preset color"
-                                            />
-                                          ))}
-                                        </div>
-                                        <ChromePicker
-                                          color={currentColor.bg}
-                                          onChange={(color: any) => handleColorChange(status, color.hex)}
-                                        />
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      </div>
-                    )}
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-3 text-center">
+                Get Started with Appointments
+              </h2>
+              <p className="text-base text-gray-600 dark:text-gray-400 text-center max-w-md leading-relaxed mb-2">
+                First create{" "}
+                <span className="font-semibold text-blue-600 dark:text-blue-400">
+                  doctors
+                </span>{" "}
+                and{" "}
+                <span className="font-semibold text-blue-600 dark:text-blue-400">
+                  rooms
+                </span>{" "}
+                to book appointments
+              </p>
+              <p className="text-sm text-gray-500 dark:text-gray-500 text-center">
+                Once you've added them, you'll be able to manage your
+                appointment schedule here
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="flex flex-col gap-2">
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2">
+                  <div>
+                    <h1 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-900">
+                      Appointment Schedule
+                    </h1>
+                    <p className="text-xs text-gray-700 dark:text-gray-800">
+                      {clinic?.name}
+                    </p>
                   </div>
-                  <div className="flex items-center gap-1">
+                  <div className="flex sm:flex-row sm:items-center gap-3">
+                    {permissions.canCreate === true && (
+                      <button
+                        onClick={() => setImportModalOpen(true)}
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded border border-blue-600 dark:border-blue-500 bg-blue-600 dark:bg-blue-500 text-[10px] font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors"
+                        type="button"
+                        title="Import appointments from CSV or Excel"
+                      >
+                        <Upload className="w-3 h-3" />
+                        Import
+                      </button>
+                    )}
+
+                    {/* Customize Status Colors Button */}
+                    <div className="relative">
+                      <button
+                        onClick={() =>
+                          setShowColorCustomization(!showColorCustomization)
+                        }
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded border border-purple-600 dark:border-purple-500 bg-purple-600 dark:bg-purple-500 text-[10px] font-medium text-white hover:bg-purple-700 dark:hover:bg-purple-600 transition-colors"
+                        type="button"
+                        title="Customize appointment status colors"
+                      >
+                        <div className="w-3 h-3 rounded-sm bg-gradient-to-r from-blue-400 to-green-400"></div>
+                        Colors
+                      </button>
+
+                      {showColorCustomization && (
+                        <div className="color-customization-panel absolute z-50 mt-1 w-80 max-w-[90vw] bg-white dark:bg-gray-50 rounded-lg shadow-xl border border-gray-200 dark:border-gray-300 sm:right-0 max-h-[70vh] overflow-y-auto">
+                          <div className="p-3 border-b border-gray-200 dark:border-gray-300">
+                            <div className="flex items-center justify-between">
+                              <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-900">
+                                Appointment Status Colors
+                              </h3>
+                              <button
+                                onClick={() => setShowColorCustomization(false)}
+                                className="text-gray-500 hover:text-gray-700"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="p-3 max-h-60 overflow-y-auto">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              {Object.keys(DEFAULT_STATUS_COLORS)
+                                .filter((status) => status !== "default")
+                                .map((status) => {
+                                  const currentColor =
+                                    customStatusColors[status] ||
+                                    DEFAULT_STATUS_COLORS[status];
+                                  return (
+                                    <div
+                                      key={status}
+                                      className="flex items-center gap-2 p-2 bg-white dark:bg-gray-50 rounded border border-gray-200 relative"
+                                    >
+                                      <div
+                                        className="w-6 h-6 rounded border border-gray-300 cursor-pointer flex items-center justify-center text-[8px] font-bold"
+                                        style={{
+                                          backgroundColor: currentColor.bg,
+                                          color: currentColor.text,
+                                        }}
+                                        onClick={(e) =>
+                                          openColorPicker(e, status)
+                                        }
+                                        title={`${status}: ${currentColor.bg}`}
+                                      >
+                                        {status.charAt(0).toUpperCase()}
+                                      </div>
+                                      <span className="text-xs font-medium text-gray-700 capitalize flex-1">
+                                        {status}
+                                      </span>
+
+                                      {openPicker === status && (
+                                        <div className="color-picker-wrapper">
+                                          <div
+                                            className="fixed inset-0 z-[1000] bg-black/30"
+                                            onClick={() => setOpenPicker(null)}
+                                          ></div>
+                                          <div
+                                            className="fixed z-[1001] bg-white p-3 rounded-md shadow-xl border border-gray-300 w-[300px] sm:w-[320px] max-w-[92vw]"
+                                            style={{
+                                              top: pickerPosition.top,
+                                              left: pickerPosition.left,
+                                            }}
+                                          >
+                                            <div className="flex items-center justify-between mb-2">
+                                              <span className="text-xs font-semibold capitalize">
+                                                {status}
+                                              </span>
+                                              <button
+                                                className="px-2 py-1 text-xs bg-gray-200 rounded hover:bg-gray-300"
+                                                onClick={() =>
+                                                  setOpenPicker(null)
+                                                }
+                                              >
+                                                Close
+                                              </button>
+                                            </div>
+                                            <div className="grid grid-cols-8 gap-1 mb-2">
+                                              {Object.values(
+                                                DEFAULT_STATUS_COLORS,
+                                              )
+                                                .filter(
+                                                  (s) =>
+                                                    s !==
+                                                    DEFAULT_STATUS_COLORS.default,
+                                                )
+                                                .slice(0, 8)
+                                                .map((c, i) => (
+                                                  <button
+                                                    key={i}
+                                                    className="h-5 rounded border"
+                                                    style={{
+                                                      backgroundColor: c.bg,
+                                                      borderColor: c.border,
+                                                    }}
+                                                    onClick={() =>
+                                                      handleColorChange(
+                                                        status,
+                                                        c.bg,
+                                                      )
+                                                    }
+                                                    aria-label="preset color"
+                                                  />
+                                                ))}
+                                            </div>
+                                            <ChromePicker
+                                              color={currentColor.bg}
+                                              onChange={(color: any) =>
+                                                handleColorChange(
+                                                  status,
+                                                  color.hex,
+                                                )
+                                              }
+                                            />
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Schedule appointment - Opens booking page in new tab */}
                     <button
                       onClick={() => {
-                        const current = new Date(selectedDate);
-                        current.setDate(current.getDate() - 1);
-                        const newDate = current.toISOString().split("T")[0];
-                        setSelectedDate(newDate);
-                        if (typeof window !== "undefined") {
-                          localStorage.setItem("appointmentSelectedDate", newDate);
+                        if (clinic?._id) {
+                          const bookingUrl = `/clinic/appointment-booking?clinicId=${clinic._id}`;
+                          window.open(bookingUrl, "_blank");
+                        } else {
+                          toast.error("Clinic information not available");
                         }
                       }}
-                      className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-200 text-gray-600 dark:text-gray-700 transition-colors"
+                      className="inline-flex items-center gap-1 px-3 py-1 rounded-md bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-normal shadow-sm"
                       type="button"
-                      title="Previous Day"
+                      title="Open appointment booking page"
                     >
-                      <ChevronLeft className="w-3.5 h-3.5" />
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                        />
+                      </svg>
+                      <span>Schedule Link</span>
+                      <svg
+                        className="w-3 h-3 ml-1"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0 0L10 14"
+                        />
+                      </svg>
                     </button>
-                   
-                    <div className="relative inline-flex items-center gap-1">
-                      <input
-                        ref={dateInputRef}
-                        type="date"
-                        value={selectedDate}
-                        onChange={(e) => {
-                          const newDate = e.target.value;
+
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => {
+                          const current = new Date(selectedDate);
+                          current.setDate(current.getDate() - 1);
+                          const newDate = current.toISOString().split("T")[0];
                           setSelectedDate(newDate);
                           if (typeof window !== "undefined") {
-                            localStorage.setItem("appointmentSelectedDate", newDate);
+                            localStorage.setItem(
+                              "appointmentSelectedDate",
+                              newDate,
+                            );
                           }
-                          toast(`Viewing appointments for ${formatDateForDisplay(newDate)}`, {
-                            duration: 2000,
-                            icon: "â„¹ï¸ ",
-                          });
                         }}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                        title="Select date"
-                      />
-                      <span className="text-[10px] font-bold text-teal-600 select-none pointer-events-none">
-                        {formatDateForDisplay(selectedDate)}
-                      </span>
-                      <Calendar className="w-3.5 h-3.5 text-gray-600 dark:text-gray-700 pointer-events-none" />
+                        className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-200 text-gray-600 dark:text-gray-700 transition-colors"
+                        type="button"
+                        title="Previous Day"
+                      >
+                        <ChevronLeft className="w-3.5 h-3.5" />
+                      </button>
+
+                      <div className="relative inline-flex items-center gap-1">
+                        <input
+                          ref={dateInputRef}
+                          type="date"
+                          value={selectedDate}
+                          onChange={(e) => {
+                            const newDate = e.target.value;
+                            setSelectedDate(newDate);
+                            if (typeof window !== "undefined") {
+                              localStorage.setItem(
+                                "appointmentSelectedDate",
+                                newDate,
+                              );
+                            }
+                            toast(
+                              `Viewing appointments for ${formatDateForDisplay(newDate)}`,
+                              {
+                                duration: 2000,
+                                icon: "â„¹ï¸ ",
+                              },
+                            );
+                          }}
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                          title="Select date"
+                        />
+                        <span className="text-[10px] font-bold text-teal-600 select-none pointer-events-none">
+                          {formatDateForDisplay(selectedDate)}
+                        </span>
+                        <Calendar className="w-3.5 h-3.5 text-gray-600 dark:text-gray-700 pointer-events-none" />
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          const current = new Date(selectedDate);
+                          current.setDate(current.getDate() + 1);
+                          const newDate = current.toISOString().split("T")[0];
+                          setSelectedDate(newDate);
+                          if (typeof window !== "undefined") {
+                            localStorage.setItem(
+                              "appointmentSelectedDate",
+                              newDate,
+                            );
+                          }
+                        }}
+                        className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-200 text-gray-600 dark:text-gray-700 transition-colors"
+                        type="button"
+                        title="Next Day"
+                      >
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
                     </div>
-                   
-                    <button
-                      onClick={() => {
-                        const current = new Date(selectedDate);
-                        current.setDate(current.getDate() + 1);
-                        const newDate = current.toISOString().split("T")[0];
-                        setSelectedDate(newDate);
-                        if (typeof window !== "undefined") {
-                          localStorage.setItem("appointmentSelectedDate", newDate);
-                        }
-                      }}
-                      className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-200 text-gray-600 dark:text-gray-700 transition-colors"
-                      type="button"
-                      title="Next Day"
-                    >
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
                   </div>
                 </div>
                 <div className="mt-1 flex items-center gap-4 text-[10px]">
                   <div className="flex items-center gap-1">
                     <span className="inline-block w-2 h-2 rounded-full bg-blue-600"></span>
-                    <span className="text-gray-700 dark:text-gray-800">Doctor</span>
+                    <span className="text-gray-700 dark:text-gray-800">
+                      Doctor
+                    </span>
                   </div>
                   <div className="flex items-center gap-1">
                     <span className="inline-block w-2 h-2 rounded-full bg-green-600"></span>
-                    <span className="text-gray-700 dark:text-gray-800">Room</span>
+                    <span className="text-gray-700 dark:text-gray-800">
+                      Room
+                    </span>
                   </div>
                 </div>
               </div>
               {(doctorStaff.length > 0 || rooms.length > 0) && (
-            <div className="flex flex-wrap gap-2">
-              {doctorStaff.length > 0 && getUserInfo().role !== "doctorStaff" && (
-                <div className="relative" ref={doctorFilterRef}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!permissions.canUpdate) {
-                        showErrorToast("You do not have permission to filter doctors");
-                        return;
-                      }
-                      setDoctorFilterOpen((prev) => !prev);
-                    }}
-                    disabled={!permissions.canUpdate}
-                    className={`inline-flex items-center gap-1 rounded border border-gray-300 dark:border-gray-300 px-2 py-1 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-gray-900 dark:focus:ring-gray-700 ${
-                      permissions.canUpdate
-                        ? "bg-white dark:bg-gray-100 text-gray-700 dark:text-gray-800 hover:bg-gray-50 dark:hover:bg-gray-200"
-                        : "bg-gray-100 dark:bg-gray-200 text-gray-400 dark:text-gray-500 cursor-not-allowed"
-                    }`}
-                  >
-                    Doctors
-                    <span className="text-[10px] text-gray-700 dark:text-gray-800">
-                      ({visibleDoctorIds.length}/{doctorStaff.length})
-                    </span>
-                  </button>
-                  {doctorFilterOpen && (
-                    <div className="absolute z-[100] mt-1 w-48 rounded border border-gray-200 dark:border-gray-300 bg-white dark:bg-gray-100 p-2 shadow-lg">
-                      <div className="mb-1 flex items-center justify-between text-[10px] text-gray-700 dark:text-gray-800">
-                        <span>Doctors</span>
-                        <div className="flex gap-1.5">
-                          <button
-                            type="button"
-                            className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-[10px] disabled:opacity-50 disabled:cursor-not-allowed"
-                            onClick={() => {
-                              if (!permissions.canUpdate) {
-                                showErrorToast("You do not have permission to modify doctor filters");
-                                return;
-                              }
-                              doctorFilterTouchedRef.current = true;
-                              const allIds = doctorStaff.map((doc) => doc._id);
-                              setVisibleDoctorIds(allIds);
-                              setColumnOrder((order) => {
-                                const roomColumns = order.filter(item => item.startsWith("room:"));
-                                const doctorColumns = allIds.map(id => `doctor:${id}`);
-                                return [...roomColumns, ...doctorColumns];
-                              });
-                            }}
-                            disabled={!permissions.canUpdate}
-                          >
-                            All
-                          </button>
-                          <button
-                            type="button"
-                            className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-[10px] disabled:opacity-50 disabled:cursor-not-allowed"
-                            onClick={() => {
-                              if (!permissions.canUpdate) {
-                                showErrorToast("You do not have permission to modify doctor filters");
-                                return;
-                              }
-                              doctorFilterTouchedRef.current = true;
-                              setVisibleDoctorIds([]);
-                              // Remove all doctor columns from column order
-                              setColumnOrder((order) => order.filter(item => !item.startsWith("doctor:")));
-                            }}
-                            disabled={!permissions.canUpdate}
-                          >
-                            Clear
-                          </button>
-                          <button
-                            type="button"
-                            className="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 text-[10px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-                            onClick={() => {
-                              if (!permissions.canUpdate) {
-                                showErrorToast("You do not have permission to modify doctor filters");
-                                return;
-                              }
-                              doctorFilterTouchedRef.current = true;
-                              // Save current selection to localStorage
-                              if (typeof window !== "undefined") {
-                                if (visibleDoctorIds.length > 0) {
-                                  localStorage.setItem("appointmentVisibleDoctorIds", JSON.stringify(visibleDoctorIds));
-                                } else {
-                                  localStorage.removeItem("appointmentVisibleDoctorIds");
-                                }
-                              }
-                              toast.success("Doctor filter saved! Will persist after refresh.", { duration: 2000 });
-                              setDoctorFilterOpen(false);
-                            }}
-                            disabled={!permissions.canUpdate}
-                          >
-                            Save
-                          </button>
-                        </div>
-                      </div>
-                      <div className="max-h-48 space-y-1 overflow-y-auto pr-0.5">
-                        {doctorStaff.map((doctor) => (
-                          <label key={doctor._id} className="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-800">
-                            <input
-                              type="checkbox"
-                              className="h-3 w-3 rounded border-gray-300 dark:border-gray-300 bg-white dark:bg-gray-100 text-blue-600 focus:ring-blue-500 dark:focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                              checked={visibleDoctorIds.includes(doctor._id)}
-                              onChange={() => {
-                                if (!permissions.canUpdate) {
-                                  showErrorToast("You do not have permission to toggle doctor visibility");
-                                  return;
-                                }
-                                doctorFilterTouchedRef.current = true;
-                                setVisibleDoctorIds((prev) => {
-                                  if (prev.includes(doctor._id)) {
-                                    const filtered = prev.filter((id) => id !== doctor._id);
-                                    setColumnOrder((order) => order.filter((item) => item !== `doctor:${doctor._id}`));
-                                    return filtered;
-                                  }
-                                  const updated = [...prev, doctor._id];
-                                  setColumnOrder((order) => [...order, `doctor:${doctor._id}`]);
-                                  return updated;
-                                });
-                              }}
-                              disabled={!permissions.canUpdate}
-                            />
-                            <span className="truncate">{doctor.name}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-              {rooms.length > 0 && getUserInfo().role !== "doctorStaff" && (
-                <div className="relative" ref={roomFilterRef}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!permissions.canUpdate) {
-                        showErrorToast("You do not have permission to filter rooms");
-                        return;
-                      }
-                      setRoomFilterOpen((prev) => !prev);
-                    }}
-                    disabled={!permissions.canUpdate}
-                    className={`inline-flex items-center gap-1 rounded border border-gray-300 dark:border-gray-300 px-2 py-1 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-gray-900 dark:focus:ring-gray-700 ${
-                      permissions.canUpdate
-                        ? "bg-white dark:bg-gray-100 text-gray-700 dark:text-gray-800 hover:bg-gray-50 dark:hover:bg-gray-200"
-                        : "bg-gray-100 dark:bg-gray-200 text-gray-400 dark:text-gray-500 cursor-not-allowed"
-                    }`}
-                  >
-                    Rooms
-                    <span className="text-[10px] text-gray-700 dark:text-gray-800">
-                      ({visibleRoomIds.length}/{rooms.length})
-                    </span>
-                  </button>
-                  {roomFilterOpen && (
-                    <div className="absolute z-[100] mt-1 w-48 rounded border border-gray-200 dark:border-gray-300 bg-white dark:bg-gray-100 p-2 shadow-lg">
-                      <div className="mb-1 flex items-center justify-between text-[10px] text-gray-700 dark:text-gray-800">
-                        <span>Rooms</span>
-                        <div className="flex gap-1.5">
-                          <button
-                            type="button"
-                            className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-[10px] disabled:opacity-50 disabled:cursor-not-allowed"
-                            onClick={() => {
-                              if (!permissions.canUpdate) {
-                                showErrorToast("You do not have permission to modify room filters");
-                                return;
-                              }
-                              roomFilterTouchedRef.current = true;
-                              const allIds = rooms.map((room) => room._id);
-                              setVisibleRoomIds(allIds);
-                              setColumnOrder((order) => {
-                                const doctorColumns = order.filter(item => item.startsWith("doctor:"));
-                                const roomColumns = allIds.map(id => `room:${id}`);
-                                return [...doctorColumns, ...roomColumns];
-                              });
-                            }}
-                            disabled={!permissions.canUpdate}
-                          >
-                            All
-                          </button>
-                          <button
-                            type="button"
-                            className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-[10px] disabled:opacity-50 disabled:cursor-not-allowed"
-                            onClick={() => {
-                              if (!permissions.canUpdate) {
-                                showErrorToast("You do not have permission to modify room filters");
-                                return;
-                              }
-                              roomFilterTouchedRef.current = true;
-                              setVisibleRoomIds([]);
-                              // Remove all room columns from column order
-                              setColumnOrder((order) => order.filter(item => !item.startsWith("room:")));
-                            }}
-                            disabled={!permissions.canUpdate}
-                          >
-                            Clear
-                          </button>
-                          <button
-                            type="button"
-                            className="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 text-[10px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-                            onClick={() => {
-                              if (!permissions.canUpdate) {
-                                showErrorToast("You do not have permission to modify room filters");
-                                return;
-                              }
-                              roomFilterTouchedRef.current = true;
-                              // Save current selection to localStorage
-                              if (typeof window !== "undefined") {
-                                if (visibleRoomIds.length > 0) {
-                                  localStorage.setItem("appointmentVisibleRoomIds", JSON.stringify(visibleRoomIds));
-                                } else {
-                                  localStorage.removeItem("appointmentVisibleRoomIds");
-                                }
-                              }
-                              toast.success("Room filter saved! Will persist after refresh.", { duration: 2000 });
-                              setRoomFilterOpen(false);
-                            }}
-                            disabled={!permissions.canUpdate}
-                          >
-                            Save
-                          </button>
-                        </div>
-                      </div>
-                      <div className="max-h-48 space-y-1 overflow-y-auto pr-0.5">
-                        {rooms.map((room) => (
-                          <label key={room._id} className="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-800">
-                            <input
-                              type="checkbox"
-                              className="h-3 w-3 rounded border-gray-300 dark:border-gray-300 bg-white dark:bg-gray-100 text-blue-600 focus:ring-blue-500 dark:focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                              checked={visibleRoomIds.includes(room._id)}
-                              onChange={() => {
-                                if (!permissions.canUpdate) {
-                                  showErrorToast("You do not have permission to toggle room visibility");
-                                  return;
-                                }
-                                roomFilterTouchedRef.current = true;
-                                setVisibleRoomIds((prev) => {
-                                  if (prev.includes(room._id)) {
-                                    const filtered = prev.filter((id) => id !== room._id);
-                                    setColumnOrder((order) => order.filter((item) => item !== `room:${room._id}`));
-                                    return filtered;
-                                  }
-                                  const updated = [...prev, room._id];
-                                  setColumnOrder((order) => [...order, `room:${room._id}`]);
-                                  return updated;
-                                });
-                              }}
-                              disabled={!permissions.canUpdate}
-                            />
-                            <span className="truncate">{room.name}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-              {/* Custom Time Slot Option */}
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!permissions.canUpdate) {
-                      showErrorToast("You do not have permission to modify time slots");
-                      return;
-                    }
-                    setCustomTimeSlotModalOpen(true);
-                  }}
-                  disabled={!permissions.canUpdate}
-                  className={`inline-flex items-center gap-1 rounded border px-2 py-1 text-xs font-medium transition-colors focus:outline-none focus:ring-1 focus:ring-gray-900 dark:focus:ring-gray-100 ${
-                    !permissions.canUpdate
-                      ? "border-gray-300 dark:border-gray-300 bg-gray-100 dark:bg-gray-200 text-gray-400 dark:text-gray-500 cursor-not-allowed"
-                      : useCustomTimeSlots
-                      ? "border-purple-500 dark:border-purple-400 bg-purple-50 dark:bg-purple-100 text-purple-700 dark:text-purple-800 hover:bg-purple-100 dark:hover:bg-purple-200"
-                      : "border-gray-300 dark:border-gray-300 bg-white dark:bg-gray-100 text-gray-700 dark:text-gray-800 hover:bg-gray-50 dark:hover:bg-gray-200"
-                  }`}
-                >
-                  <Clock className="w-3 h-3" />
-                  {useCustomTimeSlots ? "Set Time" : "Time Slots"}
-                  {useCustomTimeSlots && customStartTime && customEndTime && (
-                    <span className="text-[10px]">
-                      ({formatTime(customStartTime)} - {formatTime(customEndTime)})
-                    </span>
-                  )}
-                </button>
-              </div>
-            </div>
-            )}
-
-            <div className="border border-gray-200 dark:border-gray-300 rounded bg-white dark:bg-gray-50" style={{ maxHeight: '75vh' }}>
-              {/* Unified grid container with single scroll */}
-              <div
-                ref={dataScrollRef}
-                className="overflow-auto scrollbar-spacing"
-                style={{ maxHeight: 'calc(75vh - 1px)' }}
-              >
-                {/* Grid wrapper with CSS Grid for perfect alignment */}
-                <div
-                  className="grid"
-                  style={{
-                    gridTemplateColumns: `64px repeat(${orderedColumns.length}, minmax(160px, 1fr))`,
-                    minWidth: 'max-content',
-                  }}
-                >
-                  {/* Header row - sticky top */}
-                  {/* Time header cell */}
-                  <div className="sticky top-0 z-[50] bg-gray-50 dark:bg-gray-200 border-b border-r border-gray-200 dark:border-gray-300 p-1.5 flex items-center" style={{ height: '36px', gridColumn: '1', gridRow: '1' }}>
-                    <div className="flex items-center gap-0.5 text-[8px] sm:text-[9px] font-semibold text-gray-900 dark:text-gray-900">
-                      <Clock className="w-3 h-3" />
-                      <span>Time</span>
-                    </div>
-                  </div>
-                 
-                  {/* Column headers (doctors/rooms) */}
-                  {orderedColumns.map((column, index) => {
-                    const columnKey = column.type === "doctor" ? `doctor:${column.data._id}` : `room:${column.data._id}`;
-                    const isDragged = draggedColumnId === columnKey;
-                    const isLast = index === orderedColumns.length - 1;
-                    const gridColumn = index + 2;
-                   
-                    if (column.type === "doctor") {
-                      const doctor = column.data;
-                      return (
-                        <div
-                          key={columnKey}
-                          className={`sticky top-0 z-[40] bg-white dark:bg-gray-50 border-b ${isLast ? '' : 'border-r'} border-gray-200 dark:border-gray-300 p-1.5 relative transition-all ${
-                            isDragged ? "opacity-50" : ""
-                          } ${draggedColumnId ? "cursor-move" : ""}`}
-                          style={{ height: '36px', gridColumn, gridRow: '1' }}
-                          draggable={permissions.canUpdate}
-                          onDragStart={(e) => {
+                <div className="flex flex-wrap gap-2">
+                  {doctorStaff.length > 0 &&
+                    getUserInfo().role !== "doctorStaff" && (
+                      <div className="relative" ref={doctorFilterRef}>
+                        <button
+                          type="button"
+                          onClick={() => {
                             if (!permissions.canUpdate) {
-                              e.preventDefault();
-                              showErrorToast("You do not have permission to reorder columns");
+                              showErrorToast(
+                                "You do not have permission to filter doctors",
+                              );
                               return;
                             }
-                            handleColumnDragStart(e, columnKey);
+                            setDoctorFilterOpen((prev) => !prev);
                           }}
-                          onDragEnd={handleColumnDragEnd}
-                          onDragOver={handleColumnDragOver}
-                          onDragLeave={handleColumnDragLeave}
-                          onDrop={(e) => {
-                            handleColumnDrop(e, columnKey);
-                            if (e.currentTarget instanceof HTMLElement) {
-                              e.currentTarget.classList.remove("border-blue-400", "bg-blue-50", "border-emerald-400", "bg-emerald-50");
-                            }
-                          }}
-                          onMouseEnter={(e) => handleDoctorMouseEnter(doctor, e)}
-                          onMouseLeave={handleDoctorMouseLeave}
-                          title={permissions.canUpdate ? "Drag to reorder columns" : "Column (no permission to reorder)"}
+                          disabled={!permissions.canUpdate}
+                          className={`inline-flex items-center gap-1 rounded border border-gray-300 dark:border-gray-300 px-2 py-1 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-gray-900 dark:focus:ring-gray-700 ${
+                            permissions.canUpdate
+                              ? "bg-white dark:bg-gray-100 text-gray-700 dark:text-gray-800 hover:bg-gray-50 dark:hover:bg-gray-200"
+                              : "bg-gray-100 dark:bg-gray-200 text-gray-400 dark:text-gray-500 cursor-not-allowed"
+                          }`}
                         >
-                          {permissions.canRead ? (
-                            <div className="flex items-center gap-1">
-                              <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-blue-50 dark:bg-blue-100 border border-blue-200 dark:border-blue-300 flex items-center justify-center text-blue-700 dark:text-blue-800 font-semibold text-[8px] sm:text-[9px] flex-shrink-0">
-                                {getInitials(doctor.name)}
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <p className="text-[8px] sm:text-[9px] font-semibold text-gray-900 dark:text-gray-900 truncate">{doctor.name}</p>
-                              </div>
-                              {permissions.canUpdate && (
-                                <div className="flex-shrink-0 cursor-grab active:cursor-grabbing opacity-40 hover:opacity-70 transition-opacity" title="Drag to reorder">
-                                  <svg className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-gray-500 dark:text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
-                                  </svg>
-                                </div>
-                              )}
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-1">
-                              <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-gray-100 dark:bg-gray-200 flex items-center justify-center text-gray-400 dark:text-gray-600 font-semibold text-[8px] sm:text-[9px] flex-shrink-0">
-                                ?
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <p className="text-[8px] sm:text-[9px] font-semibold text-gray-500 dark:text-gray-500 truncate">Hidden</p>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    } else {
-                      const room = column.data;
-                      return (
-                        <div
-                          key={columnKey}
-                          className={`sticky top-0 z-[40] bg-emerald-50 dark:bg-emerald-100 border-b ${isLast ? '' : 'border-r'} border-gray-200 dark:border-gray-300 p-1.5 transition-all room-column ${
-                            isDragged ? "opacity-50" : ""
-                          } ${draggedColumnId ? "cursor-move" : ""}`}
-                          style={{ height: '36px', gridColumn, gridRow: '1' }}
-                          draggable={permissions.canUpdate}
-                          onDragStart={(e) => {
-                            if (!permissions.canUpdate) {
-                              e.preventDefault();
-                              showErrorToast("You do not have permission to reorder columns");
-                              return;
-                            }
-                            handleColumnDragStart(e, columnKey);
-                          }}
-                          onDragEnd={handleColumnDragEnd}
-                          onDragOver={handleColumnDragOver}
-                          onDragLeave={handleColumnDragLeave}
-                          onDrop={(e) => {
-                            handleColumnDrop(e, columnKey);
-                            if (e.currentTarget instanceof HTMLElement) {
-                              e.currentTarget.classList.remove("border-blue-400", "bg-blue-50", "border-emerald-400", "bg-emerald-50");
-                            }
-                          }}
-                          title={permissions.canUpdate ? "Drag to reorder columns" : "Column (no permission to reorder)"}
-                        >
-                          {permissions.canRead ? (
-                            <div className="flex items-center gap-1">
-                              <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-emerald-50 dark:bg-emerald-100 border border-emerald-200 dark:border-emerald-300 flex items-center justify-center text-emerald-700 dark:text-emerald-800 font-semibold text-[8px] sm:text-[9px] flex-shrink-0">
-                                🏥
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <p className="text-[8px] sm:text-[9px] font-semibold text-gray-900 dark:text-gray-900 truncate">{room.name}</p>
-                              </div>
-                              {permissions.canUpdate && (
-                                <div className="flex-shrink-0 cursor-grab active:cursor-grabbing opacity-40 hover:opacity-70 transition-opacity" title="Drag to reorder">
-                                  <svg className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-gray-500 dark:text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
-                                  </svg>
-                                </div>
-                              )}
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-1">
-                              <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-gray-100 dark:bg-gray-200 flex items-center justify-center text-gray-400 dark:text-gray-600 font-semibold text-[8px] sm:text-[9px] flex-shrink-0">
-                                ?
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <p className="text-[8px] sm:text-[9px] font-semibold text-gray-500 dark:text-gray-500 truncate">Hidden</p>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    }
-                  })}
-                 
-                  {/* Time slots and data cells */}
-                  {timeSlots.map((slot, rowIndex) => {
-                    const rowStartMinutes = timeStringToMinutes(slot.time);
-                    const gridRow = rowIndex + 2; // Row 1 is header
-                   
-                    return (
-                      <React.Fragment key={slot.time}>
-                        {/* Time label cell */}
-                        <div
-                          className="sticky left-0 z-[30] bg-white dark:bg-gray-50 border-b border-r border-gray-200 dark:border-gray-300 p-1 relative"
-                          style={{ height: ROW_HEIGHT_PX, gridColumn: '1', gridRow }}
-                        >
-                          <p className="text-[8px] sm:text-[9px] font-semibold text-gray-900 dark:text-gray-900">{slot.displayTime}</p>
-                          <div className="absolute left-0 right-0 top-1/2 border-t border-gray-200 dark:border-gray-300 pointer-events-none" />
-                        </div>
-                       
-                        {/* Data cells for each column */}
-                        {orderedColumns.map((column, colIndex) => {
-                          const isLastColumn = colIndex === orderedColumns.length - 1;
-                          const gridColumn = colIndex + 2;
-                         
-                          if (column.type === "doctor") {
-                            const doctor = column.data;
-                            const rowAppointments = getAppointmentsForRow(doctor._id, slot.time);
-                            const isInSelection = timeDragSelection.isDragging && timeDragSelection.doctorId === doctor._id;
-                            const isDragOver = dragOverDoctorId === doctor._id;
-
-                            return (
-                              <div
-                                key={`${slot.time}-doctor-${doctor._id}`}
-                                className={`relative border-b ${isLastColumn ? '' : 'border-r'} border-gray-200 dark:border-gray-300 transition-colors ${isDragOver ? "bg-blue-100 dark:bg-blue-200 border-blue-300 dark:border-blue-400" : ""} ${
-                                  (timeDragSelection.isDragging && timeDragSelection.doctorId === doctor._id && isSlotInSelection(rowStartMinutes, rowStartMinutes + ROW_INTERVAL_MINUTES, doctor._id))
-                                    ? "bg-blue-200 dark:bg-blue-200"
-                                    : "bg-blue-50 dark:bg-blue-100"
-                                }`}
-                                style={{ height: ROW_HEIGHT_PX, gridColumn, gridRow }}
-                                data-doctor-id={doctor._id}
-                                onDragOver={(e) => {
-                                  if (permissions.canUpdate) {
-                                    handleDoctorColumnDragOver(e, doctor._id);
-                                  }
-                                }}
-                                onDragLeave={handleDragLeave}
-                                onDrop={(e) => {
-                                  if (permissions.canUpdate) {
-                                    handleDoctorColumnDrop(e, doctor._id);
-                                  }
-                                }}
-                              >
-                                <div className="absolute left-0 right-0 top-1/2 border-t border-gray-200 dark:border-gray-700 pointer-events-none" />
-                                <div className="flex flex-col h-full">
-                                  {[0, SLOT_INTERVAL_MINUTES].map((offset) => {
-                                    const subSlotTime = addMinutesToTime(slot.time, offset);
-                                    const subStartMinutes = rowStartMinutes + offset;
-                                    const subEndMinutes = subStartMinutes + SLOT_INTERVAL_MINUTES;
-                                    const isSubSlotOccupied = rowAppointments.some((apt) => {
-                                      const aptStart = timeStringToMinutes(apt.fromTime);
-                                      const aptEnd = timeStringToMinutes(apt.toTime);
-                                      return aptStart < subEndMinutes && aptEnd > subStartMinutes;
-                                    });
-                                    const slotWithinClosing =
-                                      lastBookableMinutes === null ||
-                                      subStartMinutes <= lastBookableMinutes;
-                                    const canBookSlot =
-                                      !isPastDay &&
-                                      (!isToday || subStartMinutes >= currentMinutes) &&
-                                      slotWithinClosing &&
-                                      !isSubSlotOccupied;
-                                   
-                                    const isSelected = isInSelection && isSlotInSelection(subStartMinutes, subEndMinutes, doctor._id);
-                                    const isDragOverSlot = dragOverTimeSlot?.doctorId === doctor._id && dragOverTimeSlot?.minutes === subStartMinutes;
-
-                                    return (
-                                      <div
-                                        key={`${slot.time}-${doctor._id}-${offset}`}
-                                        className={`flex-1 transition-all ${
-                                          isDragOverSlot
-                                            ? "bg-green-200 dark:bg-green-200 border-l-2 border-green-500 dark:border-green-600"
-                                            : isSelected
-                                            ? "bg-blue-200 dark:bg-blue-200 border-l-2 border-blue-500 dark:border-blue-600 cursor-crosshair"
-                                            : canBookSlot
-                                            ? "cursor-crosshair hover:bg-blue-50 dark:hover:bg-blue-100 border-l-2 border-transparent hover:border-blue-400 dark:hover:border-blue-500"
-                                            : isSubSlotOccupied
-                                            ? "bg-gray-50 dark:bg-gray-100 cursor-not-allowed"
-                                            : "bg-gray-50 dark:bg-gray-100 cursor-not-allowed"
-                                        }`}
-                                        style={{ height: SUB_SLOT_HEIGHT_PX }}
-                                        title={
-                                          draggedAppointmentId
-                                            ? `Drop appointment here to move to ${minutesToDisplay(subStartMinutes)}`
-                                            : canBookSlot
-                                            ? `Click or drag to select time range starting at ${minutesToDisplay(subStartMinutes)}`
-                                            : isPastDay
-                                            ? "Cannot book appointments for past dates"
-                                            : slotWithinClosing
-                                            ? "Cannot book past time slots"
-                                            : "Cannot book beyond clinic closing time"
-                                        }
-                                        onDragOver={(e) => {
-                                          if (permissions.canUpdate && draggedAppointmentId && canBookSlot) {
-                                            handleTimeSlotDragOver(e, doctor._id, subStartMinutes);
-                                          }
-                                        }}
-                                        onDragLeave={handleDragLeave}
-                                        onDrop={(e) => {
-                                          if (permissions.canUpdate && draggedAppointmentId && canBookSlot) {
-                                            handleTimeSlotDrop(e, doctor._id, subStartMinutes, false);
-                                          }
-                                        }}
-                                        onMouseDown={(e) => {
-                                          if (canBookSlot && !draggedAppointmentId) {
-                                            handleTimeSlotMouseDown(e, doctor._id, subStartMinutes);
-                                          }
-                                        }}
-                                        onClick={(_e) => {
-                                          console.log("Slot clicked:", {
-                                            canBookSlot,
-                                            canCreate: permissions.canCreate,
-                                            isDragging: timeDragSelection.isDragging,
-                                            draggedAppointmentId,
-                                            subStartMinutes,
-                                            currentMinutes,
-                                            isToday,
-                                            isPastDay
-                                          });
-                                          if (!permissions.canCreate) {
-                                            showErrorToast("You do not have permission to book appointments");
-                                            return;
-                                          }
-                                          if (!canBookSlot) {
-                                             const limitTime = lastBookableMinutes !== null ? minutesToDisplay(lastBookableMinutes + SLOT_INTERVAL_MINUTES) : "";
-                                             const msg = !slotWithinClosing 
-                                               ? `Booking is not allowed after ${limitTime}. Slots are available only until ${limitTime}.` 
-                                               : "This slot cannot be booked. Check date/time or availability.";
-                                             showErrorToast(msg);
-                                             return;
-                                          }
-                                          if (canBookSlot && !timeDragSelection.isDragging && !draggedAppointmentId) {
-                                            setBookingModal({
-                                              isOpen: true,
-                                              doctorId: doctor._id,
-                                              doctorName: doctor.name,
-                                              roomId: "",
-                                              roomName: "",
-                                              slotTime: subSlotTime,
-                                              slotDisplayTime: minutesToDisplay(subStartMinutes),
-                                              selectedDate,
-                                              bookedFrom: "doctor",
-                                            });
-                                          }
-                                        }}
-                                      />
-                                    );
-                                  })}
-                                </div>
-
-                                {permissions.canRead && rowAppointments.length > 0
-                                  ? (() => {
-                                      const startingAppointments = rowAppointments.filter(apt => {
-                                        if (apt.status === 'Cancelled') return false;
-                                        const aptStart = timeStringToMinutes(apt.fromTime);
-                                        return aptStart >= rowStartMinutes && aptStart < rowStartMinutes + ROW_INTERVAL_MINUTES;
-                                      });
-
-                                      if (startingAppointments.length === 0) return null;
-
-                                      const appointmentsBySlot = startingAppointments.map((apt) => {
-                                        const aptStart = timeStringToMinutes(apt.fromTime);
-                                        const aptEnd = timeStringToMinutes(apt.toTime);
-                                        const slotOffset = aptStart - rowStartMinutes;
-                                        const topOffset = (slotOffset / ROW_INTERVAL_MINUTES) * ROW_HEIGHT_PX;
-                                        const duration = aptEnd - aptStart;
-                                        const height = (duration / ROW_INTERVAL_MINUTES) * ROW_HEIGHT_PX;
-                                       
-                                        return { apt, topOffset, height: Math.max(height, ROW_HEIGHT_PX / 2) };
-                                      });
-                                     
-                                      const groupedBySlot: { [key: string]: typeof appointmentsBySlot } = {};
-                                      appointmentsBySlot.forEach((item) => {
-                                        const slotKey = Math.round(item.topOffset).toString();
-                                        if (!groupedBySlot[slotKey]) {
-                                          groupedBySlot[slotKey] = [];
-                                        }
-                                        groupedBySlot[slotKey].push(item);
-                                      });
-                                     
-                                      return (
-                                        <>
-                                          {Object.values(groupedBySlot).map((slotAppointments, groupIndex) => {
-                                            const firstAppt = slotAppointments[0];
-                                            const maxHeight = Math.max(...slotAppointments.map(item => item.height));
-                                           
-                                            return (
-                                              <div
-                                                key={`slot-${groupIndex}`}
-                                                className="absolute left-[2px] right-[2px] flex flex-row items-center"
-                                                style={{
-                                                  top: `${Math.max(0, firstAppt.topOffset + 1)}px`,
-                                                  height: `${maxHeight - 2}px`,
-                                                  zIndex: 10,
-                                                }}
-                                              >
-                                                {slotAppointments.map((item) => {
-                                                  const statusColor = getStatusColor(item.apt.status);
-                                                  const patientCount = slotAppointments.length;
-                                                  const cardWidthPercent = patientCount > 1 ? `${Math.floor(100 / patientCount)}%` : '100%';
-                                                 
-                                                  return (
-                                                    <div
-                                                      key={item.apt._id}
-                                                      className={`flex flex-col justify-center flex-1 min-w-0 px-2 py-1 border transition-all hover:shadow-sm ${permissions.canUpdate ? "cursor-pointer" : "cursor-default"} ${draggedAppointmentId === item.apt._id ? "opacity-50" : ""}`}
-                                                      style={{
-                                                        backgroundColor: statusColor.bg,
-                                                        color: statusColor.text,
-                                                        borderColor: statusColor.border,
-                                                        height: `${item.height - 2}px`,
-                                                        width: cardWidthPercent,
-                                                        flexBasis: cardWidthPercent,
-                                                      }}
-                                                      draggable={permissions.canUpdate}
-                                                      onDragStart={(e) => handleAppointmentDragStart(e, item.apt._id)}
-                                                      onDragEnd={handleAppointmentDragEnd}
-                                                      onMouseEnter={(e) => {
-                                                        const rect = e.currentTarget.getBoundingClientRect();
-                                                        const tooltipWidth = 200;
-                                                        const tooltipHeight = 300;
-                                                        const spacing = 8;
-                                                       
-                                                        let left = rect.right + spacing;
-                                                        let top = rect.top;
-                                                       
-                                                        if (left + tooltipWidth > window.innerWidth) {
-                                                          left = rect.left - tooltipWidth - spacing;
-                                                        }
-                                                       
-                                                        if (top + tooltipHeight > window.innerHeight) {
-                                                          top = window.innerHeight - tooltipHeight - 10;
-                                                        }
-                                                       
-                                                        if (top < 10) {
-                                                          top = 10;
-                                                        }
-                                                       
-                                                        if (left < 10) {
-                                                          left = 10;
-                                                        }
-                                                       
-                                                        setHoveredAppointment({
-                                                          appointment: item.apt,
-                                                          position: { top, left },
-                                                        });
-                                                      }}
-                                                      onMouseLeave={() => {
-                                                        setHoveredAppointment(null);
-                                                      }}
-                                                      onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        if (permissions.canUpdate) {
-                                                          appointmentRef.current = item.apt;
-                                                          setSelectedAppointment(item.apt);
-                                                          setEditModalOpen(true);
-                                                        } else {
-                                                          showErrorToast("You do not have permission to edit appointments");
-                                                        }
-                                                      }}
-                                                      title={`${item.apt.patientName} - ${formatTime(item.apt.fromTime)} - ${formatTime(item.apt.toTime)}`}
-                                                    >
-                                                      <div className="flex flex-col justify-center h-full">
-                                                        {item.height < 60 ? (
-                                                          <div className="flex items-center h-full px-2">
-                                                            <span className="text-[13px] font-[600] leading-[1.2] tracking-tight text-black truncate">
-                                                              {item.apt.patientName}
-                                                            </span>
-                                                          </div>
-                                                        ) : (
-                                                          <div className="px-2 py-1.5 leading-[1.2] space-y-[2px]">
-                                                            <span className="text-[11px] font-[400] opacity-[0.75] mb-[2px] block">
-                                                              {formatTime(item.apt.fromTime)} - {formatTime(item.apt.toTime)}
-                                                            </span>
-                                                            <span className="text-[13px] font-[600] text-black mb-[2px] block">
-                                                              {slotAppointments.length > 1 ? item.apt.patientName.split(' ').slice(0, 2).join(' ') : item.apt.patientName}
-                                                            </span>
-                                                            {item.apt.serviceNames && item.apt.serviceNames.length > 0 ? (
-                                                              <span className="text-[12px] font-[400] text-black opacity-[0.8] block truncate">
-                                                                {item.apt.serviceNames.join(", ")}
-                                                              </span>
-                                                            ) : item.apt.serviceName && (
-                                                              <span className="text-[12px] font-[400] text-black opacity-[0.8] block truncate">
-                                                                {item.apt.serviceName}
-                                                              </span>
-                                                            )}
-                                                          </div>
-                                                        )}
-                                                      </div>
-                                                    </div>
-                                                  );
-                                                })}
-                                              </div>
-                                            );
-                                          })}
-                                        </>
+                          Doctors
+                          <span className="text-[10px] text-gray-700 dark:text-gray-800">
+                            ({visibleDoctorIds.length}/{doctorStaff.length})
+                          </span>
+                        </button>
+                        {doctorFilterOpen && (
+                          <div className="absolute z-[100] mt-1 w-48 rounded border border-gray-200 dark:border-gray-300 bg-white dark:bg-gray-100 p-2 shadow-lg">
+                            <div className="mb-1 flex items-center justify-between text-[10px] text-gray-700 dark:text-gray-800">
+                              <span>Doctors</span>
+                              <div className="flex gap-1.5">
+                                <button
+                                  type="button"
+                                  className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-[10px] disabled:opacity-50 disabled:cursor-not-allowed"
+                                  onClick={() => {
+                                    if (!permissions.canUpdate) {
+                                      showErrorToast(
+                                        "You do not have permission to modify doctor filters",
                                       );
-                                    })()
-                                  : null}
+                                      return;
+                                    }
+                                    doctorFilterTouchedRef.current = true;
+                                    const allIds = doctorStaff.map(
+                                      (doc) => doc._id,
+                                    );
+                                    setVisibleDoctorIds(allIds);
+                                    setColumnOrder((order) => {
+                                      const roomColumns = order.filter((item) =>
+                                        item.startsWith("room:"),
+                                      );
+                                      const doctorColumns = allIds.map(
+                                        (id) => `doctor:${id}`,
+                                      );
+                                      return [...roomColumns, ...doctorColumns];
+                                    });
+                                  }}
+                                  disabled={!permissions.canUpdate}
+                                >
+                                  All
+                                </button>
+                                <button
+                                  type="button"
+                                  className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-[10px] disabled:opacity-50 disabled:cursor-not-allowed"
+                                  onClick={() => {
+                                    if (!permissions.canUpdate) {
+                                      showErrorToast(
+                                        "You do not have permission to modify doctor filters",
+                                      );
+                                      return;
+                                    }
+                                    doctorFilterTouchedRef.current = true;
+                                    setVisibleDoctorIds([]);
+                                    // Remove all doctor columns from column order
+                                    setColumnOrder((order) =>
+                                      order.filter(
+                                        (item) => !item.startsWith("doctor:"),
+                                      ),
+                                    );
+                                  }}
+                                  disabled={!permissions.canUpdate}
+                                >
+                                  Clear
+                                </button>
+                                <button
+                                  type="button"
+                                  className="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 text-[10px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                                  onClick={() => {
+                                    if (!permissions.canUpdate) {
+                                      showErrorToast(
+                                        "You do not have permission to modify doctor filters",
+                                      );
+                                      return;
+                                    }
+                                    doctorFilterTouchedRef.current = true;
+                                    // Save current selection to localStorage
+                                    if (typeof window !== "undefined") {
+                                      if (visibleDoctorIds.length > 0) {
+                                        localStorage.setItem(
+                                          "appointmentVisibleDoctorIds",
+                                          JSON.stringify(visibleDoctorIds),
+                                        );
+                                      } else {
+                                        localStorage.removeItem(
+                                          "appointmentVisibleDoctorIds",
+                                        );
+                                      }
+                                    }
+                                    toast.success(
+                                      "Doctor filter saved! Will persist after refresh.",
+                                      { duration: 2000 },
+                                    );
+                                    setDoctorFilterOpen(false);
+                                  }}
+                                  disabled={!permissions.canUpdate}
+                                >
+                                  Save
+                                </button>
                               </div>
+                            </div>
+                            <div className="max-h-48 space-y-1 overflow-y-auto pr-0.5">
+                              {doctorStaff.map((doctor) => (
+                                <label
+                                  key={doctor._id}
+                                  className="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-800"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    className="h-3 w-3 rounded border-gray-300 dark:border-gray-300 bg-white dark:bg-gray-100 text-blue-600 focus:ring-blue-500 dark:focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    checked={visibleDoctorIds.includes(
+                                      doctor._id,
+                                    )}
+                                    onChange={() => {
+                                      if (!permissions.canUpdate) {
+                                        showErrorToast(
+                                          "You do not have permission to toggle doctor visibility",
+                                        );
+                                        return;
+                                      }
+                                      doctorFilterTouchedRef.current = true;
+                                      setVisibleDoctorIds((prev) => {
+                                        if (prev.includes(doctor._id)) {
+                                          const filtered = prev.filter(
+                                            (id) => id !== doctor._id,
+                                          );
+                                          setColumnOrder((order) =>
+                                            order.filter(
+                                              (item) =>
+                                                item !== `doctor:${doctor._id}`,
+                                            ),
+                                          );
+                                          return filtered;
+                                        }
+                                        const updated = [...prev, doctor._id];
+                                        setColumnOrder((order) => [
+                                          ...order,
+                                          `doctor:${doctor._id}`,
+                                        ]);
+                                        return updated;
+                                      });
+                                    }}
+                                    disabled={!permissions.canUpdate}
+                                  />
+                                  <span className="truncate">
+                                    {doctor.name}
+                                  </span>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  {rooms.length > 0 && getUserInfo().role !== "doctorStaff" && (
+                    <div className="relative" ref={roomFilterRef}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!permissions.canUpdate) {
+                            showErrorToast(
+                              "You do not have permission to filter rooms",
                             );
-                          } else {
-                            const room = column.data;
-                            const roomAppointments = getRoomAppointmentsForRow(room._id, slot.time);
-                            const isInRoomSelection = roomDragSelection.isDragging && roomDragSelection.roomId === room._id;
-
-                            return (
-                              <div
-                                key={`${slot.time}-room-${room._id}`}
-                                className={`relative border-b ${isLastColumn ? '' : 'border-r'} border-gray-200 dark:border-gray-300 transition-colors ${
-                                  (roomDragSelection.isDragging && roomDragSelection.roomId === room._id && isRoomSlotInSelection(rowStartMinutes, rowStartMinutes + ROW_INTERVAL_MINUTES, room._id))
-                                    ? "bg-emerald-200 dark:bg-emerald-200"
-                                    : "bg-emerald-50 dark:bg-emerald-100"
-                                }`}
-                                style={{ height: ROW_HEIGHT_PX, gridColumn, gridRow }}
-                                data-room-id={room._id}
-                                onDragOver={(e) => {
-                                  if (permissions.canUpdate && draggedAppointmentId) {
-                                    handleRoomColumnDragOver(e);
-                                  }
-                                }}
-                                onDragLeave={handleDragLeave}
-                                onDrop={(e) => {
-                                  if (permissions.canUpdate) {
-                                    handleRoomColumnDrop(e, room._id);
-                                  }
-                                }}
-                              >
-                                <div className="absolute left-0 right-0 top-1/2 border-t border-gray-200 dark:border-gray-700 pointer-events-none" />
-                                <div className="flex flex-col h-full">
-                                  {[0, SLOT_INTERVAL_MINUTES].map((offset) => {
-                                    const subSlotTime = addMinutesToTime(slot.time, offset);
-                                    const subStartMinutes = rowStartMinutes + offset;
-                                    const subEndMinutes = subStartMinutes + SLOT_INTERVAL_MINUTES;
-                                    const isSubSlotOccupied = roomAppointments.some((apt) => {
-                                      const aptStart = timeStringToMinutes(apt.fromTime);
-                                      const aptEnd = timeStringToMinutes(apt.toTime);
-                                      return aptStart < subEndMinutes && aptEnd > subStartMinutes;
-                                    });
-                                    const slotWithinClosing =
-                                      lastBookableMinutes === null ||
-                                      subStartMinutes <= lastBookableMinutes;
-                                    const canBookSlot =
-                                      permissions.canCreate &&
-                                      !isPastDay &&
-                                      (!isToday || subStartMinutes >= currentMinutes) &&
-                                      slotWithinClosing &&
-                                      !isSubSlotOccupied;
-                                   
-                                    const isSelected = isInRoomSelection && isRoomSlotInSelection(subStartMinutes, subEndMinutes, room._id);
-
-                                    return (
-                                      <div
-                                        key={`${slot.time}-${room._id}-${offset}`}
-                                        className={`flex-1 transition-all ${
-                                          isSelected
-                                            ? "bg-emerald-200 dark:bg-emerald-200 border-l-2 border-emerald-500 dark:border-emerald-600 cursor-crosshair"
-                                            : canBookSlot
-                                            ? "cursor-crosshair hover:bg-emerald-50 dark:hover:bg-emerald-100 border-l-2 border-transparent hover:border-emerald-400 dark:hover:border-emerald-500"
-                                            : isSubSlotOccupied
-                                            ? "bg-gray-50 dark:bg-gray-100 cursor-not-allowed"
-                                            : "bg-gray-50 dark:bg-gray-100 cursor-not-allowed"
-                                        }`}
-                                        style={{ height: SUB_SLOT_HEIGHT_PX }}
-                                        title={
-                                          !permissions.canCreate
-                                            ? "You do not have permission to book appointments"
-                                            : canBookSlot
-                                            ? `Click or drag to select time range starting at ${minutesToDisplay(subStartMinutes)}`
-                                            : isPastDay
-                                            ? "Cannot book appointments for past dates"
-                                            : slotWithinClosing
-                                            ? "Cannot book past time slots"
-                                            : "Cannot book beyond clinic closing time"
-                                        }
-                                        onMouseDown={(e) => {
-                                          if (canBookSlot && !draggedAppointmentId) {
-                                            handleRoomSlotMouseDown(e, room._id, subStartMinutes);
-                                          }
-                                        }}
-                                        onDragOver={(e) => {
-                                          if (permissions.canUpdate && draggedAppointmentId && canBookSlot) {
-                                            handleRoomTimeSlotDragOver(e, room._id, subStartMinutes);
-                                          }
-                                        }}
-                                        onDragLeave={handleDragLeave}
-                                        onDrop={(e) => {
-                                          if (permissions.canUpdate && draggedAppointmentId && canBookSlot) {
-                                            handleTimeSlotDrop(e, room._id, subStartMinutes, true);
-                                          }
-                                        }}
-                                        onClick={(_e) => {
-                                          console.log("Room slot clicked:", {
-                                            canBookSlot,
-                                            canCreate: permissions.canCreate,
-                                            isDragging: roomDragSelection.isDragging,
-                                            draggedAppointmentId,
-                                            subStartMinutes,
-                                            currentMinutes,
-                                            isToday,
-                                            isPastDay
-                                          });
-                                          if (!permissions.canCreate) {
-                                            showErrorToast("You do not have permission to book appointments");
-                                            return;
-                                          }
-                                          if (!canBookSlot) {
-                                             const limitTime = lastBookableMinutes !== null ? minutesToDisplay(lastBookableMinutes + SLOT_INTERVAL_MINUTES) : "";
-                                             const msg = !slotWithinClosing 
-                                               ? `Booking is not allowed after ${limitTime}. Slots are available only until ${limitTime}.` 
-                                               : "This slot cannot be booked. Check date/time or availability.";
-                                             showErrorToast(msg);
-                                             return;
-                                          }
-                                          if (canBookSlot && !roomDragSelection.isDragging && !draggedAppointmentId) {
-                                            setBookingModal({
-                                              isOpen: true,
-                                              doctorId: "",
-                                              doctorName: "",
-                                              roomId: room._id,
-                                              roomName: room.name,
-                                              slotTime: subSlotTime,
-                                              slotDisplayTime: minutesToDisplay(subStartMinutes),
-                                              selectedDate,
-                                              bookedFrom: "room",
-                                            });
-                                          }
-                                        }}
-                                      />
+                            return;
+                          }
+                          setRoomFilterOpen((prev) => !prev);
+                        }}
+                        disabled={!permissions.canUpdate}
+                        className={`inline-flex items-center gap-1 rounded border border-gray-300 dark:border-gray-300 px-2 py-1 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-gray-900 dark:focus:ring-gray-700 ${
+                          permissions.canUpdate
+                            ? "bg-white dark:bg-gray-100 text-gray-700 dark:text-gray-800 hover:bg-gray-50 dark:hover:bg-gray-200"
+                            : "bg-gray-100 dark:bg-gray-200 text-gray-400 dark:text-gray-500 cursor-not-allowed"
+                        }`}
+                      >
+                        Rooms
+                        <span className="text-[10px] text-gray-700 dark:text-gray-800">
+                          ({visibleRoomIds.length}/{rooms.length})
+                        </span>
+                      </button>
+                      {roomFilterOpen && (
+                        <div className="absolute z-[100] mt-1 w-48 rounded border border-gray-200 dark:border-gray-300 bg-white dark:bg-gray-100 p-2 shadow-lg">
+                          <div className="mb-1 flex items-center justify-between text-[10px] text-gray-700 dark:text-gray-800">
+                            <span>Rooms</span>
+                            <div className="flex gap-1.5">
+                              <button
+                                type="button"
+                                className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-[10px] disabled:opacity-50 disabled:cursor-not-allowed"
+                                onClick={() => {
+                                  if (!permissions.canUpdate) {
+                                    showErrorToast(
+                                      "You do not have permission to modify room filters",
                                     );
-                                  })}
+                                    return;
+                                  }
+                                  roomFilterTouchedRef.current = true;
+                                  const allIds = rooms.map((room) => room._id);
+                                  setVisibleRoomIds(allIds);
+                                  setColumnOrder((order) => {
+                                    const doctorColumns = order.filter((item) =>
+                                      item.startsWith("doctor:"),
+                                    );
+                                    const roomColumns = allIds.map(
+                                      (id) => `room:${id}`,
+                                    );
+                                    return [...doctorColumns, ...roomColumns];
+                                  });
+                                }}
+                                disabled={!permissions.canUpdate}
+                              >
+                                All
+                              </button>
+                              <button
+                                type="button"
+                                className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-[10px] disabled:opacity-50 disabled:cursor-not-allowed"
+                                onClick={() => {
+                                  if (!permissions.canUpdate) {
+                                    showErrorToast(
+                                      "You do not have permission to modify room filters",
+                                    );
+                                    return;
+                                  }
+                                  roomFilterTouchedRef.current = true;
+                                  setVisibleRoomIds([]);
+                                  // Remove all room columns from column order
+                                  setColumnOrder((order) =>
+                                    order.filter(
+                                      (item) => !item.startsWith("room:"),
+                                    ),
+                                  );
+                                }}
+                                disabled={!permissions.canUpdate}
+                              >
+                                Clear
+                              </button>
+                              <button
+                                type="button"
+                                className="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 text-[10px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                                onClick={() => {
+                                  if (!permissions.canUpdate) {
+                                    showErrorToast(
+                                      "You do not have permission to modify room filters",
+                                    );
+                                    return;
+                                  }
+                                  roomFilterTouchedRef.current = true;
+                                  // Save current selection to localStorage
+                                  if (typeof window !== "undefined") {
+                                    if (visibleRoomIds.length > 0) {
+                                      localStorage.setItem(
+                                        "appointmentVisibleRoomIds",
+                                        JSON.stringify(visibleRoomIds),
+                                      );
+                                    } else {
+                                      localStorage.removeItem(
+                                        "appointmentVisibleRoomIds",
+                                      );
+                                    }
+                                  }
+                                  toast.success(
+                                    "Room filter saved! Will persist after refresh.",
+                                    { duration: 2000 },
+                                  );
+                                  setRoomFilterOpen(false);
+                                }}
+                                disabled={!permissions.canUpdate}
+                              >
+                                Save
+                              </button>
+                            </div>
+                          </div>
+                          <div className="max-h-48 space-y-1 overflow-y-auto pr-0.5">
+                            {rooms.map((room) => (
+                              <label
+                                key={room._id}
+                                className="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-800"
+                              >
+                                <input
+                                  type="checkbox"
+                                  className="h-3 w-3 rounded border-gray-300 dark:border-gray-300 bg-white dark:bg-gray-100 text-blue-600 focus:ring-blue-500 dark:focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                                  checked={visibleRoomIds.includes(room._id)}
+                                  onChange={() => {
+                                    if (!permissions.canUpdate) {
+                                      showErrorToast(
+                                        "You do not have permission to toggle room visibility",
+                                      );
+                                      return;
+                                    }
+                                    roomFilterTouchedRef.current = true;
+                                    setVisibleRoomIds((prev) => {
+                                      if (prev.includes(room._id)) {
+                                        const filtered = prev.filter(
+                                          (id) => id !== room._id,
+                                        );
+                                        setColumnOrder((order) =>
+                                          order.filter(
+                                            (item) =>
+                                              item !== `room:${room._id}`,
+                                          ),
+                                        );
+                                        return filtered;
+                                      }
+                                      const updated = [...prev, room._id];
+                                      setColumnOrder((order) => [
+                                        ...order,
+                                        `room:${room._id}`,
+                                      ]);
+                                      return updated;
+                                    });
+                                  }}
+                                  disabled={!permissions.canUpdate}
+                                />
+                                <span className="truncate">{room.name}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {/* Custom Time Slot Option */}
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!permissions.canUpdate) {
+                          showErrorToast(
+                            "You do not have permission to modify time slots",
+                          );
+                          return;
+                        }
+                        setCustomTimeSlotModalOpen(true);
+                      }}
+                      disabled={!permissions.canUpdate}
+                      className={`inline-flex items-center gap-1 rounded border px-2 py-1 text-xs font-medium transition-colors focus:outline-none focus:ring-1 focus:ring-gray-900 dark:focus:ring-gray-100 ${
+                        !permissions.canUpdate
+                          ? "border-gray-300 dark:border-gray-300 bg-gray-100 dark:bg-gray-200 text-gray-400 dark:text-gray-500 cursor-not-allowed"
+                          : useCustomTimeSlots
+                            ? "border-purple-500 dark:border-purple-400 bg-purple-50 dark:bg-purple-100 text-purple-700 dark:text-purple-800 hover:bg-purple-100 dark:hover:bg-purple-200"
+                            : "border-gray-300 dark:border-gray-300 bg-white dark:bg-gray-100 text-gray-700 dark:text-gray-800 hover:bg-gray-50 dark:hover:bg-gray-200"
+                      }`}
+                    >
+                      <Clock className="w-3 h-3" />
+                      {useCustomTimeSlots ? "Set Time" : "Time Slots"}
+                      {useCustomTimeSlots &&
+                        customStartTime &&
+                        customEndTime && (
+                          <span className="text-[10px]">
+                            ({formatTime(customStartTime)} -{" "}
+                            {formatTime(customEndTime)})
+                          </span>
+                        )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div
+                className="border border-gray-200 dark:border-gray-300 rounded bg-white dark:bg-gray-50"
+                style={{ maxHeight: "75vh" }}
+              >
+                {/* Unified grid container with single scroll */}
+                <div
+                  ref={dataScrollRef}
+                  className="overflow-auto scrollbar-spacing"
+                  style={{ maxHeight: "calc(75vh - 1px)" }}
+                >
+                  {/* Grid wrapper with CSS Grid for perfect alignment */}
+                  <div
+                    className="grid"
+                    style={{
+                      gridTemplateColumns: `64px repeat(${orderedColumns.length}, minmax(160px, 1fr))`,
+                      minWidth: "max-content",
+                    }}
+                  >
+                    {/* Header row - sticky top */}
+                    {/* Time header cell */}
+                    <div
+                      className="sticky top-0 z-[50] bg-gray-50 dark:bg-gray-200 border-b border-r border-gray-200 dark:border-gray-300 p-1.5 flex items-center"
+                      style={{ height: "36px", gridColumn: "1", gridRow: "1" }}
+                    >
+                      <div className="flex items-center gap-0.5 text-[8px] sm:text-[9px] font-semibold text-gray-900 dark:text-gray-900">
+                        <Clock className="w-3 h-3" />
+                        <span>Time</span>
+                      </div>
+                    </div>
+
+                    {/* Column headers (doctors/rooms) */}
+                    {orderedColumns.map((column, index) => {
+                      const columnKey =
+                        column.type === "doctor"
+                          ? `doctor:${column.data._id}`
+                          : `room:${column.data._id}`;
+                      const isDragged = draggedColumnId === columnKey;
+                      const isLast = index === orderedColumns.length - 1;
+                      const gridColumn = index + 2;
+
+                      if (column.type === "doctor") {
+                        const doctor = column.data;
+                        return (
+                          <div
+                            key={columnKey}
+                            className={`sticky top-0 z-[40] bg-white dark:bg-gray-50 border-b ${isLast ? "" : "border-r"} border-gray-200 dark:border-gray-300 p-1.5 relative transition-all ${
+                              isDragged ? "opacity-50" : ""
+                            } ${draggedColumnId ? "cursor-move" : ""}`}
+                            style={{ height: "36px", gridColumn, gridRow: "1" }}
+                            draggable={permissions.canUpdate}
+                            onDragStart={(e) => {
+                              if (!permissions.canUpdate) {
+                                e.preventDefault();
+                                showErrorToast(
+                                  "You do not have permission to reorder columns",
+                                );
+                                return;
+                              }
+                              handleColumnDragStart(e, columnKey);
+                            }}
+                            onDragEnd={handleColumnDragEnd}
+                            onDragOver={handleColumnDragOver}
+                            onDragLeave={handleColumnDragLeave}
+                            onDrop={(e) => {
+                              handleColumnDrop(e, columnKey);
+                              if (e.currentTarget instanceof HTMLElement) {
+                                e.currentTarget.classList.remove(
+                                  "border-blue-400",
+                                  "bg-blue-50",
+                                  "border-emerald-400",
+                                  "bg-emerald-50",
+                                );
+                              }
+                            }}
+                            onMouseEnter={(e) =>
+                              handleDoctorMouseEnter(doctor, e)
+                            }
+                            onMouseLeave={handleDoctorMouseLeave}
+                            title={
+                              permissions.canUpdate
+                                ? "Drag to reorder columns"
+                                : "Column (no permission to reorder)"
+                            }
+                          >
+                            {permissions.canRead ? (
+                              <div className="flex items-center gap-1">
+                                <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-blue-50 dark:bg-blue-100 border border-blue-200 dark:border-blue-300 flex items-center justify-center text-blue-700 dark:text-blue-800 font-semibold text-[8px] sm:text-[9px] flex-shrink-0">
+                                  {getInitials(doctor.name)}
                                 </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-[8px] sm:text-[9px] font-semibold text-gray-900 dark:text-gray-900 truncate">
+                                    {doctor.name}
+                                  </p>
+                                </div>
+                                {permissions.canUpdate && (
+                                  <div
+                                    className="flex-shrink-0 cursor-grab active:cursor-grabbing opacity-40 hover:opacity-70 transition-opacity"
+                                    title="Drag to reorder"
+                                  >
+                                    <svg
+                                      className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-gray-500 dark:text-gray-700"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M4 8h16M4 16h16"
+                                      />
+                                    </svg>
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1">
+                                <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-gray-100 dark:bg-gray-200 flex items-center justify-center text-gray-400 dark:text-gray-600 font-semibold text-[8px] sm:text-[9px] flex-shrink-0">
+                                  ?
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-[8px] sm:text-[9px] font-semibold text-gray-500 dark:text-gray-500 truncate">
+                                    Hidden
+                                  </p>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      } else {
+                        const room = column.data;
+                        return (
+                          <div
+                            key={columnKey}
+                            className={`sticky top-0 z-[40] bg-emerald-50 dark:bg-emerald-100 border-b ${isLast ? "" : "border-r"} border-gray-200 dark:border-gray-300 p-1.5 transition-all room-column ${
+                              isDragged ? "opacity-50" : ""
+                            } ${draggedColumnId ? "cursor-move" : ""}`}
+                            style={{ height: "36px", gridColumn, gridRow: "1" }}
+                            draggable={permissions.canUpdate}
+                            onDragStart={(e) => {
+                              if (!permissions.canUpdate) {
+                                e.preventDefault();
+                                showErrorToast(
+                                  "You do not have permission to reorder columns",
+                                );
+                                return;
+                              }
+                              handleColumnDragStart(e, columnKey);
+                            }}
+                            onDragEnd={handleColumnDragEnd}
+                            onDragOver={handleColumnDragOver}
+                            onDragLeave={handleColumnDragLeave}
+                            onDrop={(e) => {
+                              handleColumnDrop(e, columnKey);
+                              if (e.currentTarget instanceof HTMLElement) {
+                                e.currentTarget.classList.remove(
+                                  "border-blue-400",
+                                  "bg-blue-50",
+                                  "border-emerald-400",
+                                  "bg-emerald-50",
+                                );
+                              }
+                            }}
+                            title={
+                              permissions.canUpdate
+                                ? "Drag to reorder columns"
+                                : "Column (no permission to reorder)"
+                            }
+                          >
+                            {permissions.canRead ? (
+                              <div className="flex items-center gap-1">
+                                <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-emerald-50 dark:bg-emerald-100 border border-emerald-200 dark:border-emerald-300 flex items-center justify-center text-emerald-700 dark:text-emerald-800 font-semibold text-[8px] sm:text-[9px] flex-shrink-0">
+                                  🏥
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-[8px] sm:text-[9px] font-semibold text-gray-900 dark:text-gray-900 truncate">
+                                    {room.name}
+                                  </p>
+                                </div>
+                                {permissions.canUpdate && (
+                                  <div
+                                    className="flex-shrink-0 cursor-grab active:cursor-grabbing opacity-40 hover:opacity-70 transition-opacity"
+                                    title="Drag to reorder"
+                                  >
+                                    <svg
+                                      className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-gray-500 dark:text-gray-700"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M4 8h16M4 16h16"
+                                      />
+                                    </svg>
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1">
+                                <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-gray-100 dark:bg-gray-200 flex items-center justify-center text-gray-400 dark:text-gray-600 font-semibold text-[8px] sm:text-[9px] flex-shrink-0">
+                                  ?
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-[8px] sm:text-[9px] font-semibold text-gray-500 dark:text-gray-500 truncate">
+                                    Hidden
+                                  </p>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      }
+                    })}
 
-                                {permissions.canRead && roomAppointments.length > 0
-                                  ? (() => {
-                                      const startingAppointments = roomAppointments.filter(apt => {
-                                        if (apt.status === 'Cancelled') return false;
-                                        const aptStart = timeStringToMinutes(apt.fromTime);
-                                        return aptStart >= rowStartMinutes && aptStart < rowStartMinutes + ROW_INTERVAL_MINUTES;
-                                      });
+                    {/* Time slots and data cells */}
+                    {timeSlots.map((slot, rowIndex) => {
+                      const rowStartMinutes = timeStringToMinutes(slot.time);
+                      const gridRow = rowIndex + 2; // Row 1 is header
 
-                                      if (startingAppointments.length === 0) return null;
+                      return (
+                        <React.Fragment key={slot.time}>
+                          {/* Time label cell */}
+                          <div
+                            className="sticky left-0 z-[30] bg-white dark:bg-gray-50 border-b border-r border-gray-200 dark:border-gray-300 p-1 relative"
+                            style={{
+                              height: ROW_HEIGHT_PX,
+                              gridColumn: "1",
+                              gridRow,
+                            }}
+                          >
+                            <p className="text-[8px] sm:text-[9px] font-semibold text-gray-900 dark:text-gray-900">
+                              {slot.displayTime}
+                            </p>
+                            <div className="absolute left-0 right-0 top-1/2 border-t border-gray-200 dark:border-gray-300 pointer-events-none" />
+                          </div>
 
-                                      const appointmentsBySlot = startingAppointments.map((apt) => {
-                                        const aptStart = timeStringToMinutes(apt.fromTime);
-                                        const aptEnd = timeStringToMinutes(apt.toTime);
-                                        const slotOffset = aptStart - rowStartMinutes;
-                                        const topOffset = (slotOffset / ROW_INTERVAL_MINUTES) * ROW_HEIGHT_PX;
-                                        const duration = aptEnd - aptStart;
-                                        const height = (duration / ROW_INTERVAL_MINUTES) * ROW_HEIGHT_PX;
-                                       
-                                        return { apt, topOffset, height: Math.max(height, ROW_HEIGHT_PX / 2) };
-                                      });
-                                     
-                                      const groupedBySlot: { [key: string]: typeof appointmentsBySlot } = {};
-                                      appointmentsBySlot.forEach((item) => {
-                                        const slotKey = Math.round(item.topOffset).toString();
-                                        if (!groupedBySlot[slotKey]) {
-                                          groupedBySlot[slotKey] = [];
-                                        }
-                                        groupedBySlot[slotKey].push(item);
-                                      });
-                                     
-                                      return (
-                                        <>
-                                          {Object.values(groupedBySlot).map((slotAppointments, groupIndex) => {
-                                            const firstAppt = slotAppointments[0];
-                                            const maxHeight = Math.max(...slotAppointments.map(item => item.height));
-                                           
+                          {/* Data cells for each column */}
+                          {orderedColumns.map((column, colIndex) => {
+                            const isLastColumn =
+                              colIndex === orderedColumns.length - 1;
+                            const gridColumn = colIndex + 2;
+
+                            if (column.type === "doctor") {
+                              const doctor = column.data;
+                              const rowAppointments = getAppointmentsForRow(
+                                doctor._id,
+                                slot.time,
+                              );
+                              const isInSelection =
+                                timeDragSelection.isDragging &&
+                                timeDragSelection.doctorId === doctor._id;
+                              const isDragOver =
+                                dragOverDoctorId === doctor._id;
+
+                              return (
+                                <div
+                                  key={`${slot.time}-doctor-${doctor._id}`}
+                                  className={`relative border-b ${isLastColumn ? "" : "border-r"} border-gray-200 dark:border-gray-300 transition-colors ${isDragOver ? "bg-blue-100 dark:bg-blue-200 border-blue-300 dark:border-blue-400" : ""} ${
+                                    timeDragSelection.isDragging &&
+                                    timeDragSelection.doctorId === doctor._id &&
+                                    isSlotInSelection(
+                                      rowStartMinutes,
+                                      rowStartMinutes + ROW_INTERVAL_MINUTES,
+                                      doctor._id,
+                                    )
+                                      ? "bg-blue-200 dark:bg-blue-200"
+                                      : "bg-blue-50 dark:bg-blue-100"
+                                  }`}
+                                  style={{
+                                    height: ROW_HEIGHT_PX,
+                                    gridColumn,
+                                    gridRow,
+                                  }}
+                                  data-doctor-id={doctor._id}
+                                  onDragOver={(e) => {
+                                    if (permissions.canUpdate) {
+                                      handleDoctorColumnDragOver(e, doctor._id);
+                                    }
+                                  }}
+                                  onDragLeave={handleDragLeave}
+                                  onDrop={(e) => {
+                                    if (permissions.canUpdate) {
+                                      handleDoctorColumnDrop(e, doctor._id);
+                                    }
+                                  }}
+                                >
+                                  <div className="absolute left-0 right-0 top-1/2 border-t border-gray-200 dark:border-gray-700 pointer-events-none" />
+                                  <div className="flex flex-col h-full">
+                                    {[0, SLOT_INTERVAL_MINUTES].map(
+                                      (offset) => {
+                                        const subSlotTime = addMinutesToTime(
+                                          slot.time,
+                                          offset,
+                                        );
+                                        const subStartMinutes =
+                                          rowStartMinutes + offset;
+                                        const subEndMinutes =
+                                          subStartMinutes +
+                                          SLOT_INTERVAL_MINUTES;
+                                        const isSubSlotOccupied =
+                                          rowAppointments.some((apt) => {
+                                            const aptStart =
+                                              timeStringToMinutes(apt.fromTime);
+                                            const aptEnd = timeStringToMinutes(
+                                              apt.toTime,
+                                            );
                                             return (
-                                              <div
-                                                key={`slot-${groupIndex}`}
-                                                className="absolute left-0.5 right-0.5 flex flex-row items-center"
-                                                style={{
-                                                  top: `${Math.max(0, firstAppt.topOffset + 1)}px`,
-                                                  height: `${maxHeight - 2}px`,
-                                                  zIndex: 10,
-                                                  gap: '2px',
-                                                }}
-                                              >
-                                                {slotAppointments.map((item, index) => {
-                                                  const statusColor = getStatusColor(item.apt.status);
-                                                  const patientCount = slotAppointments.length;
-                                                  const cardWidthPercent = patientCount > 1 ? `${Math.floor(100 / patientCount)}%` : '100%';
-                                                  const maxCardWidth = patientCount > 3 ? '80px' : patientCount > 2 ? '90px' : 'none';
-                                                 
-                                                  return (
-                                                    <div
-                                                      key={item.apt._id}
-                                                      className={`flex flex-col justify-center flex-1 min-w-0 px-2 py-1 border transition-all hover:shadow-sm ${permissions.canUpdate ? "cursor-pointer" : "cursor-default"} ${draggedAppointmentId === item.apt._id ? "opacity-50" : ""}`}
-                                                      style={{
-                                                        backgroundColor: statusColor.bg,
-                                                        color: statusColor.text,
-                                                        borderColor: statusColor.border,
-                                                        height: `${item.height - 2}px`,
-                                                        borderWidth: '1px',
-                                                        width: cardWidthPercent,
-                                                        maxWidth: maxCardWidth,
-                                                        flexBasis: cardWidthPercent,
-                                                      }}
-                                                      draggable={permissions.canUpdate}
-                                                      onDragStart={(e) => handleAppointmentDragStart(e, item.apt._id)}
-                                                      onDragEnd={handleAppointmentDragEnd}
-                                                      onMouseEnter={(e) => {
-                                                        const rect = e.currentTarget.getBoundingClientRect();
-                                                        const tooltipWidth = 200;
-                                                        const tooltipHeight = 300;
-                                                        const spacing = 8;
-                                                       
-                                                        let left = rect.right + spacing;
-                                                        let top = rect.top;
-                                                       
-                                                        if (left + tooltipWidth > window.innerWidth) {
-                                                          left = rect.left - tooltipWidth - spacing;
-                                                        }
-                                                       
-                                                        if (top + tooltipHeight > window.innerHeight) {
-                                                          top = window.innerHeight - tooltipHeight - 10;
-                                                        }
-                                                       
-                                                        if (top < 10) {
-                                                          top = 10;
-                                                        }
-                                                       
-                                                        if (left < 10) {
-                                                          left = 10;
-                                                        }
-                                                       
-                                                        setHoveredAppointment({
-                                                          appointment: item.apt,
-                                                          position: { top, left },
-                                                        });
-                                                      }}
-                                                      onMouseLeave={() => {
-                                                        setHoveredAppointment(null);
-                                                      }}
-                                                      onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        if (permissions.canUpdate) {
-                                                          appointmentRef.current = item.apt;
-                                                          setSelectedAppointment(item.apt);
-                                                          setEditModalOpen(true);
-                                                        } else {
-                                                          showErrorToast("You do not have permission to edit appointments");
-                                                        }
-                                                      }}
-                                                      title={`${item.apt.patientName} - ${formatTime(item.apt.fromTime)} - ${formatTime(item.apt.toTime)}`}
-                                                    >
-                                                      <div className="flex flex-col justify-center h-full">
-                                                        {item.height < 60 ? (
-                                                          <div className="flex items-center h-full px-2">
-                                                            <span className="text-[13px] font-[600] leading-[1.2] tracking-tight text-black truncate">
-                                                              {item.apt.patientName}
-                                                            </span>
+                                              aptStart < subEndMinutes &&
+                                              aptEnd > subStartMinutes
+                                            );
+                                          });
+                                        const slotWithinClosing =
+                                          lastBookableMinutes === null ||
+                                          subStartMinutes <=
+                                            lastBookableMinutes;
+                                        const canBookSlot =
+                                          !isPastDay &&
+                                          (!isToday ||
+                                            subStartMinutes >=
+                                              currentMinutes) &&
+                                          slotWithinClosing &&
+                                          !isSubSlotOccupied;
+
+                                        const isSelected =
+                                          isInSelection &&
+                                          isSlotInSelection(
+                                            subStartMinutes,
+                                            subEndMinutes,
+                                            doctor._id,
+                                          );
+                                        const isDragOverSlot =
+                                          dragOverTimeSlot?.doctorId ===
+                                            doctor._id &&
+                                          dragOverTimeSlot?.minutes ===
+                                            subStartMinutes;
+
+                                        return (
+                                          <div
+                                            key={`${slot.time}-${doctor._id}-${offset}`}
+                                            className={`flex-1 transition-all ${
+                                              isDragOverSlot
+                                                ? "bg-green-200 dark:bg-green-200 border-l-2 border-green-500 dark:border-green-600"
+                                                : isSelected
+                                                  ? "bg-blue-200 dark:bg-blue-200 border-l-2 border-blue-500 dark:border-blue-600 cursor-crosshair"
+                                                  : canBookSlot
+                                                    ? "cursor-crosshair hover:bg-blue-50 dark:hover:bg-blue-100 border-l-2 border-transparent hover:border-blue-400 dark:hover:border-blue-500"
+                                                    : isSubSlotOccupied
+                                                      ? "bg-gray-50 dark:bg-gray-100 cursor-not-allowed"
+                                                      : "bg-gray-50 dark:bg-gray-100 cursor-not-allowed"
+                                            }`}
+                                            style={{
+                                              height: SUB_SLOT_HEIGHT_PX,
+                                            }}
+                                            title={
+                                              draggedAppointmentId
+                                                ? `Drop appointment here to move to ${minutesToDisplay(subStartMinutes)}`
+                                                : canBookSlot
+                                                  ? `Click or drag to select time range starting at ${minutesToDisplay(subStartMinutes)}`
+                                                  : isPastDay
+                                                    ? "Cannot book appointments for past dates"
+                                                    : slotWithinClosing
+                                                      ? "Cannot book past time slots"
+                                                      : "Cannot book beyond clinic closing time"
+                                            }
+                                            onDragOver={(e) => {
+                                              if (
+                                                permissions.canUpdate &&
+                                                draggedAppointmentId &&
+                                                canBookSlot
+                                              ) {
+                                                handleTimeSlotDragOver(
+                                                  e,
+                                                  doctor._id,
+                                                  subStartMinutes,
+                                                );
+                                              }
+                                            }}
+                                            onDragLeave={handleDragLeave}
+                                            onDrop={(e) => {
+                                              if (
+                                                permissions.canUpdate &&
+                                                draggedAppointmentId &&
+                                                canBookSlot
+                                              ) {
+                                                handleTimeSlotDrop(
+                                                  e,
+                                                  doctor._id,
+                                                  subStartMinutes,
+                                                  false,
+                                                );
+                                              }
+                                            }}
+                                            onMouseDown={(e) => {
+                                              if (
+                                                canBookSlot &&
+                                                !draggedAppointmentId
+                                              ) {
+                                                handleTimeSlotMouseDown(
+                                                  e,
+                                                  doctor._id,
+                                                  subStartMinutes,
+                                                );
+                                              }
+                                            }}
+                                            onClick={(_e) => {
+                                              console.log("Slot clicked:", {
+                                                canBookSlot,
+                                                canCreate:
+                                                  permissions.canCreate,
+                                                isDragging:
+                                                  timeDragSelection.isDragging,
+                                                draggedAppointmentId,
+                                                subStartMinutes,
+                                                currentMinutes,
+                                                isToday,
+                                                isPastDay,
+                                              });
+                                              if (!permissions.canCreate) {
+                                                showErrorToast(
+                                                  "You do not have permission to book appointments",
+                                                );
+                                                return;
+                                              }
+                                              if (!canBookSlot) {
+                                                const limitTime =
+                                                  lastBookableMinutes !== null
+                                                    ? minutesToDisplay(
+                                                        lastBookableMinutes +
+                                                          SLOT_INTERVAL_MINUTES,
+                                                      )
+                                                    : "";
+                                                const msg = !slotWithinClosing
+                                                  ? `Booking is not allowed after ${limitTime}. Slots are available only until ${limitTime}.`
+                                                  : "This slot cannot be booked. Check date/time or availability.";
+                                                showErrorToast(msg);
+                                                return;
+                                              }
+                                              if (
+                                                canBookSlot &&
+                                                !timeDragSelection.isDragging &&
+                                                !draggedAppointmentId
+                                              ) {
+                                                setBookingModal({
+                                                  isOpen: true,
+                                                  doctorId: doctor._id,
+                                                  doctorName: doctor.name,
+                                                  roomId: "",
+                                                  roomName: "",
+                                                  slotTime: subSlotTime,
+                                                  slotDisplayTime:
+                                                    minutesToDisplay(
+                                                      subStartMinutes,
+                                                    ),
+                                                  selectedDate,
+                                                  bookedFrom: "doctor",
+                                                });
+                                              }
+                                            }}
+                                          />
+                                        );
+                                      },
+                                    )}
+                                  </div>
+
+                                  {permissions.canRead &&
+                                  rowAppointments.length > 0
+                                    ? (() => {
+                                        const startingAppointments =
+                                          rowAppointments.filter((apt) => {
+                                            if (apt.status === "Cancelled")
+                                              return false;
+                                            const aptStart =
+                                              timeStringToMinutes(apt.fromTime);
+                                            return (
+                                              aptStart >= rowStartMinutes &&
+                                              aptStart <
+                                                rowStartMinutes +
+                                                  ROW_INTERVAL_MINUTES
+                                            );
+                                          });
+
+                                        if (startingAppointments.length === 0)
+                                          return null;
+
+                                        const appointmentsBySlot =
+                                          startingAppointments.map((apt) => {
+                                            const aptStart =
+                                              timeStringToMinutes(apt.fromTime);
+                                            const aptEnd = timeStringToMinutes(
+                                              apt.toTime,
+                                            );
+                                            const slotOffset =
+                                              aptStart - rowStartMinutes;
+                                            const topOffset =
+                                              (slotOffset /
+                                                ROW_INTERVAL_MINUTES) *
+                                              ROW_HEIGHT_PX;
+                                            const duration = aptEnd - aptStart;
+                                            const height =
+                                              (duration /
+                                                ROW_INTERVAL_MINUTES) *
+                                              ROW_HEIGHT_PX;
+
+                                            return {
+                                              apt,
+                                              topOffset,
+                                              height: Math.max(
+                                                height,
+                                                ROW_HEIGHT_PX / 2,
+                                              ),
+                                            };
+                                          });
+
+                                        const groupedBySlot: {
+                                          [
+                                            key: string
+                                          ]: typeof appointmentsBySlot;
+                                        } = {};
+                                        appointmentsBySlot.forEach((item) => {
+                                          const slotKey = Math.round(
+                                            item.topOffset,
+                                          ).toString();
+                                          if (!groupedBySlot[slotKey]) {
+                                            groupedBySlot[slotKey] = [];
+                                          }
+                                          groupedBySlot[slotKey].push(item);
+                                        });
+
+                                        return (
+                                          <>
+                                            {Object.values(groupedBySlot).map(
+                                              (
+                                                slotAppointments,
+                                                groupIndex,
+                                              ) => {
+                                                const firstAppt =
+                                                  slotAppointments[0];
+                                                const maxHeight = Math.max(
+                                                  ...slotAppointments.map(
+                                                    (item) => item.height,
+                                                  ),
+                                                );
+
+                                                return (
+                                                  <div
+                                                    key={`slot-${groupIndex}`}
+                                                    className="absolute left-[2px] right-[2px] flex flex-row items-center"
+                                                    style={{
+                                                      top: `${Math.max(0, firstAppt.topOffset + 1)}px`,
+                                                      height: `${maxHeight - 2}px`,
+                                                      zIndex: 10,
+                                                    }}
+                                                  >
+                                                    {slotAppointments.map(
+                                                      (item) => {
+                                                        const statusColor =
+                                                          getStatusColor(
+                                                            item.apt.status,
+                                                          );
+                                                        const patientCount =
+                                                          slotAppointments.length;
+                                                        const cardWidthPercent =
+                                                          patientCount > 1
+                                                            ? `${Math.floor(100 / patientCount)}%`
+                                                            : "100%";
+
+                                                        return (
+                                                          <div
+                                                            key={item.apt._id}
+                                                            className={`flex flex-col justify-center flex-1 min-w-0 px-2 py-1 border transition-all hover:shadow-sm ${permissions.canUpdate ? "cursor-pointer" : "cursor-default"} ${draggedAppointmentId === item.apt._id ? "opacity-50" : ""}`}
+                                                            style={{
+                                                              backgroundColor:
+                                                                statusColor.bg,
+                                                              color:
+                                                                statusColor.text,
+                                                              borderColor:
+                                                                statusColor.border,
+                                                              height: `${item.height - 2}px`,
+                                                              width:
+                                                                cardWidthPercent,
+                                                              flexBasis:
+                                                                cardWidthPercent,
+                                                            }}
+                                                            draggable={
+                                                              permissions.canUpdate
+                                                            }
+                                                            onDragStart={(e) =>
+                                                              handleAppointmentDragStart(
+                                                                e,
+                                                                item.apt._id,
+                                                              )
+                                                            }
+                                                            onDragEnd={
+                                                              handleAppointmentDragEnd
+                                                            }
+                                                            onMouseEnter={(
+                                                              e,
+                                                            ) => {
+                                                              const rect =
+                                                                e.currentTarget.getBoundingClientRect();
+                                                              const tooltipWidth = 200;
+                                                              const tooltipHeight = 300;
+                                                              const spacing = 8;
+
+                                                              let left =
+                                                                rect.right +
+                                                                spacing;
+                                                              let top =
+                                                                rect.top;
+
+                                                              if (
+                                                                left +
+                                                                  tooltipWidth >
+                                                                window.innerWidth
+                                                              ) {
+                                                                left =
+                                                                  rect.left -
+                                                                  tooltipWidth -
+                                                                  spacing;
+                                                              }
+
+                                                              if (
+                                                                top +
+                                                                  tooltipHeight >
+                                                                window.innerHeight
+                                                              ) {
+                                                                top =
+                                                                  window.innerHeight -
+                                                                  tooltipHeight -
+                                                                  10;
+                                                              }
+
+                                                              if (top < 10) {
+                                                                top = 10;
+                                                              }
+
+                                                              if (left < 10) {
+                                                                left = 10;
+                                                              }
+
+                                                              setHoveredAppointment(
+                                                                {
+                                                                  appointment:
+                                                                    item.apt,
+                                                                  position: {
+                                                                    top,
+                                                                    left,
+                                                                  },
+                                                                },
+                                                              );
+                                                            }}
+                                                            onMouseLeave={() => {
+                                                              setHoveredAppointment(
+                                                                null,
+                                                              );
+                                                            }}
+                                                            onClick={(e) => {
+                                                              e.stopPropagation();
+                                                              if (
+                                                                permissions.canUpdate
+                                                              ) {
+                                                                appointmentRef.current =
+                                                                  item.apt;
+                                                                setSelectedAppointment(
+                                                                  item.apt,
+                                                                );
+                                                                setEditModalOpen(
+                                                                  true,
+                                                                );
+                                                              } else {
+                                                                showErrorToast(
+                                                                  "You do not have permission to edit appointments",
+                                                                );
+                                                              }
+                                                            }}
+                                                            title={`${item.apt.patientName} - ${formatTime(item.apt.fromTime)} - ${formatTime(item.apt.toTime)}`}
+                                                          >
+                                                            <div className="flex flex-col justify-center h-full">
+                                                              {item.height <
+                                                              60 ? (
+                                                                <div className="flex items-center h-full px-2">
+                                                                  <span className="text-[13px] font-[600] leading-[1.2] tracking-tight text-black truncate">
+                                                                    {
+                                                                      item.apt
+                                                                        .patientName
+                                                                    }
+                                                                  </span>
+                                                                </div>
+                                                              ) : (
+                                                                <div className="px-2 py-1.5 leading-[1.2] space-y-[2px]">
+                                                                  <span className="text-[11px] font-[400] opacity-[0.75] mb-[2px] block">
+                                                                    {formatTime(
+                                                                      item.apt
+                                                                        .fromTime,
+                                                                    )}{" "}
+                                                                    -{" "}
+                                                                    {formatTime(
+                                                                      item.apt
+                                                                        .toTime,
+                                                                    )}
+                                                                  </span>
+                                                                  <span className="text-[13px] font-[600] text-black mb-[2px] block">
+                                                                    {slotAppointments.length >
+                                                                    1
+                                                                      ? item.apt.patientName
+                                                                          .split(
+                                                                            " ",
+                                                                          )
+                                                                          .slice(
+                                                                            0,
+                                                                            2,
+                                                                          )
+                                                                          .join(
+                                                                            " ",
+                                                                          )
+                                                                      : item.apt
+                                                                          .patientName}
+                                                                  </span>
+                                                                  {item.apt
+                                                                    .serviceNames &&
+                                                                  item.apt
+                                                                    .serviceNames
+                                                                    .length >
+                                                                    0 ? (
+                                                                    <span className="text-[12px] font-[400] text-black opacity-[0.8] block truncate">
+                                                                      {item.apt.serviceNames.join(
+                                                                        ", ",
+                                                                      )}
+                                                                    </span>
+                                                                  ) : (
+                                                                    item.apt
+                                                                      .serviceName && (
+                                                                      <span className="text-[12px] font-[400] text-black opacity-[0.8] block truncate">
+                                                                        {
+                                                                          item
+                                                                            .apt
+                                                                            .serviceName
+                                                                        }
+                                                                      </span>
+                                                                    )
+                                                                  )}
+                                                                </div>
+                                                              )}
+                                                            </div>
                                                           </div>
-                                                        ) : (
-                                                          <div className="px-2 py-1.5 leading-[1.2] space-y-[2px]">
-                                                            <span className="text-[11px] font-[400] opacity-[0.75] mb-[2px] block">
-                                                              {formatTime(item.apt.fromTime)} - {formatTime(item.apt.toTime)}
-                                                            </span>
-                                                            <span className="text-[13px] font-[600] text-black mb-[2px] block">
-                                                              {slotAppointments.length > 1 ? item.apt.patientName.split(' ').slice(0, 2).join(' ') : item.apt.patientName}
-                                                            </span>
-                                                            {item.apt.serviceNames && item.apt.serviceNames.length > 0 ? (
-                                                              <span className="text-[12px] font-[400] text-black opacity-[0.8] block truncate">
-                                                                {item.apt.serviceNames.join(", ")}
-                                                              </span>
-                                                            ) : item.apt.serviceName && (
-                                                              <span className="text-[12px] font-[400] text-black opacity-[0.8] block truncate">
-                                                                {item.apt.serviceName}
-                                                              </span>
+                                                        );
+                                                      },
+                                                    )}
+                                                  </div>
+                                                );
+                                              },
+                                            )}
+                                          </>
+                                        );
+                                      })()
+                                    : null}
+                                </div>
+                              );
+                            } else {
+                              const room = column.data;
+                              const roomAppointments =
+                                getRoomAppointmentsForRow(room._id, slot.time);
+                              const isInRoomSelection =
+                                roomDragSelection.isDragging &&
+                                roomDragSelection.roomId === room._id;
+
+                              return (
+                                <div
+                                  key={`${slot.time}-room-${room._id}`}
+                                  className={`relative border-b ${isLastColumn ? "" : "border-r"} border-gray-200 dark:border-gray-300 transition-colors ${
+                                    roomDragSelection.isDragging &&
+                                    roomDragSelection.roomId === room._id &&
+                                    isRoomSlotInSelection(
+                                      rowStartMinutes,
+                                      rowStartMinutes + ROW_INTERVAL_MINUTES,
+                                      room._id,
+                                    )
+                                      ? "bg-emerald-200 dark:bg-emerald-200"
+                                      : "bg-emerald-50 dark:bg-emerald-100"
+                                  }`}
+                                  style={{
+                                    height: ROW_HEIGHT_PX,
+                                    gridColumn,
+                                    gridRow,
+                                  }}
+                                  data-room-id={room._id}
+                                  onDragOver={(e) => {
+                                    if (
+                                      permissions.canUpdate &&
+                                      draggedAppointmentId
+                                    ) {
+                                      handleRoomColumnDragOver(e);
+                                    }
+                                  }}
+                                  onDragLeave={handleDragLeave}
+                                  onDrop={(e) => {
+                                    if (permissions.canUpdate) {
+                                      handleRoomColumnDrop(e, room._id);
+                                    }
+                                  }}
+                                >
+                                  <div className="absolute left-0 right-0 top-1/2 border-t border-gray-200 dark:border-gray-700 pointer-events-none" />
+                                  <div className="flex flex-col h-full">
+                                    {[0, SLOT_INTERVAL_MINUTES].map(
+                                      (offset) => {
+                                        const subSlotTime = addMinutesToTime(
+                                          slot.time,
+                                          offset,
+                                        );
+                                        const subStartMinutes =
+                                          rowStartMinutes + offset;
+                                        const subEndMinutes =
+                                          subStartMinutes +
+                                          SLOT_INTERVAL_MINUTES;
+                                        const isSubSlotOccupied =
+                                          roomAppointments.some((apt) => {
+                                            const aptStart =
+                                              timeStringToMinutes(apt.fromTime);
+                                            const aptEnd = timeStringToMinutes(
+                                              apt.toTime,
+                                            );
+                                            return (
+                                              aptStart < subEndMinutes &&
+                                              aptEnd > subStartMinutes
+                                            );
+                                          });
+                                        const slotWithinClosing =
+                                          lastBookableMinutes === null ||
+                                          subStartMinutes <=
+                                            lastBookableMinutes;
+                                        const canBookSlot =
+                                          permissions.canCreate &&
+                                          !isPastDay &&
+                                          (!isToday ||
+                                            subStartMinutes >=
+                                              currentMinutes) &&
+                                          slotWithinClosing &&
+                                          !isSubSlotOccupied;
+
+                                        const isSelected =
+                                          isInRoomSelection &&
+                                          isRoomSlotInSelection(
+                                            subStartMinutes,
+                                            subEndMinutes,
+                                            room._id,
+                                          );
+
+                                        return (
+                                          <div
+                                            key={`${slot.time}-${room._id}-${offset}`}
+                                            className={`flex-1 transition-all ${
+                                              isSelected
+                                                ? "bg-emerald-200 dark:bg-emerald-200 border-l-2 border-emerald-500 dark:border-emerald-600 cursor-crosshair"
+                                                : canBookSlot
+                                                  ? "cursor-crosshair hover:bg-emerald-50 dark:hover:bg-emerald-100 border-l-2 border-transparent hover:border-emerald-400 dark:hover:border-emerald-500"
+                                                  : isSubSlotOccupied
+                                                    ? "bg-gray-50 dark:bg-gray-100 cursor-not-allowed"
+                                                    : "bg-gray-50 dark:bg-gray-100 cursor-not-allowed"
+                                            }`}
+                                            style={{
+                                              height: SUB_SLOT_HEIGHT_PX,
+                                            }}
+                                            title={
+                                              !permissions.canCreate
+                                                ? "You do not have permission to book appointments"
+                                                : canBookSlot
+                                                  ? `Click or drag to select time range starting at ${minutesToDisplay(subStartMinutes)}`
+                                                  : isPastDay
+                                                    ? "Cannot book appointments for past dates"
+                                                    : slotWithinClosing
+                                                      ? "Cannot book past time slots"
+                                                      : "Cannot book beyond clinic closing time"
+                                            }
+                                            onMouseDown={(e) => {
+                                              if (
+                                                canBookSlot &&
+                                                !draggedAppointmentId
+                                              ) {
+                                                handleRoomSlotMouseDown(
+                                                  e,
+                                                  room._id,
+                                                  subStartMinutes,
+                                                );
+                                              }
+                                            }}
+                                            onDragOver={(e) => {
+                                              if (
+                                                permissions.canUpdate &&
+                                                draggedAppointmentId &&
+                                                canBookSlot
+                                              ) {
+                                                handleRoomTimeSlotDragOver(
+                                                  e,
+                                                  room._id,
+                                                  subStartMinutes,
+                                                );
+                                              }
+                                            }}
+                                            onDragLeave={handleDragLeave}
+                                            onDrop={(e) => {
+                                              if (
+                                                permissions.canUpdate &&
+                                                draggedAppointmentId &&
+                                                canBookSlot
+                                              ) {
+                                                handleTimeSlotDrop(
+                                                  e,
+                                                  room._id,
+                                                  subStartMinutes,
+                                                  true,
+                                                );
+                                              }
+                                            }}
+                                            onClick={(_e) => {
+                                              console.log(
+                                                "Room slot clicked:",
+                                                {
+                                                  canBookSlot,
+                                                  canCreate:
+                                                    permissions.canCreate,
+                                                  isDragging:
+                                                    roomDragSelection.isDragging,
+                                                  draggedAppointmentId,
+                                                  subStartMinutes,
+                                                  currentMinutes,
+                                                  isToday,
+                                                  isPastDay,
+                                                },
+                                              );
+                                              if (!permissions.canCreate) {
+                                                showErrorToast(
+                                                  "You do not have permission to book appointments",
+                                                );
+                                                return;
+                                              }
+                                              if (!canBookSlot) {
+                                                const limitTime =
+                                                  lastBookableMinutes !== null
+                                                    ? minutesToDisplay(
+                                                        lastBookableMinutes +
+                                                          SLOT_INTERVAL_MINUTES,
+                                                      )
+                                                    : "";
+                                                const msg = !slotWithinClosing
+                                                  ? `Booking is not allowed after ${limitTime}. Slots are available only until ${limitTime}.`
+                                                  : "This slot cannot be booked. Check date/time or availability.";
+                                                showErrorToast(msg);
+                                                return;
+                                              }
+                                              if (
+                                                canBookSlot &&
+                                                !roomDragSelection.isDragging &&
+                                                !draggedAppointmentId
+                                              ) {
+                                                setBookingModal({
+                                                  isOpen: true,
+                                                  doctorId: "",
+                                                  doctorName: "",
+                                                  roomId: room._id,
+                                                  roomName: room.name,
+                                                  slotTime: subSlotTime,
+                                                  slotDisplayTime:
+                                                    minutesToDisplay(
+                                                      subStartMinutes,
+                                                    ),
+                                                  selectedDate,
+                                                  bookedFrom: "room",
+                                                });
+                                              }
+                                            }}
+                                          />
+                                        );
+                                      },
+                                    )}
+                                  </div>
+
+                                  {permissions.canRead &&
+                                  roomAppointments.length > 0
+                                    ? (() => {
+                                        const startingAppointments =
+                                          roomAppointments.filter((apt) => {
+                                            if (apt.status === "Cancelled")
+                                              return false;
+                                            const aptStart =
+                                              timeStringToMinutes(apt.fromTime);
+                                            return (
+                                              aptStart >= rowStartMinutes &&
+                                              aptStart <
+                                                rowStartMinutes +
+                                                  ROW_INTERVAL_MINUTES
+                                            );
+                                          });
+
+                                        if (startingAppointments.length === 0)
+                                          return null;
+
+                                        const appointmentsBySlot =
+                                          startingAppointments.map((apt) => {
+                                            const aptStart =
+                                              timeStringToMinutes(apt.fromTime);
+                                            const aptEnd = timeStringToMinutes(
+                                              apt.toTime,
+                                            );
+                                            const slotOffset =
+                                              aptStart - rowStartMinutes;
+                                            const topOffset =
+                                              (slotOffset /
+                                                ROW_INTERVAL_MINUTES) *
+                                              ROW_HEIGHT_PX;
+                                            const duration = aptEnd - aptStart;
+                                            const height =
+                                              (duration /
+                                                ROW_INTERVAL_MINUTES) *
+                                              ROW_HEIGHT_PX;
+
+                                            return {
+                                              apt,
+                                              topOffset,
+                                              height: Math.max(
+                                                height,
+                                                ROW_HEIGHT_PX / 2,
+                                              ),
+                                            };
+                                          });
+
+                                        const groupedBySlot: {
+                                          [
+                                            key: string
+                                          ]: typeof appointmentsBySlot;
+                                        } = {};
+                                        appointmentsBySlot.forEach((item) => {
+                                          const slotKey = Math.round(
+                                            item.topOffset,
+                                          ).toString();
+                                          if (!groupedBySlot[slotKey]) {
+                                            groupedBySlot[slotKey] = [];
+                                          }
+                                          groupedBySlot[slotKey].push(item);
+                                        });
+
+                                        return (
+                                          <>
+                                            {Object.values(groupedBySlot).map(
+                                              (
+                                                slotAppointments,
+                                                groupIndex,
+                                              ) => {
+                                                const firstAppt =
+                                                  slotAppointments[0];
+                                                const maxHeight = Math.max(
+                                                  ...slotAppointments.map(
+                                                    (item) => item.height,
+                                                  ),
+                                                );
+
+                                                return (
+                                                  <div
+                                                    key={`slot-${groupIndex}`}
+                                                    className="absolute left-0.5 right-0.5 flex flex-row items-center"
+                                                    style={{
+                                                      top: `${Math.max(0, firstAppt.topOffset + 1)}px`,
+                                                      height: `${maxHeight - 2}px`,
+                                                      zIndex: 10,
+                                                      gap: "2px",
+                                                    }}
+                                                  >
+                                                    {slotAppointments.map(
+                                                      (item, index) => {
+                                                        const statusColor =
+                                                          getStatusColor(
+                                                            item.apt.status,
+                                                          );
+                                                        const patientCount =
+                                                          slotAppointments.length;
+                                                        const cardWidthPercent =
+                                                          patientCount > 1
+                                                            ? `${Math.floor(100 / patientCount)}%`
+                                                            : "100%";
+                                                        const maxCardWidth =
+                                                          patientCount > 3
+                                                            ? "80px"
+                                                            : patientCount > 2
+                                                              ? "90px"
+                                                              : "none";
+
+                                                        return (
+                                                          <div
+                                                            key={item.apt._id}
+                                                            className={`flex flex-col justify-center flex-1 min-w-0 px-2 py-1 border transition-all hover:shadow-sm ${permissions.canUpdate ? "cursor-pointer" : "cursor-default"} ${draggedAppointmentId === item.apt._id ? "opacity-50" : ""}`}
+                                                            style={{
+                                                              backgroundColor:
+                                                                statusColor.bg,
+                                                              color:
+                                                                statusColor.text,
+                                                              borderColor:
+                                                                statusColor.border,
+                                                              height: `${item.height - 2}px`,
+                                                              borderWidth:
+                                                                "1px",
+                                                              width:
+                                                                cardWidthPercent,
+                                                              maxWidth:
+                                                                maxCardWidth,
+                                                              flexBasis:
+                                                                cardWidthPercent,
+                                                            }}
+                                                            draggable={
+                                                              permissions.canUpdate
+                                                            }
+                                                            onDragStart={(e) =>
+                                                              handleAppointmentDragStart(
+                                                                e,
+                                                                item.apt._id,
+                                                              )
+                                                            }
+                                                            onDragEnd={
+                                                              handleAppointmentDragEnd
+                                                            }
+                                                            onMouseEnter={(
+                                                              e,
+                                                            ) => {
+                                                              const rect =
+                                                                e.currentTarget.getBoundingClientRect();
+                                                              const tooltipWidth = 200;
+                                                              const tooltipHeight = 300;
+                                                              const spacing = 8;
+
+                                                              let left =
+                                                                rect.right +
+                                                                spacing;
+                                                              let top =
+                                                                rect.top;
+
+                                                              if (
+                                                                left +
+                                                                  tooltipWidth >
+                                                                window.innerWidth
+                                                              ) {
+                                                                left =
+                                                                  rect.left -
+                                                                  tooltipWidth -
+                                                                  spacing;
+                                                              }
+
+                                                              if (
+                                                                top +
+                                                                  tooltipHeight >
+                                                                window.innerHeight
+                                                              ) {
+                                                                top =
+                                                                  window.innerHeight -
+                                                                  tooltipHeight -
+                                                                  10;
+                                                              }
+
+                                                              if (top < 10) {
+                                                                top = 10;
+                                                              }
+
+                                                              if (left < 10) {
+                                                                left = 10;
+                                                              }
+
+                                                              setHoveredAppointment(
+                                                                {
+                                                                  appointment:
+                                                                    item.apt,
+                                                                  position: {
+                                                                    top,
+                                                                    left,
+                                                                  },
+                                                                },
+                                                              );
+                                                            }}
+                                                            onMouseLeave={() => {
+                                                              setHoveredAppointment(
+                                                                null,
+                                                              );
+                                                            }}
+                                                            onClick={(e) => {
+                                                              e.stopPropagation();
+                                                              if (
+                                                                permissions.canUpdate
+                                                              ) {
+                                                                appointmentRef.current =
+                                                                  item.apt;
+                                                                setSelectedAppointment(
+                                                                  item.apt,
+                                                                );
+                                                                setEditModalOpen(
+                                                                  true,
+                                                                );
+                                                              } else {
+                                                                showErrorToast(
+                                                                  "You do not have permission to edit appointments",
+                                                                );
+                                                              }
+                                                            }}
+                                                            title={`${item.apt.patientName} - ${formatTime(item.apt.fromTime)} - ${formatTime(item.apt.toTime)}`}
+                                                          >
+                                                            <div className="flex flex-col justify-center h-full">
+                                                              {item.height <
+                                                              60 ? (
+                                                                <div className="flex items-center h-full px-2">
+                                                                  <span className="text-[13px] font-[600] leading-[1.2] tracking-tight text-black truncate">
+                                                                    {
+                                                                      item.apt
+                                                                        .patientName
+                                                                    }
+                                                                  </span>
+                                                                </div>
+                                                              ) : (
+                                                                <div className="px-2 py-1.5 leading-[1.2] space-y-[2px]">
+                                                                  <span className="text-[11px] font-[400] opacity-[0.75] mb-[2px] block">
+                                                                    {formatTime(
+                                                                      item.apt
+                                                                        .fromTime,
+                                                                    )}{" "}
+                                                                    -{" "}
+                                                                    {formatTime(
+                                                                      item.apt
+                                                                        .toTime,
+                                                                    )}
+                                                                  </span>
+                                                                  <span className="text-[13px] font-[600] text-black mb-[2px] block">
+                                                                    {slotAppointments.length >
+                                                                    1
+                                                                      ? item.apt.patientName
+                                                                          .split(
+                                                                            " ",
+                                                                          )
+                                                                          .slice(
+                                                                            0,
+                                                                            2,
+                                                                          )
+                                                                          .join(
+                                                                            " ",
+                                                                          )
+                                                                      : item.apt
+                                                                          .patientName}
+                                                                  </span>
+                                                                  {item.apt
+                                                                    .serviceNames &&
+                                                                  item.apt
+                                                                    .serviceNames
+                                                                    .length >
+                                                                    0 ? (
+                                                                    <span className="text-[12px] font-[400] text-black opacity-[0.8] block truncate">
+                                                                      {item.apt.serviceNames.join(
+                                                                        ", ",
+                                                                      )}
+                                                                    </span>
+                                                                  ) : (
+                                                                    item.apt
+                                                                      .serviceName && (
+                                                                      <span className="text-[12px] font-[400] text-black opacity-[0.8] block truncate">
+                                                                        {
+                                                                          item
+                                                                            .apt
+                                                                            .serviceName
+                                                                        }
+                                                                      </span>
+                                                                    )
+                                                                  )}
+                                                                </div>
+                                                              )}
+                                                            </div>
+                                                            {index <
+                                                              slotAppointments.length -
+                                                                1 && (
+                                                              <div className="w-px h-2 bg-gray-300 dark:bg-gray-400 mx-0.5 flex-shrink-0" />
                                                             )}
                                                           </div>
-                                                        )}
-                                                      </div>
-                                                      {index < slotAppointments.length - 1 && (
-                                                        <div className="w-px h-2 bg-gray-300 dark:bg-gray-400 mx-0.5 flex-shrink-0" />
-                                                      )}
-                                                    </div>
-                                                  );
-                                                })}
-                                              </div>
-                                            );
-                                          })}
-                                        </>
-                                      );
-                                    })()
-                                  : null}
-                              </div>
+                                                        );
+                                                      },
+                                                    )}
+                                                  </div>
+                                                );
+                                              },
+                                            )}
+                                          </>
+                                        );
+                                      })()
+                                    : null}
+                                </div>
+                              );
+                            }
+                          })}
+                        </React.Fragment>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+              {visibleDoctors.length === 0 &&
+                visibleRooms.length === 0 &&
+                (doctorStaff.length > 0 || rooms.length > 0) && (
+                  <div className="mt-2 rounded border border-dashed border-gray-300 dark:border-gray-300 bg-gray-50 dark:bg-gray-100 p-2 text-center text-xs text-gray-700 dark:text-gray-800">
+                    No doctor or room columns selected. Use the filters above to
+                    choose which schedules to display.
+                  </div>
+                )}
+            </>
+          )}
+        </div>
+
+        {/* Custom Time Slot Modal */}
+        {customTimeSlotModalOpen && (
+          <ModalPortal>
+            <div
+              className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[9999] p-4"
+              onClick={() => setCustomTimeSlotModalOpen(false)}
+            >
+              <div
+                className="bg-white dark:bg-gray-50 rounded-xl shadow-2xl max-w-md w-full p-4 sm:p-6"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-900">
+                    Custom Time Slots
+                  </h2>
+                  <button
+                    onClick={() => setCustomTimeSlotModalOpen(false)}
+                    className="p-1 hover:bg-gray-100 dark:hover:bg-gray-200 rounded-lg transition-colors text-gray-900 dark:text-gray-900"
+                  >
+                    <X className="w-5 h-5 text-gray-500 dark:text-gray-700" />
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-800 mb-2">
+                      Use Custom Time Slots
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={useCustomTimeSlots}
+                        onChange={(e) => {
+                          setUseCustomTimeSlots(e.target.checked);
+                          // Don't reset custom times when disabled - preserve them for when user re-enables
+                          // The time slots will switch back to clinic timings, but custom values are preserved
+                        }}
+                        className="w-4 h-4 rounded border-gray-300 dark:border-gray-300 bg-white dark:bg-gray-100 text-purple-600 focus:ring-purple-500 dark:focus:ring-purple-500"
+                      />
+                      <span className="text-sm text-gray-700 dark:text-gray-800">
+                        Enable custom time slots
+                      </span>
+                    </label>
+                  </div>
+
+                  {useCustomTimeSlots && (
+                    <>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-800 mb-2">
+                          Start Time
+                        </label>
+                        <input
+                          type="time"
+                          value={customStartTime}
+                          onChange={(e) => setCustomStartTime(e.target.value)}
+                          className="w-full border border-gray-300 dark:border-gray-300 bg-white dark:bg-gray-100 text-gray-900 dark:text-gray-900 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-500 focus:border-purple-500 dark:focus:border-purple-600"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-800 mb-2">
+                          End Time
+                        </label>
+                        <input
+                          type="time"
+                          value={customEndTime}
+                          onChange={(e) => setCustomEndTime(e.target.value)}
+                          className="w-full border border-gray-300 dark:border-gray-300 bg-white dark:bg-gray-100 text-gray-900 dark:text-gray-900 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-500 focus:border-purple-500 dark:focus:border-purple-600"
+                        />
+                      </div>
+                      {customStartTime && customEndTime && (
+                        <div className="bg-purple-50 dark:bg-purple-100 border border-purple-200 dark:border-purple-300 rounded-lg p-3">
+                          <p className="text-sm text-purple-700 dark:text-purple-800">
+                            <strong>Preview:</strong>{" "}
+                            {formatTime(customStartTime)} -{" "}
+                            {formatTime(customEndTime)}
+                          </p>
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  <div className="flex gap-2 pt-2">
+                    <button
+                      onClick={async () => {
+                        if (
+                          useCustomTimeSlots &&
+                          customStartTime &&
+                          customEndTime
+                        ) {
+                          const startMinutes =
+                            timeStringToMinutes(customStartTime);
+                          const endMinutes = timeStringToMinutes(customEndTime);
+                          if (endMinutes > startMinutes) {
+                            // Save to database immediately
+                            try {
+                              const currentValues = {
+                                useCustomTimeSlots: true,
+                                customStartTime,
+                                customEndTime,
+                              };
+                              await axios.put(
+                                "/api/clinic/custom-time-slots",
+                                currentValues,
+                                { headers: getAuthHeaders() },
+                              );
+                              // Update ref to prevent duplicate save
+                              lastSavedValuesRef.current = currentValues;
+                              // Apply time slots locally
+                              const slots = generateTimeSlots(
+                                customStartTime,
+                                customEndTime,
+                              );
+                              setTimeSlots(slots);
+                              setClosingMinutes(endMinutes);
+
+                              // Show success pop-up with time details
+                              toast.success(
+                                `Custom time slots applied: ${formatTime(customStartTime)} - ${formatTime(customEndTime)}`,
+                                { duration: 3000 },
+                              );
+
+                              setCustomTimeSlotModalOpen(false);
+                            } catch (err: any) {
+                              console.error(
+                                "Error saving custom time slots:",
+                                err,
+                              );
+                              showErrorToast(
+                                err.response?.data?.message ||
+                                  "Failed to save custom time slots",
+                              );
+                            }
+                          } else {
+                            showErrorToast("End time must be after start time");
+                          }
+                        } else {
+                          // If disabling custom time slots, save that to database
+                          try {
+                            const currentValues = {
+                              useCustomTimeSlots: false,
+                              customStartTime: "",
+                              customEndTime: "",
+                            };
+                            await axios.put(
+                              "/api/clinic/custom-time-slots",
+                              currentValues,
+                              { headers: getAuthHeaders() },
+                            );
+                            // Update ref to prevent duplicate save
+                            lastSavedValuesRef.current = currentValues;
+                            // Revert to clinic timings (day-aware)
+                            if (Array.isArray(clinic?.timings)) {
+                              const dayTiming = parseTimingsForDay(
+                                clinic.timings,
+                                selectedDate,
+                              );
+                              if (dayTiming) {
+                                setTimeSlots(
+                                  generateTimeSlots(
+                                    dayTiming.startTime,
+                                    dayTiming.endTime,
+                                  ),
+                                );
+                                setClosingMinutes(
+                                  timeStringToMinutes(dayTiming.endTime),
+                                );
+                              } else {
+                                setTimeSlots([]);
+                                setClosingMinutes(null);
+                              }
+                            } else {
+                              const parsed = parseTimings(
+                                clinic?.timings || "",
+                              );
+                              if (parsed && !parsed.isCustom) {
+                                setTimeSlots(
+                                  generateTimeSlots(
+                                    parsed.startTime,
+                                    parsed.endTime,
+                                  ),
+                                );
+                                setClosingMinutes(
+                                  timeStringToMinutes(parsed.endTime),
+                                );
+                              }
+                            }
+
+                            // Show success pop-up with duration
+                            toast.success("Reverted to clinic timings", {
+                              duration: 3000,
+                            });
+
+                            setCustomTimeSlotModalOpen(false);
+                          } catch (err: any) {
+                            console.error(
+                              "Error saving custom time slots:",
+                              err,
+                            );
+                            showErrorToast(
+                              err.response?.data?.message ||
+                                "Failed to save settings",
                             );
                           }
-                        })}
-                      </React.Fragment>
-                    );
-                  })}
+                        }
+                      }}
+                      className="flex-1 px-4 py-2 bg-purple-600 dark:bg-purple-500 text-white rounded-lg hover:bg-purple-700 dark:hover:bg-purple-600 font-medium transition-colors"
+                    >
+                      Apply
+                    </button>
+                    <button
+                      onClick={() => setCustomTimeSlotModalOpen(false)}
+                      className="px-4 py-2 bg-gray-200 dark:bg-gray-200 text-gray-700 dark:text-gray-900 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-300 font-medium transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
-        {visibleDoctors.length === 0 && visibleRooms.length === 0 && (doctorStaff.length > 0 || rooms.length > 0) && (
-          <div className="mt-2 rounded border border-dashed border-gray-300 dark:border-gray-300 bg-gray-50 dark:bg-gray-100 p-2 text-center text-xs text-gray-700 dark:text-gray-800">
-            No doctor or room columns selected. Use the filters above to choose which schedules to display.
+          </ModalPortal>
+        )}
+
+        {/* Booking Modal */}
+        <AppointmentBookingModal
+          isOpen={bookingModal.isOpen}
+          onClose={() => setBookingModal({ ...bookingModal, isOpen: false })}
+          onSuccess={handleBookingSuccess}
+          doctorId={bookingModal.doctorId}
+          doctorName={bookingModal.doctorName}
+          defaultRoomId={bookingModal.roomId}
+          slotTime={bookingModal.slotTime}
+          slotDisplayTime={bookingModal.slotDisplayTime}
+          defaultDate={bookingModal.selectedDate}
+          bookedFrom={bookingModal.bookedFrom}
+          fromTime={bookingModal.fromTime}
+          toTime={bookingModal.toTime}
+          customTimeSlots={
+            useCustomTimeSlots
+              ? { startTime: customStartTime, endTime: customEndTime }
+              : undefined
+          }
+          rooms={rooms}
+          doctorStaff={doctorStaff}
+          getAuthHeaders={getAuthHeaders}
+        />
+
+        {/* Import Appointments Modal */}
+        {permissions.canCreate === true && (
+          <ImportAppointmentsModal
+            isOpen={importModalOpen}
+            onClose={() => setImportModalOpen(false)}
+            onImported={handleImportSuccess}
+            doctorStaff={doctorStaff}
+            rooms={rooms}
+            getAuthHeaders={getAuthHeaders}
+          />
+        )}
+
+        {/* Edit Appointment Modal */}
+        <EditAppointmentModal
+          isOpen={
+            editModalOpen &&
+            (selectedAppointment !== null || appointmentRef.current !== null)
+          }
+          onClose={() => {
+            setEditModalOpen(false);
+            setSelectedAppointment(null);
+            appointmentRef.current = null;
+          }}
+          onSuccess={() => {
+            loadAppointments();
+            setEditModalOpen(false);
+            setSelectedAppointment(null);
+            appointmentRef.current = null;
+          }}
+          appointment={selectedAppointment || appointmentRef.current}
+          rooms={rooms}
+          doctors={doctorStaff}
+          getAuthHeaders={getAuthHeaders}
+        />
+
+        {activeDoctorTooltip && (
+          <div
+            className="fixed z-[80] w-[180px] max-w-[85vw] -translate-x-1/2"
+            style={{
+              top: activeDoctorTooltip.position.top,
+              left: activeDoctorTooltip.position.left,
+            }}
+          >
+            <div className="rounded-lg bg-white dark:bg-gray-50 shadow-xl border border-purple-200 dark:border-purple-300 overflow-hidden">
+              <div className="bg-gradient-to-r from-purple-600 to-purple-500 dark:from-purple-700 dark:to-purple-600 text-white text-[9px] font-bold px-2 py-1 flex items-center justify-center tracking-wide">
+                Doctor Info
+              </div>
+              <div className="p-1.5 space-y-1.5">
+                <div className="flex items-center gap-1.5 pb-1 border-b border-gray-100 dark:border-gray-200">
+                  <div className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-500 to-purple-600 dark:from-purple-600 dark:to-purple-700 flex items-center justify-center text-white font-bold text-[9px] flex-shrink-0 shadow-sm">
+                    {getInitials(activeDoctorTooltip.doctorName)}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[9px] font-bold text-gray-900 dark:text-gray-900 truncate leading-tight">
+                      {activeDoctorTooltip.doctorName}
+                    </p>
+                    <p className="text-[8px] text-gray-600 dark:text-gray-700 truncate leading-tight mt-0.5">
+                      {tooltipDoctor?.email || "No email"}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-0.5">
+                  {tooltipDeptLoading ? (
+                    <div className="flex items-center gap-1 text-gray-700 dark:text-gray-800">
+                      <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                      <span className="text-[8px]">Loading...</span>
+                    </div>
+                  ) : tooltipDeptError ? (
+                    <p className="text-[8px] text-red-500 dark:text-red-400">
+                      {tooltipDeptError}
+                    </p>
+                  ) : tooltipDeptList && tooltipDeptList.length > 0 ? (
+                    <div className="flex items-start gap-1">
+                      <span className="text-[8px] font-bold text-gray-600 dark:text-gray-700 flex-shrink-0">
+                        Dept:
+                      </span>
+                      <span className="text-[8px] font-medium text-gray-800 dark:text-gray-900 leading-tight">
+                        {tooltipDeptList.map((dept) => dept.name).join(", ")}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex items-start gap-1">
+                      <span className="text-[8px] font-bold text-gray-600 dark:text-gray-700 flex-shrink-0">
+                        Dept:
+                      </span>
+                      <span className="text-[8px] text-gray-500 dark:text-gray-600">
+                        Not assigned
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="pt-0.5 border-t border-gray-100 dark:border-gray-200">
+                  {tooltipLoading ? (
+                    <div className="flex gap-1 text-gray-700 dark:text-gray-800">
+                      <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                      <span className="text-[8px]">Loading...</span>
+                    </div>
+                  ) : tooltipError ? (
+                    <p className="text-[8px] text-red-500 dark:text-red-400">
+                      {tooltipError}
+                    </p>
+                  ) : tooltipTreatments && tooltipTreatments.length > 0 ? (
+                    <div className="space-y-1 max-h-32 overflow-y-auto pr-0.5 custom-scrollbar">
+                      {tooltipTreatments.map((treatment) => (
+                        <div
+                          key={treatment._id}
+                          className="rounded-md border border-purple-100 dark:border-purple-200 bg-gradient-to-r from-purple-50 to-purple-100/50 dark:from-purple-50/30 dark:to-purple-100/20 p-1"
+                        >
+                          <p className="text-[8px] font-bold text-purple-900 dark:text-purple-900 mb-0.5 leading-tight">
+                            {treatment.treatmentName}
+                          </p>
+                          {treatment.departmentName && (
+                            <p className="text-[7px] text-gray-600 dark:text-gray-700 mb-0.5 leading-tight">
+                              <span className="font-semibold">Dept:</span>{" "}
+                              {treatment.departmentName}
+                            </p>
+                          )}
+                          {treatment.subcategories &&
+                            treatment.subcategories.length > 0 && (
+                              <p className="text-[7px] text-gray-700 dark:text-gray-800 leading-tight">
+                                <span className="font-semibold">Types:</span>{" "}
+                                {treatment.subcategories
+                                  .map((sub) => sub.name)
+                                  .join(", ")}
+                              </p>
+                            )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex items-start gap-1">
+                      <span className="text-[8px] font-bold text-gray-600 dark:text-gray-700 flex-shrink-0">
+                        Treatment:
+                      </span>
+                      <span className="text-[8px] text-gray-500 dark:text-gray-600">
+                        Not assigned
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         )}
-          </>
+
+        {/* Appointment Hover Tooltip */}
+        {hoveredAppointment && (
+          <div
+            className="fixed z-[90] w-[200px] max-w-[85vw] pointer-events-none"
+            style={{
+              top: hoveredAppointment.position.top,
+              left: hoveredAppointment.position.left,
+            }}
+          >
+            <div className="bg-white dark:bg-gray-50 rounded-md shadow-xl border border-gray-200 dark:border-gray-300 overflow-hidden">
+              {/* Header */}
+              <div
+                className="px-2 py-1"
+                style={{
+                  backgroundColor: getStatusColor(
+                    hoveredAppointment.appointment.status,
+                  ).bg,
+                  color: getStatusColor(hoveredAppointment.appointment.status)
+                    .text,
+                }}
+              >
+                <div className="flex items-center justify-between gap-1">
+                  <p className="text-[10px] font-bold truncate text-gray-900 dark:text-gray-900">
+                    {hoveredAppointment.appointment.patientName}
+                  </p>
+                  <span className="text-[9px] font-semibold opacity-90 dark:opacity-80 ml-1">
+                    {hoveredAppointment.appointment.status.toUpperCase()}
+                  </span>
+                </div>
+              </div>
+
+              {/* Content */}
+              <div className="p-2 space-y-1 max-h-[300px] overflow-y-auto">
+                {/* Time */}
+                <div className="flex items-center gap-1.5">
+                  <Clock className="w-2.5 h-2.5 text-gray-500 dark:text-gray-700 flex-shrink-0" />
+                  <p className="text-[10px] text-gray-700 dark:text-gray-800 font-semibold">
+                    {formatTime(hoveredAppointment.appointment.fromTime)} -{" "}
+                    {formatTime(hoveredAppointment.appointment.toTime)}
+                  </p>
+                </div>
+
+                {/* Patient Info */}
+                <div className="space-y-0.5 pt-0.5 border-t border-gray-100 dark:border-gray-300">
+                  {hoveredAppointment.appointment.patientEmrNumber && (
+                    <div className="flex items-center gap-1">
+                      <span className="text-[9px] text-gray-700 dark:text-gray-800 font-medium">
+                        EMR:
+                      </span>
+                      <span className="text-[10px] text-gray-700 dark:text-gray-800 truncate">
+                        {hoveredAppointment.appointment.patientEmrNumber}
+                      </span>
+                    </div>
+                  )}
+                  {hoveredAppointment.appointment.patientInvoiceNumber && (
+                    <div className="flex items-center gap-1">
+                      <span className="text-[9px] text-gray-700 dark:text-gray-800 font-medium">
+                        Inv:
+                      </span>
+                      <span className="text-[10px] text-gray-700 dark:text-gray-800 truncate">
+                        {hoveredAppointment.appointment.patientInvoiceNumber}
+                      </span>
+                    </div>
+                  )}
+                  {hoveredAppointment.appointment.patientGender && (
+                    <div className="flex items-center gap-1">
+                      <span className="text-[9px] text-gray-700 dark:text-gray-800 font-medium">
+                        Gender:
+                      </span>
+                      <span className="text-[10px] text-gray-700 dark:text-gray-800">
+                        {hoveredAppointment.appointment.patientGender}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Contact Info */}
+                {(hoveredAppointment.appointment.patientEmail ||
+                  hoveredAppointment.appointment.patientMobileNumber) && (
+                  <div className="space-y-0.5 pt-0.5 border-t border-gray-100 dark:border-gray-300">
+                    {hoveredAppointment.appointment.patientMobileNumber && (
+                      <div className="flex items-center gap-1">
+                        <span className="text-[9px] text-gray-700 dark:text-gray-800 font-medium w-12 flex-shrink-0">
+                          Mobile:
+                        </span>
+                        <span className="text-[10px] text-gray-700 dark:text-gray-800 truncate">
+                          {hoveredAppointment.appointment.patientMobileNumber}
+                        </span>
+                      </div>
+                    )}
+                    {hoveredAppointment.appointment.patientEmail && (
+                      <div className="flex items-center gap-1">
+                        <span className="text-[9px] text-gray-700 dark:text-gray-800 font-medium w-12 flex-shrink-0">
+                          Email:
+                        </span>
+                        <span className="text-[10px] text-gray-700 dark:text-gray-800 truncate">
+                          {hoveredAppointment.appointment.patientEmail}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Doctor & Treatment */}
+                <div className="space-y-0.5 pt-0.5 border-t border-gray-100 dark:border-gray-300">
+                  <div className="flex items-center gap-1">
+                    <span className="text-[9px] text-gray-700 dark:text-gray-800 font-medium w-12 flex-shrink-0">
+                      Dr:
+                    </span>
+                    <span className="text-[10px] text-gray-700 dark:text-gray-800 truncate">
+                      {hoveredAppointment.appointment.doctorName}
+                    </span>
+                  </div>
+                  {hoveredAppointment.appointment.serviceNames &&
+                  hoveredAppointment.appointment.serviceNames.length > 0 ? (
+                    <div className="flex items-start gap-1">
+                      <span className="text-[9px] text-gray-700 dark:text-gray-800 font-medium w-12 flex-shrink-0">
+                        Services:
+                      </span>
+                      <span className="text-[10px] text-gray-700 dark:text-gray-800 leading-tight">
+                        {hoveredAppointment.appointment.serviceNames.join(", ")}
+                      </span>
+                    </div>
+                  ) : (
+                    hoveredAppointment.appointment.serviceName && (
+                      <div className="flex items-center gap-1">
+                        <span className="text-[9px] text-gray-700 dark:text-gray-800 font-medium w-12 flex-shrink-0">
+                          Service:
+                        </span>
+                        <span className="text-[10px] text-gray-700 dark:text-gray-800 truncate">
+                          {hoveredAppointment.appointment.serviceName}
+                        </span>
+                      </div>
+                    )
+                  )}
+                </div>
+
+                {/* Follow Type */}
+                {hoveredAppointment.appointment.followType && (
+                  <div className="pt-0.5 border-t border-gray-100 dark:border-gray-300">
+                    <div className="flex items-center gap-1">
+                      <span className="text-[9px] text-gray-700 dark:text-gray-800 font-medium w-12 flex-shrink-0">
+                        Follow:
+                      </span>
+                      <span className="text-[10px] text-gray-700 dark:text-gray-800">
+                        {hoveredAppointment.appointment.followType}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Referral */}
+                {hoveredAppointment.appointment.referral && (
+                  <div className="pt-0.5 border-t border-gray-100 dark:border-gray-300">
+                    <div className="flex items-start gap-1">
+                      <span className="text-[9px] text-gray-700 dark:text-gray-800 font-medium w-12 flex-shrink-0">
+                        Ref:
+                      </span>
+                      <span className="text-[10px] text-gray-700 dark:text-gray-800">
+                        {hoveredAppointment.appointment.referral}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Emergency */}
+                {hoveredAppointment.appointment.emergency && (
+                  <div className="pt-0.5 border-t border-gray-100 dark:border-gray-300">
+                    <div className="flex items-start gap-1">
+                      <span className="text-[9px] text-gray-700 dark:text-gray-800 font-medium w-12 flex-shrink-0">
+                        Emer:
+                      </span>
+                      <span className="text-[10px] text-red-600 dark:text-red-400 font-semibold">
+                        {hoveredAppointment.appointment.emergency}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Notes */}
+                {hoveredAppointment.appointment.notes && (
+                  <div className="pt-0.5 border-t border-gray-100 dark:border-gray-300">
+                    <p className="text-[9px] font-semibold text-gray-700 dark:text-gray-800 uppercase mb-0.5">
+                      Notes
+                    </p>
+                    <p className="text-[10px] text-gray-700 dark:text-gray-800 leading-tight">
+                      {hoveredAppointment.appointment.notes}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         )}
       </div>
 
-      {/* Custom Time Slot Modal */}
-      {customTimeSlotModalOpen && (
-        <ModalPortal>
-          <div
-            className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[9999] p-4"
-            onClick={() => setCustomTimeSlotModalOpen(false)}
-          >
-            <div
-              className="bg-white dark:bg-gray-50 rounded-xl shadow-2xl max-w-md w-full p-4 sm:p-6"
-              onClick={(e) => e.stopPropagation()}
-            >
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-900">Custom Time Slots</h2>
-              <button
-                onClick={() => setCustomTimeSlotModalOpen(false)}
-                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-200 rounded-lg transition-colors text-gray-900 dark:text-gray-900"
-              >
-                <X className="w-5 h-5 text-gray-500 dark:text-gray-700" />
-              </button>
-            </div>
-           
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-800 mb-2">
-                  Use Custom Time Slots
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={useCustomTimeSlots}
-                    onChange={(e) => {
-                      setUseCustomTimeSlots(e.target.checked);
-                      // Don't reset custom times when disabled - preserve them for when user re-enables
-                      // The time slots will switch back to clinic timings, but custom values are preserved
-                    }}
-                    className="w-4 h-4 rounded border-gray-300 dark:border-gray-300 bg-white dark:bg-gray-100 text-purple-600 focus:ring-purple-500 dark:focus:ring-purple-500"
-                  />
-                  <span className="text-sm text-gray-700 dark:text-gray-800">Enable custom time slots</span>
-                </label>
-              </div>
-
-              {useCustomTimeSlots && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-800 mb-2">
-                      Start Time
-                    </label>
-                    <input
-                      type="time"
-                      value={customStartTime}
-                      onChange={(e) => setCustomStartTime(e.target.value)}
-                      className="w-full border border-gray-300 dark:border-gray-300 bg-white dark:bg-gray-100 text-gray-900 dark:text-gray-900 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-500 focus:border-purple-500 dark:focus:border-purple-600"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-800 mb-2">
-                      End Time
-                    </label>
-                    <input
-                      type="time"
-                      value={customEndTime}
-                      onChange={(e) => setCustomEndTime(e.target.value)}
-                      className="w-full border border-gray-300 dark:border-gray-300 bg-white dark:bg-gray-100 text-gray-900 dark:text-gray-900 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-500 focus:border-purple-500 dark:focus:border-purple-600"
-                    />
-                  </div>
-                  {customStartTime && customEndTime && (
-                    <div className="bg-purple-50 dark:bg-purple-100 border border-purple-200 dark:border-purple-300 rounded-lg p-3">
-                      <p className="text-sm text-purple-700 dark:text-purple-800">
-                        <strong>Preview:</strong> {formatTime(customStartTime)} - {formatTime(customEndTime)}
-                      </p>
-                    </div>
-                  )}
-                </>
-              )}
-
-              <div className="flex gap-2 pt-2">
-                <button
-                  onClick={async () => {
-                    if (useCustomTimeSlots && customStartTime && customEndTime) {
-                      const startMinutes = timeStringToMinutes(customStartTime);
-                      const endMinutes = timeStringToMinutes(customEndTime);
-                      if (endMinutes > startMinutes) {
-                        // Save to database immediately
-                        try {
-                          const currentValues = {
-                            useCustomTimeSlots: true,
-                            customStartTime,
-                            customEndTime,
-                          };
-                          await axios.put(
-                            "/api/clinic/custom-time-slots",
-                            currentValues,
-                            { headers: getAuthHeaders() }
-                          );
-                          // Update ref to prevent duplicate save
-                          lastSavedValuesRef.current = currentValues;
-                          // Apply time slots locally
-                          const slots = generateTimeSlots(customStartTime, customEndTime);
-                          setTimeSlots(slots);
-                          setClosingMinutes(endMinutes);
-                         
-                          // Show success pop-up with time details
-                          toast.success(
-                            `Custom time slots applied: ${formatTime(customStartTime)} - ${formatTime(customEndTime)}`,
-                            { duration: 3000 }
-                          );
-                         
-                          setCustomTimeSlotModalOpen(false);
-                        } catch (err: any) {
-                          console.error("Error saving custom time slots:", err);
-                          showErrorToast(err.response?.data?.message || "Failed to save custom time slots");
-                        }
-                      } else {
-                        showErrorToast("End time must be after start time");
-                      }
-                    } else {
-                      // If disabling custom time slots, save that to database
-                      try {
-                        const currentValues = {
-                          useCustomTimeSlots: false,
-                          customStartTime: "",
-                          customEndTime: "",
-                        };
-                        await axios.put(
-                          "/api/clinic/custom-time-slots",
-                          currentValues,
-                          { headers: getAuthHeaders() }
-                        );
-                        // Update ref to prevent duplicate save
-                        lastSavedValuesRef.current = currentValues;
-                        // Revert to clinic timings (day-aware)
-                        if (Array.isArray(clinic?.timings)) {
-                          const dayTiming = parseTimingsForDay(clinic.timings, selectedDate);
-                          if (dayTiming) {
-                            setTimeSlots(generateTimeSlots(dayTiming.startTime, dayTiming.endTime));
-                            setClosingMinutes(timeStringToMinutes(dayTiming.endTime));
-                          } else {
-                            setTimeSlots([]);
-                            setClosingMinutes(null);
-                          }
-                        } else {
-                          const parsed = parseTimings(clinic?.timings || "");
-                          if (parsed && !parsed.isCustom) {
-                            setTimeSlots(generateTimeSlots(parsed.startTime, parsed.endTime));
-                            setClosingMinutes(timeStringToMinutes(parsed.endTime));
-                          }
-                        }
-                       
-                        // Show success pop-up with duration
-                        toast.success("Reverted to clinic timings", { duration: 3000 });
-                       
-                        setCustomTimeSlotModalOpen(false);
-                      } catch (err: any) {
-                        console.error("Error saving custom time slots:", err);
-                        showErrorToast(err.response?.data?.message || "Failed to save settings");
-                      }
-                    }
-                  }}
-                  className="flex-1 px-4 py-2 bg-purple-600 dark:bg-purple-500 text-white rounded-lg hover:bg-purple-700 dark:hover:bg-purple-600 font-medium transition-colors"
-                >
-                  Apply
-                </button>
-                <button
-                  onClick={() => setCustomTimeSlotModalOpen(false)}
-                  className="px-4 py-2 bg-gray-200 dark:bg-gray-200 text-gray-700 dark:text-gray-900 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-300 font-medium transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </ModalPortal>
-      )}
-
-      {/* Booking Modal */}
-      <AppointmentBookingModal
-        isOpen={bookingModal.isOpen}
-        onClose={() => setBookingModal({ ...bookingModal, isOpen: false })}
-        onSuccess={handleBookingSuccess}
-        doctorId={bookingModal.doctorId}
-        doctorName={bookingModal.doctorName}
-        defaultRoomId={bookingModal.roomId}
-        slotTime={bookingModal.slotTime}
-        slotDisplayTime={bookingModal.slotDisplayTime}
-        defaultDate={bookingModal.selectedDate}
-        bookedFrom={bookingModal.bookedFrom}
-        fromTime={bookingModal.fromTime}
-        toTime={bookingModal.toTime}
-        customTimeSlots={useCustomTimeSlots ? { startTime: customStartTime, endTime: customEndTime } : undefined}
-        rooms={rooms}
-        doctorStaff={doctorStaff}
-        getAuthHeaders={getAuthHeaders}
-      />
-
-      {/* Import Appointments Modal */}
-      {permissions.canCreate === true && (
-        <ImportAppointmentsModal
-          isOpen={importModalOpen}
-          onClose={() => setImportModalOpen(false)}
-          onImported={handleImportSuccess}
-          doctorStaff={doctorStaff}
-          rooms={rooms}
-          getAuthHeaders={getAuthHeaders}
-        />
-      )}
-
-      {/* Edit Appointment Modal */}
-      <EditAppointmentModal
-        isOpen={editModalOpen && (selectedAppointment !== null || appointmentRef.current !== null)}
-        onClose={() => {
-          setEditModalOpen(false);
-          setSelectedAppointment(null);
-          appointmentRef.current = null;
+      {/* Toast Notification Container */}
+      <Toaster
+        position="top-right"
+        containerStyle={{
+          zIndex: 10000,
         }}
-        onSuccess={() => {
-          loadAppointments();
-          setEditModalOpen(false);
-          setSelectedAppointment(null);
-          appointmentRef.current = null;
+        toastOptions={{
+          duration: 3000,
+          success: {
+            style: {
+              background: "#10B981",
+              color: "#fff",
+              fontWeight: "600",
+            },
+            iconTheme: {
+              primary: "#fff",
+              secondary: "#10B981",
+            },
+          },
+          error: {
+            style: {
+              background: "#EF4444",
+              color: "#fff",
+              fontWeight: "600",
+            },
+          },
         }}
-        appointment={selectedAppointment || appointmentRef.current}
-        rooms={rooms}
-        doctors={doctorStaff}
-        getAuthHeaders={getAuthHeaders}
       />
-
-      {activeDoctorTooltip && (
-        <div
-          className="fixed z-[80] w-[180px] max-w-[85vw] -translate-x-1/2"
-          style={{
-            top: activeDoctorTooltip.position.top,
-            left: activeDoctorTooltip.position.left,
-          }}
-        >
-          <div className="rounded-lg bg-white dark:bg-gray-50 shadow-xl border border-purple-200 dark:border-purple-300 overflow-hidden">
-            <div className="bg-gradient-to-r from-purple-600 to-purple-500 dark:from-purple-700 dark:to-purple-600 text-white text-[9px] font-bold px-2 py-1 flex items-center justify-center tracking-wide">
-              Doctor Info
-            </div>
-            <div className="p-1.5 space-y-1.5">
-              <div className="flex items-center gap-1.5 pb-1 border-b border-gray-100 dark:border-gray-200">
-                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-500 to-purple-600 dark:from-purple-600 dark:to-purple-700 flex items-center justify-center text-white font-bold text-[9px] flex-shrink-0 shadow-sm">
-                  {getInitials(activeDoctorTooltip.doctorName)}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[9px] font-bold text-gray-900 dark:text-gray-900 truncate leading-tight">
-                    {activeDoctorTooltip.doctorName}
-                  </p>
-                  <p className="text-[8px] text-gray-600 dark:text-gray-700 truncate leading-tight mt-0.5">{tooltipDoctor?.email || "No email"}</p>
-                </div>
-              </div>
-
-              <div className="space-y-0.5">
-                {tooltipDeptLoading ? (
-                  <div className="flex items-center gap-1 text-gray-700 dark:text-gray-800">
-                    <Loader2 className="w-2.5 h-2.5 animate-spin" />
-                    <span className="text-[8px]">Loading...</span>
-                  </div>
-                ) : tooltipDeptError ? (
-                  <p className="text-[8px] text-red-500 dark:text-red-400">{tooltipDeptError}</p>
-                ) : tooltipDeptList && tooltipDeptList.length > 0 ? (
-                  <div className="flex items-start gap-1">
-                    <span className="text-[8px] font-bold text-gray-600 dark:text-gray-700 flex-shrink-0">Dept:</span>
-                    <span className="text-[8px] font-medium text-gray-800 dark:text-gray-900 leading-tight">{tooltipDeptList.map((dept) => dept.name).join(", ")}</span>
-                  </div>
-                ) : (
-                  <div className="flex items-start gap-1">
-                    <span className="text-[8px] font-bold text-gray-600 dark:text-gray-700 flex-shrink-0">Dept:</span>
-                    <span className="text-[8px] text-gray-500 dark:text-gray-600">Not assigned</span>
-                  </div>
-                )}
-              </div>
-
-              <div className="pt-0.5 border-t border-gray-100 dark:border-gray-200">
-                {tooltipLoading ? (
-                  <div className="flex gap-1 text-gray-700 dark:text-gray-800">
-                    <Loader2 className="w-2.5 h-2.5 animate-spin" />
-                    <span className="text-[8px]">Loading...</span>
-                  </div>
-                ) : tooltipError ? (
-                  <p className="text-[8px] text-red-500 dark:text-red-400">{tooltipError}</p>
-                ) : tooltipTreatments && tooltipTreatments.length > 0 ? (
-                  <div className="space-y-1 max-h-32 overflow-y-auto pr-0.5 custom-scrollbar">
-                    {tooltipTreatments.map((treatment) => (
-                      <div
-                        key={treatment._id}
-                        className="rounded-md border border-purple-100 dark:border-purple-200 bg-gradient-to-r from-purple-50 to-purple-100/50 dark:from-purple-50/30 dark:to-purple-100/20 p-1"
-                      >
-                        <p className="text-[8px] font-bold text-purple-900 dark:text-purple-900 mb-0.5 leading-tight">
-                          {treatment.treatmentName}
-                        </p>
-                        {treatment.departmentName && (
-                          <p className="text-[7px] text-gray-600 dark:text-gray-700 mb-0.5 leading-tight">
-                            <span className="font-semibold">Dept:</span> {treatment.departmentName}
-                          </p>
-                        )}
-                        {treatment.subcategories && treatment.subcategories.length > 0 && (
-                          <p className="text-[7px] text-gray-700 dark:text-gray-800 leading-tight">
-                            <span className="font-semibold">Types:</span> {treatment.subcategories.map((sub) => sub.name).join(", ")}
-                          </p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="flex items-start gap-1">
-                    <span className="text-[8px] font-bold text-gray-600 dark:text-gray-700 flex-shrink-0">Treatment:</span>
-                    <span className="text-[8px] text-gray-500 dark:text-gray-600">Not assigned</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Appointment Hover Tooltip */}
-      {hoveredAppointment && (
-        <div
-          className="fixed z-[90] w-[200px] max-w-[85vw] pointer-events-none"
-          style={{
-            top: hoveredAppointment.position.top,
-            left: hoveredAppointment.position.left,
-          }}
-        >
-          <div className="bg-white dark:bg-gray-50 rounded-md shadow-xl border border-gray-200 dark:border-gray-300 overflow-hidden">
-            {/* Header */}
-            <div
-              className="px-2 py-1"
-              style={{
-                backgroundColor: getStatusColor(hoveredAppointment.appointment.status).bg,
-                color: getStatusColor(hoveredAppointment.appointment.status).text,
-              }}
-            >
-              <div className="flex items-center justify-between gap-1">
-                <p className="text-[10px] font-bold truncate text-gray-900 dark:text-gray-900">{hoveredAppointment.appointment.patientName}</p>
-                <span className="text-[9px] font-semibold opacity-90 dark:opacity-80 ml-1">{hoveredAppointment.appointment.status.toUpperCase()}</span>
-              </div>
-            </div>
-
-            {/* Content */}
-            <div className="p-2 space-y-1 max-h-[300px] overflow-y-auto">
-              {/* Time */}
-              <div className="flex items-center gap-1.5">
-                <Clock className="w-2.5 h-2.5 text-gray-500 dark:text-gray-700 flex-shrink-0" />
-                <p className="text-[10px] text-gray-700 dark:text-gray-800 font-semibold">
-                  {formatTime(hoveredAppointment.appointment.fromTime)} - {formatTime(hoveredAppointment.appointment.toTime)}
-                </p>
-              </div>
-
-              {/* Patient Info */}
-              <div className="space-y-0.5 pt-0.5 border-t border-gray-100 dark:border-gray-300">
-                {hoveredAppointment.appointment.patientEmrNumber && (
-                  <div className="flex items-center gap-1">
-                    <span className="text-[9px] text-gray-700 dark:text-gray-800 font-medium">EMR:</span>
-                    <span className="text-[10px] text-gray-700 dark:text-gray-800 truncate">{hoveredAppointment.appointment.patientEmrNumber}</span>
-                  </div>
-                )}
-                {hoveredAppointment.appointment.patientInvoiceNumber && (
-                  <div className="flex items-center gap-1">
-                    <span className="text-[9px] text-gray-700 dark:text-gray-800 font-medium">Inv:</span>
-                    <span className="text-[10px] text-gray-700 dark:text-gray-800 truncate">{hoveredAppointment.appointment.patientInvoiceNumber}</span>
-                  </div>
-                )}
-                {hoveredAppointment.appointment.patientGender && (
-                  <div className="flex items-center gap-1">
-                    <span className="text-[9px] text-gray-700 dark:text-gray-800 font-medium">Gender:</span>
-                    <span className="text-[10px] text-gray-700 dark:text-gray-800">{hoveredAppointment.appointment.patientGender}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Contact Info */}
-              {(hoveredAppointment.appointment.patientEmail || hoveredAppointment.appointment.patientMobileNumber) && (
-                <div className="space-y-0.5 pt-0.5 border-t border-gray-100 dark:border-gray-300">
-                  {hoveredAppointment.appointment.patientMobileNumber && (
-                    <div className="flex items-center gap-1">
-                      <span className="text-[9px] text-gray-700 dark:text-gray-800 font-medium w-12 flex-shrink-0">Mobile:</span>
-                      <span className="text-[10px] text-gray-700 dark:text-gray-800 truncate">{hoveredAppointment.appointment.patientMobileNumber}</span>
-                    </div>
-                  )}
-                  {hoveredAppointment.appointment.patientEmail && (
-                    <div className="flex items-center gap-1">
-                      <span className="text-[9px] text-gray-700 dark:text-gray-800 font-medium w-12 flex-shrink-0">Email:</span>
-                      <span className="text-[10px] text-gray-700 dark:text-gray-800 truncate">{hoveredAppointment.appointment.patientEmail}</span>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Doctor & Treatment */}
-              <div className="space-y-0.5 pt-0.5 border-t border-gray-100 dark:border-gray-300">
-                <div className="flex items-center gap-1">
-                  <span className="text-[9px] text-gray-700 dark:text-gray-800 font-medium w-12 flex-shrink-0">Dr:</span>
-                  <span className="text-[10px] text-gray-700 dark:text-gray-800 truncate">{hoveredAppointment.appointment.doctorName}</span>
-                </div>
-                {hoveredAppointment.appointment.serviceNames && hoveredAppointment.appointment.serviceNames.length > 0 ? (
-                  <div className="flex items-start gap-1">
-                    <span className="text-[9px] text-gray-700 dark:text-gray-800 font-medium w-12 flex-shrink-0">Services:</span>
-                    <span className="text-[10px] text-gray-700 dark:text-gray-800 leading-tight">
-                      {hoveredAppointment.appointment.serviceNames.join(", ")}
-                    </span>
-                  </div>
-                ) : hoveredAppointment.appointment.serviceName && (
-                  <div className="flex items-center gap-1">
-                    <span className="text-[9px] text-gray-700 dark:text-gray-800 font-medium w-12 flex-shrink-0">Service:</span>
-                    <span className="text-[10px] text-gray-700 dark:text-gray-800 truncate">{hoveredAppointment.appointment.serviceName}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Follow Type */}
-              {hoveredAppointment.appointment.followType && (
-                <div className="pt-0.5 border-t border-gray-100 dark:border-gray-300">
-                  <div className="flex items-center gap-1">
-                    <span className="text-[9px] text-gray-700 dark:text-gray-800 font-medium w-12 flex-shrink-0">Follow:</span>
-                    <span className="text-[10px] text-gray-700 dark:text-gray-800">{hoveredAppointment.appointment.followType}</span>
-                  </div>
-                </div>
-              )}
-
-              {/* Referral */}
-              {hoveredAppointment.appointment.referral && (
-                <div className="pt-0.5 border-t border-gray-100 dark:border-gray-300">
-                  <div className="flex items-start gap-1">
-                    <span className="text-[9px] text-gray-700 dark:text-gray-800 font-medium w-12 flex-shrink-0">Ref:</span>
-                    <span className="text-[10px] text-gray-700 dark:text-gray-800">{hoveredAppointment.appointment.referral}</span>
-                  </div>
-                </div>
-              )}
-
-              {/* Emergency */}
-              {hoveredAppointment.appointment.emergency && (
-                <div className="pt-0.5 border-t border-gray-100 dark:border-gray-300">
-                  <div className="flex items-start gap-1">
-                    <span className="text-[9px] text-gray-700 dark:text-gray-800 font-medium w-12 flex-shrink-0">Emer:</span>
-                    <span className="text-[10px] text-red-600 dark:text-red-400 font-semibold">{hoveredAppointment.appointment.emergency}</span>
-                  </div>
-                </div>
-              )}
-
-              {/* Notes */}
-              {hoveredAppointment.appointment.notes && (
-                <div className="pt-0.5 border-t border-gray-100 dark:border-gray-300">
-                  <p className="text-[9px] font-semibold text-gray-700 dark:text-gray-800 uppercase mb-0.5">Notes</p>
-                  <p className="text-[10px] text-gray-700 dark:text-gray-800 leading-tight">{hoveredAppointment.appointment.notes}</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
-   
-    {/* Toast Notification Container */}
-    <Toaster
-      position="top-right"
-      containerStyle={{
-        zIndex: 10000,
-      }}
-      toastOptions={{
-        duration: 3000,
-        success: {
-          style: {
-            background: '#10B981',
-            color: '#fff',
-            fontWeight: '600',
-          },
-          iconTheme: {
-            primary: '#fff',
-            secondary: '#10B981',
-          },
-        },
-        error: {
-          style: {
-            background: '#EF4444',
-            color: '#fff',
-            fontWeight: '600',
-          },
-        },
-      }}
-    />
-  </div>
   );
 }
 
@@ -4350,7 +5659,8 @@ AppointmentPage.getLayout = function PageLayout(page: React.ReactNode) {
 
 export const AppointmentPageBase = AppointmentPage;
 
-const ProtectedAppointmentPage: NextPageWithLayout = withClinicAuth(AppointmentPage);
+const ProtectedAppointmentPage: NextPageWithLayout =
+  withClinicAuth(AppointmentPage);
 ProtectedAppointmentPage.getLayout = AppointmentPage.getLayout;
 
 export default ProtectedAppointmentPage;
