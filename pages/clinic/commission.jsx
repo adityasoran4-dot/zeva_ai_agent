@@ -39,6 +39,23 @@ function ClinicCommissionPage() {
   const [addExpenseRow, setAddExpenseRow] = useState(null); // commissionId or null
   const [newExpenses, setNewExpenses] = useState([{ name: "", price: "" }]);
   const [addExpenseLoading, setAddExpenseLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Filter main items by search query
+  const filteredMainItems = items.filter(row => {
+    if (!searchQuery) return true;
+    const nameLower = (row.name || "").toLowerCase();
+    return nameLower.includes(searchQuery.toLowerCase());
+  });
+
+  // Filter modal items by search query
+  const filteredModalItems = modalItems.filter(item => {
+    if (!searchQuery) return true;
+    const patientName = (item.patientName || "").toLowerCase();
+    const doctorName = (item.doctorName || "").toLowerCase();
+    const queryLower = searchQuery.toLowerCase();
+    return patientName.includes(queryLower) || doctorName.includes(queryLower);
+  });
 
   const showToast = useCallback((message, type = "success") => {
     setToast({ message, type });
@@ -355,39 +372,63 @@ function ClinicCommissionPage() {
               <h2 className="text-lg sm:text-xl font-bold text-teal-900">Commission Tracker</h2>
               <p className="text-xs sm:text-sm text-teal-600">Referral and doctor/staff commissions</p>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-md transition-all ${source === "referral" ? "bg-teal-600 text-white shadow-sm hover:bg-teal-700" : "bg-white text-teal-700 border border-gray-300 hover:bg-teal-50"}`}
-                onClick={() => {
-                  if (source !== "referral") {
-                    setSource("referral");
-                  }
-                }}
-              >
-                Referral
-              </button>
-              <button
-                className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-md transition-all ${source === "staff" ? "bg-teal-600 text-white shadow-sm hover:bg-teal-700" : "bg-white text-teal-700 border border-gray-300 hover:bg-teal-50"}`}
-                onClick={() => {
-                  if (source !== "staff") {
-                    setSource("staff");
-                  }
-                }}
-              >
-                Doctor/Staff
-              </button>
-              <button 
-                className="flex-1 sm:flex-none px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-md border border-gray-300 text-teal-700 hover:bg-teal-50 transition-all whitespace-nowrap"
-                onClick={load}
-              >
-                Refresh
-              </button>
+          </div>
+
+          <div className="bg-gray-50 rounded-lg p-3 sm:p-4 mb-4 border border-gray-200">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+              <div className="flex-1 flex flex-col gap-1">
+                <label className="text-xs font-medium text-gray-600">Doctor/Staff Name</label>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search by name..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                />
+              </div>
+              <div className="flex gap-2">
+                <button 
+                  className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-md border border-gray-300 text-teal-700 hover:bg-teal-50 transition-all whitespace-nowrap"
+                  onClick={() => setSearchQuery("")}
+                >
+                  Clear Filter
+                </button>
+                <button 
+                  className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-md border border-gray-300 text-teal-700 hover:bg-teal-50 transition-all whitespace-nowrap"
+                  onClick={load}
+                >
+                  Refresh
+                </button>
+              </div>
             </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 mb-4">
+            <button
+              className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-md transition-all ${source === "referral" ? "bg-teal-600 text-white shadow-sm hover:bg-teal-700" : "bg-white text-teal-700 border border-gray-300 hover:bg-teal-50"}`}
+              onClick={() => {
+                if (source !== "referral") {
+                  setSource("referral");
+                }
+              }}
+            >
+              Referral
+            </button>
+            <button
+              className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-md transition-all ${source === "staff" ? "bg-teal-600 text-white shadow-sm hover:bg-teal-700" : "bg-white text-teal-700 border border-gray-300 hover:bg-teal-50"}`}
+              onClick={() => {
+                if (source !== "staff") {
+                  setSource("staff");
+                }
+              }}
+            >
+              Doctor/Staff
+            </button>
           </div>
 
           {loading ? (
             <div className="text-sm text-teal-600">Loading...</div>
-          ) : items.length === 0 ? (
+          ) : filteredMainItems.length === 0 ? (
             <div className="text-sm text-teal-600">No commissions found</div>
           ) : (
             <div className="overflow-x-auto -mx-4 sm:mx-0">
@@ -404,7 +445,7 @@ function ClinicCommissionPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {items.map((row) => (
+                  {filteredMainItems.map((row) => (
                     <tr key={`${row.source}-${row.personId}`} className="border-t border-gray-200 hover:bg-gray-50">
                       <td className="px-2 sm:px-4 py-3 whitespace-nowrap">{row.name || "—"}</td>
                       <td className="px-2 sm:px-4 py-3 whitespace-nowrap">{row.source === "referral" ? "Referral" : "Doctor/Staff"}</td>
@@ -477,7 +518,7 @@ function ClinicCommissionPage() {
                       <span className="text-teal-700 font-medium">Loading history...</span>
                     </div>
                   </div>
-                ) : modalItems.length === 0 ? (
+                ) : filteredModalItems.length === 0 ? (
                   <div className="text-center py-6">
                     <div className="text-teal-600">No records found</div>
                   </div>
@@ -487,9 +528,11 @@ function ClinicCommissionPage() {
                       <thead className="bg-gray-50 sticky top-0">
                         <tr>
                           <th className="px-2 sm:px-4 py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Patient</th>
-                          <th className="px-2 sm:px-4 py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Mobile</th>
+                          <th className="px-2 sm:px-4 py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">EMR</th>
                           <th className="px-2 sm:px-4 py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Invoice</th>
                           <th className="px-2 sm:px-4 py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Paid</th>
+                          <th className="px-2 sm:px-4 py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Bank Deduction</th>
+                          <th className="px-2 sm:px-4 py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Payment Details</th>
                           <th className="px-2 sm:px-4 py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Earned</th>
                           <th className="px-2 sm:px-4 py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Commission</th>
                           <th className="px-2 sm:px-4 py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Doctor</th>
@@ -498,13 +541,38 @@ function ClinicCommissionPage() {
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
-                        {modalItems.map((it) => (
+                        {filteredModalItems.map((it) => (
                           <React.Fragment key={it.commissionId}>
                             <tr className="hover:bg-gray-50">
                               <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">{it.patientName || "—"}</td>
-                              <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">{it.patientMobile || "—"}</td>
+                              <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">{it.patientEmr || "—"}</td>
                               <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">{it.invoiceNumber || "—"}</td>
                               <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">{getCurrencySymbol(currency)} {Number(it.paidAmount || 0).toFixed(2)}</td>
+                              <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+                                {it.bankDeduction?.deductionAmount ? (
+                                  `${getCurrencySymbol(currency)} ${Number(it.bankDeduction.deductionAmount).toFixed(2)}`
+                                ) : "—"}
+                              </td>
+                              <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+                                {it.paymentMethod === "Cash" ? (
+                                  <span className="text-gray-700 text-[9px]">Cash</span>
+                                ) : it.paymentMethod && it.bankDeduction?.enabled ? (
+                                  <div className="flex flex-col gap-0.5 text-[9px]">
+                                    <span className="font-medium text-gray-700">{it.paymentMethod}</span>
+                                    <span className="text-gray-600">
+                                      {it.bankDeduction.type === "flat" ? (
+                                        `${getCurrencySymbol(currency)} ${Number(it.bankDeduction.value).toFixed(2)}`
+                                      ) : (
+                                        `${Number(it.bankDeduction.value).toFixed(0)}%`
+                                      )}
+                                      {" • "}
+                                      Apply on: {it.bankDeduction.applyOn}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <span className="text-gray-400 text-[9px]">—</span>
+                                )}
+                              </td>
                               <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
                                 {Number((it.finalCommissionAmount ?? it.commissionAmount) || 0) > 0
                                   ? `${getCurrencySymbol(currency)} ${Number((it.finalCommissionAmount ?? it.commissionAmount) || 0).toFixed(2)}`
@@ -547,7 +615,7 @@ function ClinicCommissionPage() {
                             </tr>
                             {expandedRow === it.commissionId && (
                               <tr className="bg-gray-50/60">
-                                <td colSpan={9} className="px-2 sm:px-4 py-2 sm:py-3">
+                                <td colSpan={11} className="px-2 sm:px-4 py-2 sm:py-3">
                                   <div className="rounded-lg border border-gray-200 bg-white p-2 sm:p-3 shadow-sm overflow-x-auto">
                                     <div className="flex flex-col sm:flex-row items-start justify-between gap-2 mb-2">
                                       <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">

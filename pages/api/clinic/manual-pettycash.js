@@ -95,23 +95,36 @@ export default async function handler(req, res) {
 
       // Total sum across filtered records
       const manualTotalSum = manualSummary.length > 0 ? manualSummary[0].total : 0;
-      
-      // Collect and filter expenses from PettyCash model
+
+      // GRAND totals (unfiltered by date — for Total Cash In card)
+      // Grand manual total: sum of ALL manual entries (no date filter)
+      const grandManualAgg = await ManualPettyCash.aggregate([
+        { $match: { ...baseFilter } },
+        { $group: { _id: null, total: { $sum: "$amount" } } }
+      ]);
+      const grandManualTotal = grandManualAgg.length > 0 ? grandManualAgg[0].total : 0;
+
+      // Grand expense total: read from global PettyCash record's globalSpentAmount
+      // (updated by add-expense.js via updateGlobalSpentAmount static method)
+      const globalPettyCash = await PettyCash.findOne({ clinicId: new mongoose.Types.ObjectId(String(clinicId)), staffId: null }).select("globalSpentAmount").lean();
+      const grandExpenseTotal = globalPettyCash?.globalSpentAmount || 0;
+
+      // FILTERED expense total (date-filtered, for the dashboard cards)
       let calculatedExpenseTotal = 0;
       const expensesRaw = [];
-      
+
       pettyCashRecords.forEach(record => {
         if (record.expenses) {
           record.expenses.forEach(exp => {
             const expDate = new Date(exp.date || exp.createdAt);
-            
+
             if (startDate) {
-              const s = new Date(startDate); 
+              const s = new Date(startDate);
               s.setUTCHours(0, 0, 0, 0);
               if (expDate < s) return;
             }
             if (endDate) {
-              const e = new Date(endDate); 
+              const e = new Date(endDate);
               e.setUTCHours(23, 59, 59, 999);
               if (expDate > e) return;
             }
@@ -141,8 +154,10 @@ export default async function handler(req, res) {
           usedFromPettyCash: e.usedFromPettyCash,
         })),
         total,
-        totalAmount: manualTotalSum, // Filtered sum
-        expenseTotal: calculatedExpenseTotal, // Filtered expense total
+        totalAmount: manualTotalSum,
+        expenseTotal: calculatedExpenseTotal,
+        grandManualTotal,
+        grandExpenseTotal,
         pettyCashGlobal: {
           ...pettyCashGlobal,
           globalSpentAmount: calculatedExpenseTotal, // Override with filtered total for the dashboard

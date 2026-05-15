@@ -531,6 +531,15 @@ export default async function handler(req, res) {
         }
       }
 
+      // Parse bankDetails from JSON string (FormData) or keep as object (JSON body)
+      if (typeof updateData.bankDetails === 'string') {
+        try {
+          updateData.bankDetails = JSON.parse(updateData.bankDetails);
+        } catch {
+          delete updateData.bankDetails;
+        }
+      }
+
       if (typeof updateData.location === "string") {
         try {
           updateData.location = JSON.parse(updateData.location);

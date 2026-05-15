@@ -4,10 +4,17 @@ const multiplePaymentSchema = new mongoose.Schema(
   {
     paymentMethod: {
       type: String,
-      enum: ["Cash", "Card", "BT", "Tabby", "Tamara"],
+      enum: ["Cash", "Card", "BT", "Tabby", "Tamara", "Advance Balance", "Insurance Claim", "Pending Claim", "Cashback Wallet"],
       required: true,
     },
     amount: { type: Number, required: true, min: 0 },
+    paidAt: { type: Date },
+    paidBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    transactionType: {
+      type: String,
+      enum: ["PAYMENT", "ADVANCE_USAGE", "CLAIM_USAGE", "PENDING_CLEARANCE", "CASHBACK_USAGE"]
+    },
+    notes: { type: String }
   },
   { _id: false },
 );
@@ -20,14 +27,23 @@ const paymentHistorySchema = new mongoose.Schema(
     paymentMethod: {
       type: String,
       enum: ["Cash", "Card", "BT", "Tabby", "Tamara"],
-      required: true,
     },
     multiplePayments: [multiplePaymentSchema],
     status: {
       type: String,
-      enum: ["Active", "Cancelled", "Completed", "Rejected", "Released"],
+      enum: ["Active", "Cancelled", "Completed", "Rejected", "Released", "Partial"],
     },
     updatedAt: { type: Date, default: Date.now },
+    // Enterprise-grade audit trail fields
+    transactionType: {
+      type: String,
+      enum: ["PAYMENT", "PENDING_CLEARANCE", "REGULAR_PAYMENT", "ADVANCE_USAGE", "CLAIM_USAGE", "FULL_PAYMENT", "PARTIAL_PAYMENT"]
+    },
+    amountPaid: { type: Number, default: 0 },
+    advanceAmountUsed: { type: Number, default: 0 },
+    paidBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    paidByName: { type: String },
+    remainingPending: { type: Number, default: 0 }
   },
   { _id: false },
 );
@@ -430,16 +446,28 @@ billingSchema.pre("save", function (next) {
   if (this.claimAmountUsed < 0) this.claimAmountUsed = 0;
   if (this.pendingUsed < 0) this.pendingUsed = 0;
 
-  // If multiplePayments are present, sum them as total paid
-  if (this.multiplePayments && this.multiplePayments.length > 0) {
-    this.paid = this.multiplePayments.reduce(
-      (sum, mp) => sum + Number(mp.amount || 0),
-      0,
-    );
+  // Check if pending was directly modified, if so skip calculation
+  // This allows explicit pending updates from APIs like pay-invoice-pending
+  if (this.isModified('pending')) {
+    // Only recalculate advance based on paid and pendingUsed
+    const totalCreditsUsed = this.advanceUsed + this.claimAmountUsed;
+    const effectiveDue = Math.max(0, this.amount - totalCreditsUsed);
+    // New advance generated if paid exceeds effective due (minus pending cleared)
+    this.advance = Math.max(0, this.paid - effectiveDue - this.pendingUsed);
+    return next();
   }
 
-  // Check if pending was directly modified, if so skip calculation
-  if (this.isModified('pending')) {
+  // For new documents (isNew), use the provided pending value if it's a partial payment
+  // This prevents recalculation when creating billing records with explicit pending amounts
+  if (this.isNew) {
+    // For partial payments, the pending was already set correctly
+    // We still need to ensure paid, advanceUsed, etc. are properly reflected
+    const totalCreditsUsed = this.advanceUsed + this.claimAmountUsed;
+    const effectiveDue = Math.max(0, this.amount - totalCreditsUsed);
+    // Only recalculate pending if it wasn't explicitly set (i.e., equals effectiveDue - paid)
+    // For package billing with partial payment, pending is already set correctly
+    // Calculate advance: new advance generated if paid exceeds effective due
+    this.advance = Math.max(0, this.paid - effectiveDue);
     return next();
   }
 

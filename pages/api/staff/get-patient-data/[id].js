@@ -242,6 +242,8 @@ export default async function handler(req, res) {
           } else {
             invoice.packages = packagesArray.map((p) => ({
               packageId: p.packageId,
+              packageName: p.packageName,
+              packageSoldBy: p.packageSoldBy || user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Unknown',
               assignedDate: p.assignedDate ? new Date(p.assignedDate) : undefined,
               validityInMonths: p.validityInMonths || 0,
               startDate: p.startDate ? new Date(p.startDate) : undefined,

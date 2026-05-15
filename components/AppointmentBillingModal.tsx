@@ -3566,7 +3566,9 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
         return;
       }
 
-      if (selectedService === "Treatment" && selectedTreatments.length === 0) {
+      const hasPendingAmount = balances.pendingBalance > 0 || balances.pendingClaim > 0 || unpaidPackagesTotal > 0;
+
+      if (selectedService === "Treatment" && selectedTreatments.length === 0 && !hasPendingAmount) {
         setErrors({
           general: "Please select at least one treatment",
           treatment: "Select at least one treatment",
@@ -3575,7 +3577,7 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
         return;
       }
 
-      if (selectedService === "Package" && !selectedPackage) {
+      if (selectedService === "Package" && !selectedPackage && !hasPendingAmount) {
         setErrors({
           general: "Please select a package",
           package: "Select a package",
@@ -3584,7 +3586,7 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
         return;
       }
 
-      if (selectedService === "Package" && selectedPackage) {
+      if (selectedService === "Package" && selectedPackage && !hasPendingAmount) {
         // Check if at least one treatment is selected
         const hasSelectedTreatment = packageTreatmentSessions.some(
           (t) => t.isSelected,
@@ -3817,7 +3819,7 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
         originalAmount: baseAmount,
       };
 
-      if (selectedService === "Treatment") {
+      if (selectedService === "Treatment" && selectedTreatments.length > 0) {
         // For treatment, send all selected treatments with their quantities
         const totalQuantity = selectedTreatments.reduce(
           (sum, t) => sum + t.quantity,
@@ -3827,7 +3829,7 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
           .map((t) => t.treatmentName)
           .join(", ");
         payload.quantity = totalQuantity;
-      } else {
+      } else if (selectedService === "Package" && selectedPackage) {
         // For package, only send selected treatments and their sessions
         const selectedTreatmentsFromPackage = packageTreatmentSessions.filter(
           (t) => t.isSelected,
@@ -3857,6 +3859,10 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
             isUserPackage: true
           });
         }
+      } else {
+        // If there's a pending amount but no treatment/package selected,
+        // still allow the billing - it will just be for the pending amount
+        // No need to set treatment/package fields, the backend handles it
       }
 
       // Track unpaid packages being paid in this billing
@@ -5997,10 +6003,34 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
                               billingHistory: []
                             };
 
+                            // Calculate correct payment status from billing history (including advance balance)
+                            // This ensures packages paid entirely with advance balance show as "Full Paid"
+                            const packageBillings = (billingHistory || []).filter(
+                              (b: any) => b.service === "Package" && b.package === packageName
+                            );
+                            const totalCashPaidFromBillings = packageBillings.reduce(
+                              (sum: number, b: any) => sum + (Number(b.paid) || 0), 0
+                            );
+                            const totalAdvanceUsedFromBillings = packageBillings.reduce(
+                              (sum: number, b: any) => sum + (Number(b.advanceUsed) || 0), 0
+                            );
+                            const totalPaidFromBillings = totalCashPaidFromBillings + totalAdvanceUsedFromBillings;
+                            const packagePrice = packageDef?.totalPrice || pkg.totalPrice || 0;
+                            
+                            // Determine correct payment status based on total paid (cash + advance)
+                            let calculatedPaymentStatus = pkg.paymentStatus || 'Unpaid';
+                            if (packagePrice > 0 && totalPaidFromBillings >= packagePrice) {
+                              calculatedPaymentStatus = 'Full';
+                            } else if (totalPaidFromBillings > 0) {
+                              calculatedPaymentStatus = 'Partial';
+                            }
+                            
                             const isExpired = pkg.endDate && new Date(pkg.endDate) < new Date();
-                            const paymentStatus = pkg.paymentStatus || 'Unpaid';
-                            const paidAmount = pkg.paidAmount || 0;
-                            const isUnpaid = paymentStatus === 'Unpaid' || paidAmount === 0;
+                            const paymentStatus = calculatedPaymentStatus; // Use calculated status
+                            // const paidAmount = totalCashPaidFromBillings || pkg.paidAmount || 0;
+                            const advanceUsed = totalAdvanceUsedFromBillings;
+                            const totalPaid = totalPaidFromBillings;
+                            const isUnpaid = paymentStatus === 'Unpaid' || totalPaid === 0;
 
                             return (
                               <div key={`${pkg.packageId || pkg._id}-${pkgIndex}`} className={`border ${isExpired ? 'border-red-200 bg-red-50' : 'border-teal-200 bg-gradient-to-br from-teal-50 to-cyan-50'} rounded-xl overflow-hidden relative shadow-sm`}>
@@ -6024,10 +6054,13 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
                                           <span className="px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 text-[7px] font-black uppercase tracking-tighter shadow-sm">Full Paid</span>
                                         )}
                                         {!isExpired && paymentStatus === 'Partial' && (
-                                          <span className="px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[7px] font-black uppercase tracking-tighter shadow-sm">Partial (₹{paidAmount})</span>
+                                          <span className="px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[7px] font-black uppercase tracking-tighter shadow-sm">Partial (₹{totalPaid.toFixed(0)})</span>
                                         )}
                                         {!isExpired && isUnpaid && (
                                           <span className="px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 text-[7px] font-black uppercase tracking-tighter shadow-sm">Unpaid</span>
+                                        )}
+                                        {!isExpired && advanceUsed > 0 && (
+                                          <span className="px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[7px] font-black uppercase tracking-tighter shadow-sm">Advance Used</span>
                                         )}
                                       </div>
                                       <div className="text-[8px] text-gray-500 flex items-center gap-2">
@@ -6146,6 +6179,7 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
                         ))}
                         {last3Billings.length > 0 && (
                           <button
+                            type="button"
                             onClick={() => {
                               const router = window.location.href.includes('/clinic/')
                                 ? (window as any).router || { push: (url: string) => window.location.href = url }

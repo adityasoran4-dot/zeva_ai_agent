@@ -95,6 +95,33 @@ const ClinicSchema = new mongoose.Schema(
     currency: { type: String, default: "INR" },
     // Trial registration timestamp (for new users only, introduced after 30-day trial removal)
     registeredAt: { type: Date, default: null },
+    // Bank details for payment methods
+    bankDetails: {
+      bankTransfer: {
+        enabled: { type: Boolean, default: false },
+        type: { type: String, enum: ['flat', 'percentage'], default: 'flat' },
+        value: { type: Number, default: 0 },
+        applyOn: { type: String, enum: ['earned', 'paid'], default: 'earned' }
+      },
+      tabby: {
+        enabled: { type: Boolean, default: false },
+        type: { type: String, enum: ['flat', 'percentage'], default: 'flat' },
+        value: { type: Number, default: 0 },
+        applyOn: { type: String, enum: ['earned', 'paid'], default: 'earned' }
+      },
+      card: {
+        enabled: { type: Boolean, default: false },
+        type: { type: String, enum: ['flat', 'percentage'], default: 'flat' },
+        value: { type: Number, default: 0 },
+        applyOn: { type: String, enum: ['earned', 'paid'], default: 'earned' }
+      },
+      tamara: {
+        enabled: { type: Boolean, default: false },
+        type: { type: String, enum: ['flat', 'percentage'], default: 'flat' },
+        value: { type: Number, default: 0 },
+        applyOn: { type: String, enum: ['earned', 'paid'], default: 'earned' }
+      }
+    },
   },
   { timestamps: true }
 );

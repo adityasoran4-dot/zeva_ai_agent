@@ -26,12 +26,21 @@ export default async function handler(req, res) {
       return res.status(400).json({ success: false, message: "Billing ID is required" });
     }
 
-    const { amount, paymentMethod, notes } = req.body;
-    if (!amount || isNaN(amount) || Number(amount) <= 0) {
+    const { amount, paymentMethod, notes, advanceBalanceUsed } = req.body;
+    const advanceUsed = Number(advanceBalanceUsed || 0);
+    const totalPayment = Number(amount || 0) + advanceUsed;
+    
+    // Allow amount to be 0 if advance balance covers the full payment
+    if (isNaN(amount) || Number(amount) < 0) {
       return res.status(400).json({ success: false, message: "Valid amount is required" });
     }
     if (!paymentMethod) {
       return res.status(400).json({ success: false, message: "Payment method is required" });
+    }
+    
+    // Validate that total payment (cash + advance) is greater than 0
+    if (totalPayment <= 0) {
+      return res.status(400).json({ success: false, message: "Total payment amount must be greater than 0" });
     }
 
     // Find the billing record
@@ -64,45 +73,84 @@ export default async function handler(req, res) {
 
     // Check if payment amount exceeds pending
     const currentPending = Number(billing.pending || 0);
-    if (Number(amount) > currentPending) {
+    
+    if (totalPayment > currentPending) {
       return res.status(400).json({ 
         success: false, 
         message: `Payment amount exceeds pending amount. Current pending: ${currentPending}` 
       });
     }
 
-    // Update the billing record - directly set pending to avoid multiplePayments overriding paid
+    // Calculate new values for billing record
+    // paid tracks total cash/card paid (not including advance balance)
     const newPaid = Number(billing.paid || 0) + Number(amount);
-    const newPending = Math.max(0, currentPending - Number(amount));
+    const newAdvanceUsed = Number(billing.advanceUsed || 0) + advanceUsed;
+    const newPending = Math.max(0, currentPending - totalPayment);
 
-    // Create payment history entry
+    // Determine if this is a pending clearance or regular payment
+    // pendingUsed tracks payments towards pending amounts (for accounting)
+    const isPendingClearance = Number(amount) >= currentPending || totalPayment >= currentPending;
+    const pendingAmountUsed = isPendingClearance ? currentPending : Number(amount);
+    const newPendingUsed = Number(billing.pendingUsed || 0) + pendingAmountUsed;
+
+    // Create payment history entry (for UI display - derived state)
     const paymentHistoryEntry = {
       amount: Number(billing.amount || 0),
       paid: newPaid,
-      pending: newPending, // Show remaining pending
+      pending: newPending,
       paymentMethod: paymentMethod,
-      status: "Completed",
+      status: newPending === 0 ? "Completed" : "Partial",
       updatedAt: new Date(),
+      transactionType: isPendingClearance ? "PENDING_CLEARANCE" : "REGULAR_PAYMENT",
+      amountPaid: Number(amount),
+      advanceAmountUsed: advanceUsed,
+      paidBy: clinicUser._id,
+      paidByName: clinicUser.name || "Staff",
+      remainingPending: newPending,
+      multiplePayments: advanceUsed > 0 ? [
+        { paymentMethod: paymentMethod, amount: Number(amount), transactionType: "PAYMENT" },
+        { paymentMethod: "Advance Balance", amount: advanceUsed, transactionType: "ADVANCE_USAGE" }
+      ] : [{ paymentMethod: paymentMethod, amount: Number(amount), transactionType: "PAYMENT" }]
     };
 
-    // Update the billing record - directly set pending so pre-save hook doesn't recalculate
+    // Update the billing record - main fields are derived totals
     billing.paid = newPaid;
-    billing.pending = newPending; // Directly set pending to our calculated value
+    billing.advanceUsed = newAdvanceUsed;
+    billing.pending = newPending;
+    billing.pendingUsed = newPendingUsed;
     
-    // Add to payment history
+    // Add to paymentHistory (UI audit trail)
     if (!billing.paymentHistory) {
       billing.paymentHistory = [];
     }
     billing.paymentHistory.push(paymentHistoryEntry);
 
-    // Update multiplePayments if exists
+    // Update multiplePayments (enterprise ledger)
     if (!billing.multiplePayments) {
       billing.multiplePayments = [];
     }
-    billing.multiplePayments.push({
-      paymentMethod: paymentMethod,
-      amount: Number(amount),
-    });
+    
+    // Add cash/card payment
+    if (Number(amount) > 0) {
+      billing.multiplePayments.push({
+        paymentMethod: paymentMethod,
+        amount: Number(amount),
+        paidAt: new Date(),
+        paidBy: clinicUser._id,
+        transactionType: "PAYMENT"
+      });
+    }
+    
+    // Add advance balance usage if any
+    if (advanceUsed > 0) {
+      billing.multiplePayments.push({
+        paymentMethod: "Advance Balance",
+        amount: advanceUsed,
+        paidAt: new Date(),
+        paidBy: clinicUser._id,
+        transactionType: "ADVANCE_USAGE"
+      });
+    }
 
     // Update notes if provided
     if (notes) {

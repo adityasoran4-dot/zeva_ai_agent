@@ -33,6 +33,7 @@ export default async function handler(req, res) {
       endDate,
       page = "1",
       limit = "50",
+      skipDateFilter = "false",
     } = req.query;
 
     const pageNum = Math.max(1, parseInt(page, 10));
@@ -73,17 +74,20 @@ export default async function handler(req, res) {
       ? { clinicId: new mongoose.Types.ObjectId(String(clinicId)) }
       : {};
 
-    // Date filter
+    // Date filter — skip when fetching grand total
     const dateFilter = {};
-    if (startDate) {
-      const start = new Date(startDate);
-      start.setHours(0, 0, 0, 0);
-      dateFilter.$gte = start;
-    }
-    if (endDate) {
-      const end = new Date(endDate);
-      end.setHours(23, 59, 59, 999);
-      dateFilter.$lte = end;
+    const applyDateFilter = skipDateFilter !== "true";
+    if (applyDateFilter) {
+      if (startDate) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        dateFilter.$gte = start;
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        dateFilter.$lte = end;
+      }
     }
     const dateMatch =
       Object.keys(dateFilter).length > 0 ? { invoicedDate: dateFilter } : {};

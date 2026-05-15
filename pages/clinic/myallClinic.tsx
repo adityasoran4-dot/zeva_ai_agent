@@ -113,7 +113,7 @@ function ClinicManagementDashboard(): ReactElement {
   const [customAdded, setCustomAdded] = useState(false);
   const [activeTab, setActiveTab] = useState<
     'General Info' | 'Contact' | 'Documents' | 'Listing' | 'Clinic Timing' |
-    'Branches' 
+    'Branches' | 'Banks'
   >('General Info');
   const [contactForm, setContactForm] = useState({ phone: '', whatsapp: '', email: '', website: '' });
   const [listingVisibility, setListingVisibility] = useState({
@@ -226,6 +226,17 @@ function ClinicManagementDashboard(): ReactElement {
   const [offers, setOffers] = useState<Array<{ _id?: string; title: string; type: "percentage" | "fixed" | "free Consult"; value: number; currency?: string; startsAt: string; endsAt: string; enabled?: boolean; treatments?: Array<{ name: string }> }>>([]);
   const [offersLoading] = useState(false);
   const [clinicCurrency, setClinicCurrency] = useState<string>("INR");
+  const [bankDetails, setBankDetails] = useState<{
+    bankTransfer: { enabled: boolean; type: 'flat' | 'percentage'; value: number; applyOn: 'earned' | 'paid' };
+    tabby: { enabled: boolean; type: 'flat' | 'percentage'; value: number; applyOn: 'earned' | 'paid' };
+    card: { enabled: boolean; type: 'flat' | 'percentage'; value: number; applyOn: 'earned' | 'paid' };
+    tamara: { enabled: boolean; type: 'flat' | 'percentage'; value: number; applyOn: 'earned' | 'paid' };
+  }>({
+    bankTransfer: { enabled: false, type: 'flat', value: 0, applyOn: 'earned' },
+    tabby: { enabled: false, type: 'flat', value: 0, applyOn: 'earned' },
+    card: { enabled: false, type: 'flat', value: 0, applyOn: 'earned' },
+    tamara: { enabled: false, type: 'flat', value: 0, applyOn: 'earned' }
+  });
 
   // Fetch clinics
   useEffect(() => {
@@ -341,6 +352,15 @@ function ClinicManagementDashboard(): ReactElement {
       setClinicCurrency((c as any).currency);
       setGlobalCurrency((c as any).currency);
     }
+    // Load saved bank details from DB
+    if ((c as any).bankDetails) {
+      setBankDetails({
+        bankTransfer: (c as any).bankDetails?.bankTransfer || { enabled: false, type: 'flat', value: 0, applyOn: 'earned' },
+        tabby: (c as any).bankDetails?.tabby || { enabled: false, type: 'flat', value: 0, applyOn: 'earned' },
+        card: (c as any).bankDetails?.card || { enabled: false, type: 'flat', value: 0, applyOn: 'earned' },
+        tamara: (c as any).bankDetails?.tamara || { enabled: false, type: 'flat', value: 0, applyOn: 'earned' }
+      });
+    }
     if (!stateSnapshot) {
       setStateSnapshot({
         editForm: { ...c },
@@ -363,6 +383,12 @@ function ClinicManagementDashboard(): ReactElement {
         logoPreview,
         coverPreview,
         integrations,
+        bankDetails: {
+          bankTransfer: (c as any).bankDetails?.bankTransfer || { enabled: false, type: 'flat', value: 0, applyOn: 'earned' },
+          tabby: (c as any).bankDetails?.tabby || { enabled: false, type: 'flat', value: 0, applyOn: 'earned' },
+          card: (c as any).bankDetails?.card || { enabled: false, type: 'flat', value: 0, applyOn: 'earned' },
+          tamara: (c as any).bankDetails?.tamara || { enabled: false, type: 'flat', value: 0, applyOn: 'earned' }
+        }
       });
     }
     setBranches(prev => {
@@ -429,6 +455,7 @@ function ClinicManagementDashboard(): ReactElement {
       logoPreview,
       coverPreview,
       integrations,
+      bankDetails,
     };
     const saved = {
       editForm: stateSnapshot.editForm,
@@ -442,6 +469,7 @@ function ClinicManagementDashboard(): ReactElement {
       logoPreview: stateSnapshot.logoPreview,
       coverPreview: stateSnapshot.coverPreview,
       integrations: stateSnapshot.integrations,
+      bankDetails: stateSnapshot.bankDetails,
     };
     try {
       return JSON.stringify(current) !== JSON.stringify(saved);
@@ -460,6 +488,7 @@ function ClinicManagementDashboard(): ReactElement {
     logoPreview,
     coverPreview,
     integrations,
+    bankDetails,
     stateSnapshot,
   ]);
   useEffect(() => {
@@ -639,6 +668,7 @@ function ClinicManagementDashboard(): ReactElement {
         logoPreview,
         coverPreview,
         integrations,
+        bankDetails,
       });
     }, 0);
   };
@@ -658,6 +688,7 @@ function ClinicManagementDashboard(): ReactElement {
       setIntegrations(stateSnapshot.integrations || integrations);
       setBrandPrimary(stateSnapshot.brandPrimary || brandPrimary);
       setBrandSecondary(stateSnapshot.brandSecondary || brandSecondary);
+      setBankDetails(stateSnapshot.bankDetails || bankDetails);
     }
     setSelectedFiles([]);
     setNewDocName("");
@@ -769,6 +800,7 @@ function ClinicManagementDashboard(): ReactElement {
         form.append("timings", JSON.stringify(buildTimingsPayload()));
         form.append("listingVisibility", JSON.stringify(listingVisibility));
         form.append("currency", clinicCurrency);
+        form.append("bankDetails", JSON.stringify(bankDetails));
         if (editForm.servicesName)
           form.append("servicesName", JSON.stringify(editForm.servicesName));
         if (editForm.treatments)
@@ -804,6 +836,7 @@ function ClinicManagementDashboard(): ReactElement {
             if (editForm.pricing) retryForm.append("pricing", editForm.pricing.trim());
             retryForm.append("timings", JSON.stringify(buildTimingsPayload()));
             retryForm.append("listingVisibility", JSON.stringify(listingVisibility));
+            retryForm.append("bankDetails", JSON.stringify(bankDetails));
             if (editForm.servicesName)
               retryForm.append("servicesName", JSON.stringify(editForm.servicesName));
             if (editForm.treatments)
@@ -853,6 +886,7 @@ function ClinicManagementDashboard(): ReactElement {
           timings: buildTimingsPayload(),
           listingVisibility,
           currency: clinicCurrency,
+          bankDetails,
           ...(editForm.servicesName && { servicesName: editForm.servicesName }),
           ...(editForm.treatments && { treatments: editForm.treatments }),
           existingPhotos,
@@ -937,6 +971,15 @@ function ClinicManagementDashboard(): ReactElement {
         }
         if (clinicObj) {
           setEditForm({ ...clinicObj });
+          // Update bankDetails from fetched clinic
+          if ((clinicObj as any).bankDetails) {
+            setBankDetails({
+              bankTransfer: (clinicObj as any).bankDetails?.bankTransfer || { enabled: false, type: 'flat', value: 0, applyOn: 'earned' },
+              tabby: (clinicObj as any).bankDetails?.tabby || { enabled: false, type: 'flat', value: 0, applyOn: 'earned' },
+              card: (clinicObj as any).bankDetails?.card || { enabled: false, type: 'flat', value: 0, applyOn: 'earned' },
+              tamara: (clinicObj as any).bankDetails?.tamara || { enabled: false, type: 'flat', value: 0, applyOn: 'earned' }
+            });
+          }
           setStateSnapshot({
             editForm: { ...clinicObj },
             generalInfo,
@@ -949,6 +992,12 @@ function ClinicManagementDashboard(): ReactElement {
             logoPreview,
             coverPreview,
             integrations,
+            bankDetails: (clinicObj as any).bankDetails ? {
+              bankTransfer: (clinicObj as any).bankDetails?.bankTransfer || { enabled: false, type: 'flat', value: 0, applyOn: 'earned' },
+              tabby: (clinicObj as any).bankDetails?.tabby || { enabled: false, type: 'flat', value: 0, applyOn: 'earned' },
+              card: (clinicObj as any).bankDetails?.card || { enabled: false, type: 'flat', value: 0, applyOn: 'earned' },
+              tamara: (clinicObj as any).bankDetails?.tamara || { enabled: false, type: 'flat', value: 0, applyOn: 'earned' }
+            } : bankDetails
           });
         }
       }
@@ -1149,7 +1198,7 @@ function ClinicManagementDashboard(): ReactElement {
         {/* Tabs - Positioned below header */}
         <div className="px-2 sm:px-3 md:px-4 py-2 sm:py-3 md:py-4 max-w-7xl">
           <div className="flex items-center gap-1.5 sm:gap-2 h-9 sm:h-10 rounded-full bg-white/80 border border-gray-200 shadow-sm px-1.5 sm:px-2 overflow-x-auto whitespace-nowrap scrollbar-thin">
-            {(['General Info','Contact','Documents','Listing','Clinic Timing','Branches'] as const).map(tab => (
+            {(['General Info','Contact','Documents','Listing','Clinic Timing','Branches','Banks'] as const).map(tab => (
               <button
                 key={tab}
                 type="button"
@@ -2598,6 +2647,113 @@ function ClinicManagementDashboard(): ReactElement {
                       >
                         Create New Branch
                       </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Banks */}
+              {activeTab === 'Banks' && (
+                <div className="w-full">
+                  <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+                    <h3 className="text-lg font-bold text-gray-900 mb-4">Payment Methods</h3>
+                    <div className="space-y-4">
+                      {[
+                        { key: 'bankTransfer', label: 'Bank Transfer' },
+                        { key: 'tabby', label: 'Tabby' },
+                        { key: 'card', label: 'Card' },
+                        { key: 'tamara', label: 'Tamara' }
+                      ].map((payment) => (
+                        <div key={payment.key} className={`rounded-xl border p-4 transition-colors ${bankDetails[payment.key as keyof typeof bankDetails].enabled ? 'border-teal-200 bg-teal-50/30' : 'border-gray-200 bg-white'}`}>
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${bankDetails[payment.key as keyof typeof bankDetails].enabled ? 'bg-teal-100' : 'bg-gray-100'}`}>
+                                <DollarSign className={`w-5 h-5 ${bankDetails[payment.key as keyof typeof bankDetails].enabled ? 'text-teal-600' : 'text-gray-400'}`} />
+                              </div>
+                              <p className="text-sm font-semibold text-gray-900">{payment.label}</p>
+                            </div>
+                            <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                              <input
+                                type="checkbox"
+                                className="sr-only peer"
+                                checked={bankDetails[payment.key as keyof typeof bankDetails].enabled}
+                                onChange={(e) => {
+                                  setBankDetails(prev => ({
+                                    ...prev,
+                                    [payment.key]: {
+                                      ...prev[payment.key as keyof typeof prev],
+                                      enabled: e.target.checked
+                                    }
+                                  }));
+                                }}
+                              />
+                              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"></div>
+                            </label>
+                          </div>
+                          {bankDetails[payment.key as keyof typeof bankDetails].enabled && (
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                              <div>
+                                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Amount Type</label>
+                                <select
+                                  value={bankDetails[payment.key as keyof typeof bankDetails].type}
+                                  onChange={(e) => {
+                                    setBankDetails(prev => ({
+                                      ...prev,
+                                      [payment.key]: {
+                                        ...prev[payment.key as keyof typeof prev],
+                                        type: e.target.value as 'flat' | 'percentage'
+                                      }
+                                    }));
+                                  }}
+                                  className="w-full px-3 sm:px-4 py-2 sm:py-2.5 text-sm sm:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
+                                >
+                                  <option value="flat">Flat</option>
+                                  <option value="percentage">Percentage</option>
+                                </select>
+                              </div>
+                              <div>
+                                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Apply On</label>
+                                <select
+                                  value={bankDetails[payment.key as keyof typeof bankDetails].applyOn}
+                                  onChange={(e) => {
+                                    setBankDetails(prev => ({
+                                      ...prev,
+                                      [payment.key]: {
+                                        ...prev[payment.key as keyof typeof prev],
+                                        applyOn: e.target.value as 'earned' | 'paid'
+                                      }
+                                    }));
+                                  }}
+                                  className="w-full px-3 sm:px-4 py-2 sm:py-2.5 text-sm sm:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
+                                >
+                                  <option value="earned">Earned Amount</option>
+                                  <option value="paid">Paid Amount</option>
+                                </select>
+                              </div>
+                              <div>
+                                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Value</label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={bankDetails[payment.key as keyof typeof bankDetails].value}
+                                  onChange={(e) => {
+                                    setBankDetails(prev => ({
+                                      ...prev,
+                                      [payment.key]: {
+                                        ...prev[payment.key as keyof typeof prev],
+                                        value: parseFloat(e.target.value) || 0
+                                      }
+                                    }));
+                                  }}
+                                  className="w-full px-3 sm:px-4 py-2 sm:py-2.5 text-sm sm:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                  placeholder={bankDetails[payment.key as keyof typeof bankDetails].type === 'percentage' ? 'e.g. 2.5' : 'e.g. 50'}
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>

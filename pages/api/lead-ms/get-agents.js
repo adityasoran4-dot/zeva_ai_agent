@@ -400,7 +400,8 @@ export default async function handler(req, res) {
         targetMultiplier, targetAmount,
         joiningDate, isActive,
         discountType, discountAmount,
-        otherDocuments
+        otherDocuments,
+        bankPermissions
       } = req.body;
 
       const clean = (s) =>
@@ -475,6 +476,11 @@ export default async function handler(req, res) {
       // Explicitly set discount fields to ensure they are saved even if schema is cached
       if (discountType !== undefined) profile.set('discountType', discountType, { strict: false });
       if (discountAmount !== undefined) profile.set('discountAmount', discountAmount, { strict: false });
+
+      // Explicitly set bankPermissions
+      if (bankPermissions) {
+        profile.set('bankPermissions', bankPermissions, { strict: false });
+      }
 
       // console.log('API: Before profile.save(), profile data:', JSON.stringify(profile, null, 2));
       await profile.save();
