@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import axios from "axios";
+import LocationMessage from "./LocationMessage";
 
 interface IProps {
   message: MessageType;
@@ -36,7 +37,7 @@ const Message: React.FC<IProps> = ({
     const html = text.replace(urlRegex, (match) => {
       const href = match.startsWith("http") ? match : `http://${match}`;
       return `<a href="${href}" target="_blank" rel="noopener noreferrer" class="text-blue-600 underline hover:text-blue-700">${match}</a>`;
-      });
+    });
     return html.replace(/\n/g, "<br />");
   };
   const token =
@@ -276,6 +277,19 @@ const Message: React.FC<IProps> = ({
                 </div>
               )}
 
+              {/* Location Content */}
+              {message?.metadata?.type === "location" && (
+                <div className="mb-3">
+                  <LocationMessage
+                    latitude={message.metadata.latitude}
+                    longitude={message.metadata.longitude}
+                    address={message.metadata.address || ""}
+                    name={message.metadata.name}
+                    direction={message.direction}
+                  />
+                </div>
+              )}
+
               {/* Media Content */}
               {message?.mediaUrl && (
                 <div className="mb-3 rounded-lg overflow-hidden">
@@ -389,14 +403,19 @@ const Message: React.FC<IProps> = ({
               )}
 
               {/* Message Text */}
-              <div
-                className="text-sm text-gray-800 leading-relaxed break-words"
-                dangerouslySetInnerHTML={{
-                  __html: DOMPurify.sanitize(linkify(message?.content || ""), {
-                    ADD_ATTR: ["target", "rel", "class"],
-                  }),
-                }}
-              />
+              {message?.metadata?.type !== "location" && (
+                <div
+                  className="text-sm text-gray-800 leading-relaxed break-words"
+                  dangerouslySetInnerHTML={{
+                    __html: DOMPurify.sanitize(
+                      linkify(message?.content || ""),
+                      {
+                        ADD_ATTR: ["target", "rel", "class"],
+                      },
+                    ),
+                  }}
+                />
+              )}
 
               {/* WhatsApp Footer */}
               {message?.footerText && (
@@ -588,6 +607,19 @@ const Message: React.FC<IProps> = ({
                 </div>
               )}
 
+              {/* Location Content */}
+              {message?.metadata?.type === "location" && (
+                <div className="mb-3">
+                  <LocationMessage
+                    latitude={message.metadata.latitude}
+                    longitude={message.metadata.longitude}
+                    address={message.metadata.address || ""}
+                    name={message.metadata.name}
+                    direction={message.direction}
+                  />
+                </div>
+              )}
+
               {/* Media Content */}
               {message?.mediaUrl && (
                 <div className="mb-3 rounded-lg overflow-hidden">
@@ -701,14 +733,19 @@ const Message: React.FC<IProps> = ({
               )}
 
               {/* Message Text */}
-              <div
-                className="text-sm text-gray-800 leading-relaxed break-words"
-                dangerouslySetInnerHTML={{
-                  __html: DOMPurify.sanitize(linkify(message?.content || ""), {
-                    ADD_ATTR: ["target", "rel", "class"],
-                  }),
-                }}
-              />
+              {message?.metadata?.type !== "location" && (
+                <div
+                  className="text-sm text-gray-800 leading-relaxed break-words"
+                  dangerouslySetInnerHTML={{
+                    __html: DOMPurify.sanitize(
+                      linkify(message?.content || ""),
+                      {
+                        ADD_ATTR: ["target", "rel", "class"],
+                      },
+                    ),
+                  }}
+                />
+              )}
 
               {/* WhatsApp Footer */}
               {message?.footerText && (

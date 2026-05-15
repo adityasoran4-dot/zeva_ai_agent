@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import clsx from "clsx";
 import { ConversationType } from "@/types/conversations";
 
@@ -36,7 +36,7 @@ const DeleteConversationModal: React.FC<DeleteConversationModalProps> = ({
 
     if (text.trim().toUpperCase() !== confirmationPhrase.toUpperCase()) {
       setValidationError(
-        `Please type "${confirmationPhrase}" to confirm deletion`
+        `Please type "${confirmationPhrase}" to confirm deletion`,
       );
       return false;
     }
@@ -77,10 +77,10 @@ const DeleteConversationModal: React.FC<DeleteConversationModalProps> = ({
         <div className="bg-red-50 px-4 py-3 flex justify-between items-center border-b border-red-200">
           <div>
             <h2 className="text-base sm:text-lg font-bold text-red-800">
-              Delete Conversation
+              Move to Trash
             </h2>
             <p className="text-red-700 text-[10px] sm:text-xs mt-0.5">
-              This action cannot be undone
+              Conversation will be moved to trash
             </p>
           </div>
           <button
@@ -126,22 +126,22 @@ const DeleteConversationModal: React.FC<DeleteConversationModalProps> = ({
 
           <div className="text-center">
             <h3 className="text-lg font-bold text-gray-900 mb-2">
-              Delete "{conversation?.leadId?.name || "this conversation"}"?
+              Trash "{conversation?.leadId?.name || "this conversation"}"?
             </h3>
             <p className="text-gray-600 text-sm mb-4">
-              Are you sure you want to delete this conversation? This will
-              permanently delete the entire conversation including all messages
-              and associated data.
+              Are you sure you want to move this conversation to trash? The
+              conversation will be hidden from your inbox but can be recovered
+              from the Trashed filter.
             </p>
 
             <div className="bg-gray-50 rounded-lg p-4 mb-6">
               <h4 className="font-bold text-left text-gray-900 text-sm mb-2">
-                What happens when you delete a conversation:
+                What happens when you trash a conversation:
               </h4>
               <ul className="text-left text-xs text-gray-600 space-y-2">
                 <li className="flex items-start">
                   <svg
-                    className="w-4 h-4 text-red-500 mr-2 mt-0.5 flex-shrink-0"
+                    className="w-4 h-4 text-amber-500 mr-2 mt-0.5 flex-shrink-0"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -150,14 +150,14 @@ const DeleteConversationModal: React.FC<DeleteConversationModalProps> = ({
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       strokeWidth={2}
-                      d="M6 18L18 6M6 6l12 12"
+                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                     />
                   </svg>
-                  <span>All messages will be permanently deleted</span>
+                  <span>Conversation will be hidden from your inbox</span>
                 </li>
                 <li className="flex items-start">
                   <svg
-                    className="w-4 h-4 text-red-500 mr-2 mt-0.5 flex-shrink-0"
+                    className="w-4 h-4 text-green-500 mr-2 mt-0.5 flex-shrink-0"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -166,14 +166,14 @@ const DeleteConversationModal: React.FC<DeleteConversationModalProps> = ({
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       strokeWidth={2}
-                      d="M6 18L18 6M6 6l12 12"
+                      d="M5 13l4 4L19 7"
                     />
                   </svg>
-                  <span>All tags will be removed</span>
+                  <span>Messages and data are preserved</span>
                 </li>
                 <li className="flex items-start">
                   <svg
-                    className="w-4 h-4 text-red-500 mr-2 mt-0.5 flex-shrink-0"
+                    className="w-4 h-4 text-green-500 mr-2 mt-0.5 flex-shrink-0"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -182,26 +182,10 @@ const DeleteConversationModal: React.FC<DeleteConversationModalProps> = ({
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       strokeWidth={2}
-                      d="M6 18L18 6M6 6l12 12"
+                      d="M5 13l4 4L19 7"
                     />
                   </svg>
-                  <span>Conversation history will be lost permanently</span>
-                </li>
-                <li className="flex items-start">
-                  <svg
-                    className="w-4 h-4 text-red-500 mr-2 mt-0.5 flex-shrink-0"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
-                  <span>This action cannot be recovered or undone</span>
+                  <span>You can recover it from the Trashed filter</span>
                 </li>
               </ul>
             </div>
@@ -225,9 +209,9 @@ const DeleteConversationModal: React.FC<DeleteConversationModalProps> = ({
                     validationError
                       ? "border-red-500 bg-red-50"
                       : confirmationText.trim().toUpperCase() ===
-                        confirmationPhrase.toUpperCase()
-                      ? "border-green-500 bg-green-50"
-                      : "border-gray-300"
+                          confirmationPhrase.toUpperCase()
+                        ? "border-green-500 bg-green-50"
+                        : "border-gray-300",
                   )}
                   placeholder={`Type "${confirmationPhrase}" here`}
                   autoFocus
@@ -295,7 +279,7 @@ const DeleteConversationModal: React.FC<DeleteConversationModalProps> = ({
               "px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors",
               isConfirmDisabled
                 ? "bg-red-300 text-white cursor-not-allowed"
-                : "bg-red-600 hover:bg-red-700 text-white cursor-pointer"
+                : "bg-red-600 hover:bg-red-700 text-white cursor-pointer",
             )}
           >
             {loading ? (
@@ -319,10 +303,10 @@ const DeleteConversationModal: React.FC<DeleteConversationModalProps> = ({
                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                   />
                 </svg>
-                Deleting...
+                Moving to Trash...
               </span>
             ) : (
-              "Delete Conversation"
+              "Move to Trash"
             )}
           </button>
         </div>
@@ -332,3 +316,7 @@ const DeleteConversationModal: React.FC<DeleteConversationModalProps> = ({
 };
 
 export default DeleteConversationModal;
+
+
+
+

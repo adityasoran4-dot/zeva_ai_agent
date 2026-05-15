@@ -1,7 +1,6 @@
 import { getUserFromReq, requireRole } from "../../lead-ms/auth";
 import Clinic from "../../../../models/Clinic";
 import Conversation from "../../../../models/Conversation";
-import Message from "../../../../models/Message";
 import dbConnect from "../../../../lib/database";
 
 export default async function handler(req, res) {
@@ -73,7 +72,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // Find the conversation first to get details for response
+    // Find the conversation first
     let conversation = await Conversation.findOne({
       _id: conversationId,
       clinicId,
@@ -86,36 +85,16 @@ export default async function handler(req, res) {
       });
     }
 
-    // Start a transaction for atomic operations
-    const session = await Conversation.startSession();
+    // Soft delete - set status to "trashed" instead of hard deleting
+    conversation.status = "trashed";
+    await conversation.save();
 
-    try {
-      await session.withTransaction(async () => {
-        // 1. Delete all messages in this conversation
-        await Message.deleteMany(
-          { conversationId: conversationId, clinicId },
-          { session }
-        );
-
-        // 3. Delete the conversation itself
-        await Conversation.deleteOne(
-          { _id: conversationId, clinicId },
-          { session }
-        );
-      });
-
-      await session.endSession();
-
-      return res.status(200).json({
-        success: true,
-        message: "Conversation deleted successfully",
-      });
-    } catch (transactionErr) {
-      await session.endSession();
-      throw transactionErr;
-    }
+    return res.status(200).json({
+      success: true,
+      message: "Conversation moved to trash successfully",
+    });
   } catch (err) {
-    console.error("Error deleting conversation:", err);
+    console.error("Error trashing conversation:", err);
 
     return res.status(500).json({
       success: false,
