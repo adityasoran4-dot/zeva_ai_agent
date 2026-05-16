@@ -72,7 +72,7 @@ export default async function handler(req, res) {
           await import("../agent/permissions-helper");
         const result = await checkAgentPermission(
           clinicUser._id,
-          "clinic_Appointment",
+          "clinic_ScheduledAppointment",
           "read",
         );
 
@@ -83,7 +83,7 @@ export default async function handler(req, res) {
           result.error.includes("not found in agent permissions")
         ) {
           console.log(
-            `[appointments] Module clinic_Appointment not found in permissions for user ${clinicUser._id}, allowing access by default`,
+            `[appointments] Module clinic_ScheduledAppointment not found in permissions for user ${clinicUser._id}, allowing access by default`,
           );
         } else if (!result.hasPermission) {
           return res.status(403).json({
@@ -387,7 +387,7 @@ export default async function handler(req, res) {
           await import("../agent/permissions-helper");
         const result = await checkAgentPermission(
           clinicUser._id,
-          "clinic_Appointment",
+          "clinic_ScheduledAppointment",
           "create",
         );
 
@@ -398,7 +398,7 @@ export default async function handler(req, res) {
           result.error.includes("not found in agent permissions")
         ) {
           console.log(
-            `[appointments] Module clinic_Appointment not found in permissions for user ${clinicUser._id}, allowing access by default`,
+            `[appointments] Module clinic_ScheduledAppointment not found in permissions for user ${clinicUser._id}, allowing access by default`,
           );
         } else if (!result.hasPermission) {
           return res.status(403).json({

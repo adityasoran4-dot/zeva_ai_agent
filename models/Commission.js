@@ -53,7 +53,9 @@ const CommissionSchema = new mongoose.Schema(
       value: Number,
       applyOn: { type: String, enum: ["paid", "earned"] },
       deductionAmount: Number
-    }
+    },
+    // Referral commission deducted from paid amount before calculating staff/doctor commission
+    referralCommissionDeducted: { type: Number, min: 0, default: 0 }
   },
   { timestamps: true }
 );
