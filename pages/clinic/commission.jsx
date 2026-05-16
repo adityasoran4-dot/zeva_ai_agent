@@ -531,6 +531,7 @@ function ClinicCommissionPage() {
                           <th className="px-2 sm:px-4 py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">EMR</th>
                           <th className="px-2 sm:px-4 py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Invoice</th>
                           <th className="px-2 sm:px-4 py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Paid</th>
+                          <th className="px-2 sm:px-4 py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Referral Deducted</th>
                           <th className="px-2 sm:px-4 py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Bank Deduction</th>
                           <th className="px-2 sm:px-4 py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Payment Details</th>
                           <th className="px-2 sm:px-4 py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Earned</th>
@@ -548,6 +549,11 @@ function ClinicCommissionPage() {
                               <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">{it.patientEmr || "—"}</td>
                               <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">{it.invoiceNumber || "—"}</td>
                               <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">{getCurrencySymbol(currency)} {Number(it.paidAmount || 0).toFixed(2)}</td>
+                              <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+                                {Number(it.referralCommissionDeducted || 0) > 0 ? (
+                                  `${getCurrencySymbol(currency)} ${Number(it.referralCommissionDeducted).toFixed(2)}`
+                                ) : "—"}
+                              </td>
                               <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
                                 {it.bankDeduction?.deductionAmount ? (
                                   `${getCurrencySymbol(currency)} ${Number(it.bankDeduction.deductionAmount).toFixed(2)}`
@@ -615,7 +621,7 @@ function ClinicCommissionPage() {
                             </tr>
                             {expandedRow === it.commissionId && (
                               <tr className="bg-gray-50/60">
-                                <td colSpan={11} className="px-2 sm:px-4 py-2 sm:py-3">
+                                <td colSpan={12} className="px-2 sm:px-4 py-2 sm:py-3">
                                   <div className="rounded-lg border border-gray-200 bg-white p-2 sm:p-3 shadow-sm overflow-x-auto">
                                     <div className="flex flex-col sm:flex-row items-start justify-between gap-2 mb-2">
                                       <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">

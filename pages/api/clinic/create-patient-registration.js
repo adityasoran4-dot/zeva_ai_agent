@@ -953,6 +953,9 @@ export default async function handler(req, res) {
     console.log("[CreatePatientRegistration] Pending used amount:", pendingUsedNum);
     console.log("[CreatePatientRegistration] Commissionable paid amount (after pendingUsed deduction):", commissionablePaidAmount);
 
+    // Track referral commission amount (will be used to adjust doctor/staff commission if both are applicable
+    let referralCommissionAmount = 0;
+    
     // Commission calculation and storage
     try {
       const paidNumForCommission = commissionablePaidAmount;
@@ -1004,9 +1007,9 @@ export default async function handler(req, res) {
               console.log("[CreatePatientRegistration] Will apply bank deductions AFTER referral commission");
             }
 
-            // Calculate commission
+            // Calculate referral commission (based on full paid amount)
             let commissionAmount = Number(
-              ((adjustedAmount * commissionPercent) / 100).toFixed(2),
+              ((adjustedAmount * commissionPercent) / 100).toFixed(2)
             );
             console.log("[CreatePatientRegistration] Original referral commission amount before deduction:", commissionAmount);
 
@@ -1050,6 +1053,9 @@ export default async function handler(req, res) {
             }
 
             console.log("[CreatePatientRegistration] Final referral commission amount:", commissionAmount);
+            
+            // Store referral commission amount to adjust doctor/staff commission
+            referralCommissionAmount = Number(commissionAmount);
             
             // Optionally try to map to a staff user via email or phone
             let staffId = null;
@@ -1190,12 +1196,20 @@ export default async function handler(req, res) {
 
     // Doctor/Staff commission based on AgentProfile (supports flat, target-based, and after_deduction)
     try {
+      // Calculate adjusted paid amount for doctor/staff: if referral commission was given, subtract it from the paid amount
+      const adjustedDoctorStaffPaidAmount = Math.max(0, commissionablePaidAmount - referralCommissionAmount);
+      
       if (commissionablePaidAmount > 0 && appointment?.doctorId) {
+        console.log("[CreatePatientRegistration] Doctor/Staff commission calculation:");
+        console.log("[CreatePatientRegistration]   - Original paid amount:", commissionablePaidAmount);
+        console.log("[CreatePatientRegistration]   - Referral commission amount:", referralCommissionAmount);
+        console.log("[CreatePatientRegistration]   - Adjusted paid amount for doctor/staff:", adjustedDoctorStaffPaidAmount);
+        
         // Use the commission calculator to determine commission
         const commissionResult = await calculateCommissionForStaff({
           staffId: appointment.doctorId,
           clinicId: clinic._id,
-          paidAmount: commissionablePaidAmount,
+          paidAmount: adjustedDoctorStaffPaidAmount, // Use adjusted amount instead of full amount
           earnedAmount: earnedAmountForCommission,
           patientId: patientRegistration._id,
           appointmentId: appointment._id,
@@ -1225,7 +1239,8 @@ export default async function handler(req, res) {
               value: commissionResult.bankDeduction?.value,
               applyOn: commissionResult.bankDeduction?.applyOn,
               deductionAmount: commissionResult.bankDeduction?.deductionAmount
-            }
+            },
+            referralCommissionDeducted: referralCommissionAmount // Store referral commission deducted
           };
 
           // Add target-based specific fields if applicable
@@ -1275,22 +1290,22 @@ export default async function handler(req, res) {
           // and set initial finalCommissionAmount equal to the computed commissionAmount.
           // This base is used later if post-commission expenses are added on the commission page.
           const commissionType = commissionResult.commissionType;
-          // If applyOn is paid, use finalPaidAmount as base; if applyOn is earned, use original commissionable amount as base
+          // If applyOn is paid, use finalPaidAmount as base; if applyOn is earned, use adjusted amount (after referral deducted) as base
           let commissionBaseAmount;
           if (commissionResult.bankDeduction.deductionApplied && selectedBankPaymentDetails.applyOn === "paid") {
-            commissionBaseAmount = commissionResult.bankDeduction.finalPaidAmount || commissionablePaidAmount;
+            commissionBaseAmount = commissionResult.bankDeduction.finalPaidAmount || adjustedDoctorStaffPaidAmount;
           } else {
-            commissionBaseAmount = commissionablePaidAmount;
+            commissionBaseAmount = adjustedDoctorStaffPaidAmount; // Use adjusted amount (after referral deducted)
           }
           
           if (commissionType === "target_based") {
             // Base = only the amount above target (commission is earned only on excess)
             commissionBaseAmount = commissionResult.amountAboveTarget || 0;
           } else if (commissionType === "after_deduction") {
-            // netAmount = paidAmount - billingExpenses (already computed by calculator)
+            // netAmount = paidAmount - billingExpenses (already computed by calculator from adjusted amount)
             commissionBaseAmount = commissionResult.netAmount || 0;
           } else if (commissionType === "target_plus_expense") {
-            // netCommissionableAmount = amountAboveTarget - expenses
+            // netCommissionableAmount = amountAboveTarget - expenses (already computed by calculator from adjusted amount)
             commissionBaseAmount =
               commissionResult.netCommissionableAmount || 0;
           }

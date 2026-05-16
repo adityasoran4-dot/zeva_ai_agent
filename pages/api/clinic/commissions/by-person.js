@@ -196,6 +196,7 @@ export default async function handler(req, res) {
         doctorName: doctor.name || "",
         paymentMethod: c.paymentMethod || billing.paymentMethod || "",
         bankDeduction: c.bankDeduction || null,
+        referralCommissionDeducted: Number(c.referralCommissionDeducted || 0),
       };
     });
 

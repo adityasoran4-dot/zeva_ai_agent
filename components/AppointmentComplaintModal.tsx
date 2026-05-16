@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 import React, { useEffect, useRef, useState, useMemo } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
@@ -199,7 +199,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
   const [loadingComplaints, setLoadingComplaints] = useState(false);
   const [_showPreviousReports, setShowPreviousReports] = useState(false);
 
-  // Patient EMR stats — total spend from Billing, visits from Appointment
+  // Patient EMR stats â€” total spend from Billing, visits from Appointment
   interface PatientEMRStats {
     totalSpend: number; totalBilled: number; totalPending: number;
     totalVisits: number; billingCount: number;
@@ -424,6 +424,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
   const [pkgError, setPkgError] = useState("");
   const [pkgSuccess, setPkgSuccess] = useState("");
   const [addingPackageToPatient, setAddingPackageToPatient] = useState(false);
+  const [showVitalsWarning, setShowVitalsWarning] = useState(false);
   const [addingRecService, setAddingRecService] = useState<Record<string, boolean>>({});
   // Track added services per patient (key format: "patientId_serviceId")
   const [addedRecServices, setAddedRecServices] = useState<Record<string, boolean>>({});
@@ -812,6 +813,8 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
         } else {
           setReport(null);
           setComplaints("");
+          // Show vitals warning immediately when modal loads and no report exists
+          setShowVitalsWarning(true);
         }
 
         setPatientReports(
@@ -1344,7 +1347,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
     if (!report || !report.reportId) {
       toast.error(
         <div className="flex flex-col gap-1">
-          <span className="font-semibold">⚠ Vitals Report Required</span>
+          <span className="font-semibold">âš  Vitals Report Required</span>
           <span className="text-xs opacity-80">Please fill the appointment report first, then add complaints.</span>
         </div>,
         {
@@ -1371,7 +1374,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
     if (!complaints.trim()) {
       toast.error(
         <div className="flex flex-col gap-1">
-          <span className="font-semibold">⚠ Complaint Required</span>
+          <span className="font-semibold">âš  Complaint Required</span>
           <span className="text-xs opacity-80">Please enter complaint notes before saving.</span>
         </div>,
         {
@@ -1401,7 +1404,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
       setChecklistError(`Please tick all checklist items before saving: ${unchecked.join(", ")}`);
       toast.error(
         <div className="flex flex-col gap-1">
-          <span className="font-semibold">⚠ Incomplete Checklist</span>
+          <span className="font-semibold">âš  Incomplete Checklist</span>
           <span className="text-xs opacity-80">Please tick all checklist items before saving: {unchecked.join(", ")}</span>
         </div>,
         {
@@ -1430,6 +1433,8 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
     setError("");
     try {
       const headers = getAuthHeaders();
+      
+      // Step 1: Save the complaint FIRST
       await axios.post(
         "/api/clinic/patient-complaints",
         {
@@ -1445,6 +1450,44 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
         },
         { headers },
       );
+
+      // Step 2: Only if complaint saved successfully, then save services to appointment
+      if (selectedServices.length > 0 && details.appointmentId) {
+        try {
+          const serviceIds = selectedServices.map((s) => s._id);
+          await axios.patch(
+            `/api/clinic/appointment-services/${details.appointmentId}`,
+            { serviceIds },
+            { headers }
+          );
+        } catch (serviceErr: any) {
+          console.error("Error saving services to appointment:", serviceErr);
+          // Show warning but don't fail the entire operation since complaint was saved
+          toast.error(
+            <div className="flex flex-col gap-1">
+              <span className="font-semibold">âš  Warning</span>
+              <span className="text-xs opacity-80">Complaint saved, but services may not have been saved properly. Please verify.</span>
+            </div>,
+            {
+              duration: 4000,
+              position: 'top-right',
+              style: {
+                background: '#f59e0b',
+                color: '#fff',
+                padding: '16px',
+                borderRadius: '8px',
+                boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+                zIndex: 9999,
+                maxWidth: '500px',
+              },
+              iconTheme: {
+                primary: '#fff',
+                secondary: '#f59e0b',
+              },
+            }
+          );
+        }
+      }
 
       // Refresh previous complaints list
       if (details.patientId) {
@@ -1478,7 +1521,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
       // Show success toast
       toast.success(
         <div className="flex flex-col gap-1">
-          <span className="font-semibold">✓ Complaints Saved Successfully</span>
+          <span className="font-semibold">âœ“ Complaints Saved Successfully</span>
           <span className="text-xs opacity-80">Your complaint notes have been saved to the patient record.</span>
         </div>,
         {
@@ -1532,7 +1575,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
     if (!currentItem.name.trim() || !currentItem.quantity || !currentItem.uom) {
       toast.error(
         <div className="flex flex-col gap-1">
-          <span className="font-semibold">⚠ Incomplete Item</span>
+          <span className="font-semibold">âš  Incomplete Item</span>
           <span className="text-xs opacity-80">Please complete item selection, quantity and UOM</span>
         </div>,
         {
@@ -1810,7 +1853,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
         if (data && data?.success) {
           toast.success(
             <div className="flex flex-col gap-1">
-              <span className="font-semibold">✓ Message Sent Successfully</span>
+              <span className="font-semibold">âœ“ Message Sent Successfully</span>
               <span className="text-xs opacity-80">Your prescription has been sent via WhatsApp.</span>
             </div>,
             {
@@ -1863,7 +1906,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
         console.log("Error in send prescription msg on whatsapp: ", error?.message);
         toast.error(
           <div className="flex flex-col gap-1">
-            <span className="font-semibold">⚠ Send Failed</span>
+            <span className="font-semibold">âš  Send Failed</span>
             <span className="text-xs opacity-80">{error?.response?.data?.message || "Failed to send prescription via WhatsApp"}</span>
           </div>,
           {
@@ -1916,7 +1959,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-2 sm:p-3 md:p-4">
         <div className="bg-gray-50 w-full max-w-[1500px] rounded-xl sm:rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[98vh] sm:max-h-[96vh]">
 
-          {/* ── TOP HEADER BAR ── */}
+          {/* â”€â”€ TOP HEADER BAR â”€â”€ */}
           <div className="bg-white border-b border-gray-200 px-3 sm:px-4 md:px-5 py-2 sm:py-3 flex-shrink-0">
             {loading ? (
               <div className="flex items-center justify-between">
@@ -1948,11 +1991,11 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
                           ) : (
                             <User className="w-3 h-3 text-gray-400" />
                           )}
-                          <span className="capitalize">{details.gender || "—"}</span>
+                          <span className="capitalize">{details.gender || "â€”"}</span>
                         </span>
                         <span className="flex items-center gap-1">
                           <Phone className="w-3 h-3 text-gray-400" />
-                          <span>{details.mobileNumber || "—"}</span>
+                          <span>{details.mobileNumber || "â€”"}</span>
                         </span>
                       </div>
                     </div>
@@ -1963,13 +2006,13 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
                     <div className="flex flex-col items-center px-3 sm:px-4 py-1 sm:py-1.5 rounded-lg sm:rounded-xl border border-teal-200 bg-teal-50/40 min-w-[80px] sm:min-w-[100px]">
                       <span className="text-[9px] sm:text-[10px] text-teal-600 font-medium">Total Spend</span>
                       <span className="text-base font-bold text-teal-700 leading-tight">
-                        {loadingPatientStats ? "…" : patientStats != null ? `${getCurrencySymbol(currency)} ${patientStats.totalSpend.toLocaleString()}` : "—"}
+                        {loadingPatientStats ? "â€¦" : patientStats != null ? `${getCurrencySymbol(currency)} ${patientStats.totalSpend.toLocaleString()}` : "â€”"}
                       </span>
                     </div>
                     <div className="flex flex-col items-center px-3 sm:px-4 py-1 sm:py-1.5 rounded-lg sm:rounded-xl border border-teal-200 bg-teal-50/40 min-w-[56px] sm:min-w-[64px]">
                       <span className="text-[9px] sm:text-[10px] text-teal-600 font-medium">Visits</span>
                       <span className="text-base font-bold text-teal-700 leading-tight">
-                        {loadingPatientStats ? "…" : patientStats != null ? patientStats.totalVisits : "—"}
+                        {loadingPatientStats ? "â€¦" : patientStats != null ? patientStats.totalVisits : "â€”"}
                       </span>
                     </div>
                   </div>
@@ -1981,7 +2024,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
                     </div>
                     {details.fromTime && (
                       <div className="flex items-center gap-1 sm:gap-1.5 border border-gray-200 rounded-md sm:rounded-lg px-2 py-1 sm:px-2.5 sm:py-1.5 text-[10px] sm:text-xs text-gray-500 bg-gray-50">
-                        <Clock size={10} className="sm:w-[11px] sm:h-[11px]" /> {details.fromTime}{details.toTime ? ` – ${details.toTime}` : ""}
+                        <Clock size={10} className="sm:w-[11px] sm:h-[11px]" /> {details.fromTime}{details.toTime ? ` â€“ ${details.toTime}` : ""}
                       </div>
                     )}
                     <span className={`text-[10px] sm:text-xs rounded-full px-2 sm:px-2.5 py-0.5 sm:py-1 font-semibold ${
@@ -2004,7 +2047,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
                       </button>
                     </div>
 
-                    {/* History — scrolls to existing Previous Complaints section */}
+                    {/* History â€” scrolls to existing Previous Complaints section */}
                     <button type="button"
                       onClick={() => { if (activeTab !== "complaint") setActiveTab("complaint"); setTimeout(() => { previousComplaintsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }, 60); }}
                       className="flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 rounded-md sm:rounded-lg border border-gray-200 text-[10px] sm:text-xs font-medium text-gray-600 hover:bg-gray-50 whitespace-nowrap">
@@ -2020,13 +2063,13 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
                 {report && (
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-gray-500 bg-gray-50 rounded-lg px-3 py-1.5 border border-gray-100">
                     <span className="font-semibold text-gray-700">Vitals:</span>
-                    <span>🌡 {report.temperatureCelsius}°C</span>
-                    <span>💓 {report.pulseBpm} bpm</span>
-                    <span>🩸 {report.systolicBp}/{report.diastolicBp} mmHg</span>
-                    {report.weightKg != null && <span>⚖ {report.weightKg} kg</span>}
-                    {report.heightCm != null && <span>📏 {report.heightCm} cm</span>}
+                    <span>ðŸŒ¡ {report.temperatureCelsius}Â°C</span>
+                    <span>ðŸ’“ {report.pulseBpm} bpm</span>
+                    <span>ðŸ©¸ {report.systolicBp}/{report.diastolicBp} mmHg</span>
+                    {report.weightKg != null && <span>âš– {report.weightKg} kg</span>}
+                    {report.heightCm != null && <span>ðŸ“ {report.heightCm} cm</span>}
                     {report.bmi != null && <span>BMI {report.bmi}</span>}
-                    {report.spo2Percent != null && <span>SpO₂ {report.spo2Percent}%</span>}
+                    {report.spo2Percent != null && <span>SpOâ‚‚ {report.spo2Percent}%</span>}
                   </div>
                 )}
 
@@ -2233,11 +2276,62 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
               </div>
             ) : null}
           </div>
+{/* Vitals Warning Banner - Show at TOP of modal when no report exists */}
 
-          {/* ── MAIN BODY: two-column ── */}
+          {showVitalsWarning && !report && (
+
+            <div className="mb-4 mx-4 p-4 bg-amber-50 border border-amber-200 rounded-xl shadow-sm">
+
+              <div className="flex items-start gap-3">
+
+                <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+
+                  <AlertTriangle className="w-5 h-5 text-amber-600" />
+
+                </div>
+
+                <div className="flex-1">
+
+                  <h4 className="text-sm font-bold text-amber-800 mb-1">Vitals Report Required</h4>
+
+                  <p className="text-xs text-amber-700 mb-2">
+
+                    Please fill the appointment report first, then add complaints.
+
+                  </p>
+
+                  <p className="text-xs text-amber-600">
+
+                    No vitals have been recorded for this appointment yet.
+
+                  </p>
+
+                </div>
+
+                <button
+
+                  type="button"
+
+                  onClick={() => setShowVitalsWarning(false)}
+
+                  className="text-amber-400 hover:text-amber-600 transition-colors"
+
+                >
+
+                  <XIcon size={16} />
+
+                </button>
+
+              </div>
+
+            </div>
+
+          )}
+
+          {/* â”€â”€ MAIN BODY: two-column â”€â”€ */}
           <div className="flex flex-1 min-h-0 overflow-hidden flex-col lg:flex-row">
 
-            {/* ── LEFT MAIN PANEL ── */}
+            {/* â”€â”€ LEFT MAIN PANEL â”€â”€ */}
             <div className="flex-1 min-w-0 overflow-y-auto scrollbar-hide px-3 sm:px-4 py-3 sm:py-4 space-y-3 sm:space-y-4">
 
               {error && (
@@ -2278,7 +2372,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
                     ))}
                   </div>
 
-                  {/* ── COMPLAINT TAB ── */}
+                  {/* â”€â”€ COMPLAINT TAB â”€â”€ */}
                   {activeTab === "complaint" && (
                     <div className="space-y-4">
                       {/* Chief Complaints */}
@@ -2379,6 +2473,33 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
                           </div>
                         </div>
                       </div>
+
+                      {/* Vitals Warning Banner - Show when no report exists */}
+                      {showVitalsWarning && !report && (
+                        <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-xl shadow-sm">
+                          <div className="flex items-start gap-3">
+                            <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                              <AlertTriangle className="w-5 h-5 text-amber-600" />
+                            </div>
+                            <div className="flex-1">
+                              <h4 className="text-sm font-bold text-amber-800 mb-1">Vitals Report Required</h4>
+                              <p className="text-xs text-amber-700 mb-2">
+                                Please fill the appointment report first, then add complaints.
+                              </p>
+                              <p className="text-xs text-amber-600">
+                                No vitals have been recorded for this appointment yet.
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setShowVitalsWarning(false)}
+                              className="text-amber-400 hover:text-amber-600 transition-colors"
+                            >
+                              <XIcon size={16} />
+                            </button>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Treatment & Billing - Enhanced Modern UI */}
                       <div id="treatment-billing-section" className="bg-white rounded-xl border border-gray-200 shadow-lg overflow-hidden">
@@ -2516,34 +2637,38 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
                             </div>
                            
                             {/* Action Buttons */}
-                            {servicesError && (
+                            {/* Services save status - hidden as services are saved with complaint */}
+                            {false && servicesError && (
                               <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
                                 <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
                                 <p className="text-xs text-red-700">{servicesError}</p>
                               </div>
                             )}
-                            {servicesSaved && (
+                            {false && servicesSaved && (
                               <div className="mb-3 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
                                 <CheckCircle className="w-4 h-4 text-green-600" />
                                 <p className="text-xs text-green-700 font-medium">Services saved successfully!</p>
                               </div>
                             )}
-                            <button type="button" onClick={saveServicesToAppointment}
-                              disabled={savingServices || selectedServices.length === 0}
-                              className="w-full flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md hover:shadow-lg"
-                            >
-                              {savingServices ? (
-                                <>
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                  Saving...
-                                </>
-                              ) : (
-                                <>
-                                  <CheckCircle className="w-4 h-4" />
-                                  Save Services to Appointment
-                                </>
-                              )}
-                            </button>
+                            {/* Save Services button - hidden as services are saved automatically with complaint */}
+                            {false && (
+                              <button type="button" onClick={saveServicesToAppointment}
+                                disabled={savingServices || selectedServices.length === 0}
+                                className="w-full flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md hover:shadow-lg"
+                              >
+                                {savingServices ? (
+                                  <>
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    Saving...
+                                  </>
+                                ) : (
+                                  <>
+                                    <CheckCircle className="w-4 h-4" />
+                                    Save Services to Appointment
+                                  </>
+                                )}
+                              </button>
+                            )}
                           </div>
                         )}
 
@@ -2826,7 +2951,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
                                                       <div className="text-left">
                                                         <p className="text-sm font-medium text-gray-800">{svc.name}</p>
                                                         <p className="text-xs text-gray-500">
-                                                          {getCurrencySymbol(currency)} {(svc.clinicPrice != null ? svc.clinicPrice : svc.price).toFixed(2)} • {svc.durationMinutes} mins
+                                                          {getCurrencySymbol(currency)} {(svc.clinicPrice != null ? svc.clinicPrice : svc.price).toFixed(2)} â€¢ {svc.durationMinutes} mins
                                                         </p>
                                                       </div>
                                                     </div>
@@ -2882,7 +3007,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
                                           <div>
                                             <label className="block text-[9px] text-violet-600 font-medium mb-0.5">/Session</label>
                                             <div className="px-2 py-1.5 text-xs font-bold text-center bg-violet-100 rounded-md text-violet-700 border border-violet-200">
-                                              ₹{sessPrice.toFixed(2)}
+                                              â‚¹{sessPrice.toFixed(2)}
                                             </div>
                                           </div>
                                         </div>
@@ -2894,11 +3019,11 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
                                   <div className="grid grid-cols-3 gap-1.5 bg-violet-100 rounded-lg px-3 py-2.5">
                                     <div className="text-center">
                                       <p className="text-[9px] text-violet-600 font-medium mb-0.5">Pkg Price</p>
-                                      <p className="text-xs font-bold text-violet-800">₹{parseFloat(pkgModalPrice) || 0}</p>
+                                      <p className="text-xs font-bold text-violet-800">â‚¹{parseFloat(pkgModalPrice) || 0}</p>
                                     </div>
                                     <div className="text-center">
                                       <p className="text-[9px] text-violet-600 font-medium mb-0.5">Allocated</p>
-                                      <p className="text-xs font-bold text-violet-800">₹{pkgSelectedTreatments.reduce((sum, t) => sum + (t.allocatedPrice || 0), 0).toFixed(2)}</p>
+                                      <p className="text-xs font-bold text-violet-800">â‚¹{pkgSelectedTreatments.reduce((sum, t) => sum + (t.allocatedPrice || 0), 0).toFixed(2)}</p>
                                     </div>
                                     <div className="text-center">
                                       <p className="text-[9px] text-violet-600 font-medium mb-0.5">Remaining</p>
@@ -2906,7 +3031,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
                                         Math.abs((parseFloat(pkgModalPrice) || 0) - pkgSelectedTreatments.reduce((sum, t) => sum + (t.allocatedPrice || 0), 0)) < 0.01
                                           ? "text-teal-600" : "text-amber-600"
                                       }`}>
-                                        ₹{((parseFloat(pkgModalPrice) || 0) - pkgSelectedTreatments.reduce((sum, t) => sum + (t.allocatedPrice || 0), 0)).toFixed(2)}
+                                        â‚¹{((parseFloat(pkgModalPrice) || 0) - pkgSelectedTreatments.reduce((sum, t) => sum + (t.allocatedPrice || 0), 0)).toFixed(2)}
                                       </p>
                                     </div>
                                   </div>
@@ -3098,7 +3223,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
                                             </span>
                                           )}
                                         </div>
-                                        <p className="text-xs text-gray-500 mb-2">Service #{i + 1} • ID: {svc._id.slice(-6)}</p>
+                                        <p className="text-xs text-gray-500 mb-2">Service #{i + 1} â€¢ ID: {svc._id.slice(-6)}</p>
                                                                                                        
                                         {/* Price Input */}
                                         <div className="flex items-center gap-2">
@@ -3554,7 +3679,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
                                         )}
                                         <div className="flex items-center gap-3 mt-1.5 text-[11px] text-gray-400">
                                           <span>{formatDateTime(complaint.createdAt)}</span>
-                                          <span>·</span>
+                                          <span>Â·</span>
                                           <span>{typeof complaint.doctorId === "object" && complaint.doctorId?.name ? `Dr. ${complaint.doctorId.name}` : "Unknown Doctor"}</span>
                                         </div>
                                       </div>
@@ -3758,10 +3883,10 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
                   )}
 
 
-                      {/* ── APPOINTMENTS CARD ── */}
+                      {/* â”€â”€ APPOINTMENTS CARD â”€â”€ */}
                  
 
-                  {/* ── PROGRESS TAB ── */}
+                  {/* â”€â”€ PROGRESS TAB â”€â”€ */}
                   {activeTab === "progress" && (
                     <div className="space-y-4">
                       {progressError && (
@@ -4020,7 +4145,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
                         </button>
                       </div>
 
-                      {/* ── DIVIDER ── */}
+                      {/* â”€â”€ DIVIDER â”€â”€ */}
                       <div className="flex items-center gap-3">
                         <div className="flex-1 h-px bg-gray-200" />
                         <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Session Summary</span>
@@ -4132,24 +4257,28 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
                                 })
                               )}
                             </div>
-                            {servicesError && (
+                            {/* Services save status - hidden as services are saved with complaint */}
+                            {false && servicesError && (
                               <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
                                 <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
                                 <p className="text-xs text-red-700">{servicesError}</p>
                               </div>
                             )}
-                            {servicesSaved && (
+                            {false && servicesSaved && (
                               <div className="mb-3 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
                                 <CheckCircle className="w-4 h-4 text-green-600" />
                                 <p className="text-xs text-green-700 font-medium">Services saved successfully!</p>
                               </div>
                             )}
-                            <button type="button" onClick={saveServicesToAppointment}
-                              disabled={savingServices || selectedServices.length === 0}
-                              className="w-full flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md hover:shadow-lg"
-                            >
-                              {savingServices ? (<><Loader2 className="w-4 h-4 animate-spin" />Saving...</>) : (<><CheckCircle className="w-4 h-4" />Save Services to Appointment</>)}
-                            </button>
+                            {/* Save Services button - hidden as services are saved automatically with complaint */}
+                            {false && (
+                              <button type="button" onClick={saveServicesToAppointment}
+                                disabled={savingServices || selectedServices.length === 0}
+                                className="w-full flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md hover:shadow-lg"
+                              >
+                                {savingServices ? (<><Loader2 className="w-4 h-4 animate-spin" />Saving...</>) : (<><CheckCircle className="w-4 h-4" />Save Services to Appointment</>)}
+                              </button>
+                            )}
                           </div>
                         )}
 
@@ -4251,7 +4380,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
                                                     </div>
                                                     <div className="text-left">
                                                       <p className="text-sm font-medium text-gray-800">{svc.name}</p>
-                                                      <p className="text-xs text-gray-500">{getCurrencySymbol(currency)} {(svc.clinicPrice != null ? svc.clinicPrice : svc.price).toFixed(2)} • {svc.durationMinutes} mins</p>
+                                                      <p className="text-xs text-gray-500">{getCurrencySymbol(currency)} {(svc.clinicPrice != null ? svc.clinicPrice : svc.price).toFixed(2)} â€¢ {svc.durationMinutes} mins</p>
                                                     </div>
                                                   </div>
                                                 </button>
@@ -4285,7 +4414,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
                                             </div>
                                             <div>
                                               <label className="block text-[9px] text-violet-600 font-medium mb-0.5">/Session</label>
-                                              <div className="px-2 py-1.5 text-xs font-bold text-center bg-violet-100 rounded-md text-violet-700 border border-violet-200">₹{sessPrice.toFixed(2)}</div>
+                                              <div className="px-2 py-1.5 text-xs font-bold text-center bg-violet-100 rounded-md text-violet-700 border border-violet-200">â‚¹{sessPrice.toFixed(2)}</div>
                                             </div>
                                           </div>
                                         </div>
@@ -4294,16 +4423,16 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
                                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 bg-violet-100 rounded-lg px-3 py-2.5">
                                       <div className="text-center">
                                         <p className="text-[9px] text-violet-600 font-medium mb-0.5">Pkg Price</p>
-                                        <p className="text-xs font-bold text-violet-800">₹{parseFloat(pkgModalPrice) || 0}</p>
+                                        <p className="text-xs font-bold text-violet-800">â‚¹{parseFloat(pkgModalPrice) || 0}</p>
                                       </div>
                                       <div className="text-center">
                                         <p className="text-[9px] text-violet-600 font-medium mb-0.5">Allocated</p>
-                                        <p className="text-xs font-bold text-violet-800">₹{pkgSelectedTreatments.reduce((sum, t) => sum + (t.allocatedPrice || 0), 0).toFixed(2)}</p>
+                                        <p className="text-xs font-bold text-violet-800">â‚¹{pkgSelectedTreatments.reduce((sum, t) => sum + (t.allocatedPrice || 0), 0).toFixed(2)}</p>
                                       </div>
                                       <div className="text-center">
                                         <p className="text-[9px] text-violet-600 font-medium mb-0.5">Remaining</p>
                                         <p className={`text-xs font-bold ${Math.abs((parseFloat(pkgModalPrice) || 0) - pkgSelectedTreatments.reduce((sum, t) => sum + (t.allocatedPrice || 0), 0)) < 0.01 ? "text-teal-600" : "text-amber-600"}`}>
-                                          ₹{((parseFloat(pkgModalPrice) || 0) - pkgSelectedTreatments.reduce((sum, t) => sum + (t.allocatedPrice || 0), 0)).toFixed(2)}
+                                          â‚¹{((parseFloat(pkgModalPrice) || 0) - pkgSelectedTreatments.reduce((sum, t) => sum + (t.allocatedPrice || 0), 0)).toFixed(2)}
                                         </p>
                                       </div>
                                     </div>
@@ -4357,7 +4486,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
                                           <h4 className="text-sm font-bold text-gray-900">{svc.name}</h4>
                                           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100">Standard</span>
                                         </div>
-                                        <p className="text-xs text-gray-500 mb-2">Service #{i + 1} • ID: {svc._id.slice(-6)}</p>
+                                        <p className="text-xs text-gray-500 mb-2">Service #{i + 1} â€¢ ID: {svc._id.slice(-6)}</p>
                                         <div className="flex items-center gap-2">
                                           <label className="text-xs text-gray-600 font-medium">Price:</label>
                                           <div className="relative">
@@ -4447,7 +4576,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
                     </div>
                   )}
 
-                  {/* ── PRESCRIPTION TAB ── */}
+                  {/* â”€â”€ PRESCRIPTION TAB â”€â”€ */}
                   {activeTab === "prescription" && (
                     <div className="space-y-5">
                       <div>
@@ -4730,7 +4859,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
                               } else {
                                 toast.error(
                                   <div className="flex flex-col gap-1">
-                                    <span className="font-semibold">⚠ Upload Failed</span>
+                                    <span className="font-semibold">âš  Upload Failed</span>
                                     <span className="text-xs opacity-80">Prescription saved but failed to send WhatsApp message.</span>
                                   </div>,
                                   {
@@ -4756,7 +4885,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
                               console.error("Error sending prescription:", err);
                               toast.error(
                                 <div className="flex flex-col gap-1">
-                                  <span className="font-semibold">⚠ Send Failed</span>
+                                  <span className="font-semibold">âš  Send Failed</span>
                                   <span className="text-xs opacity-80">{err.response?.data?.message || "Failed to send prescription via WhatsApp"}</span>
                                 </div>,
                                 {
@@ -4838,9 +4967,9 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
                                               <tr key={med._id || mIdx}>
                                                 <td className="px-3 py-2 text-gray-400">{mIdx + 1}</td>
                                                 <td className="px-3 py-2 font-medium text-gray-800">{med.medicineName}</td>
-                                                <td className="px-3 py-2 text-gray-500">{med.dosage || "—"}</td>
-                                                <td className="px-3 py-2 text-gray-500">{med.duration || "—"}</td>
-                                                <td className="px-3 py-2 text-gray-500">{med.notes || "—"}</td>
+                                                <td className="px-3 py-2 text-gray-500">{med.dosage || "â€”"}</td>
+                                                <td className="px-3 py-2 text-gray-500">{med.duration || "â€”"}</td>
+                                                <td className="px-3 py-2 text-gray-500">{med.notes || "â€”"}</td>
                                               </tr>
                                             ))}
                                           </tbody>
@@ -5000,7 +5129,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
                         </button>
                       </div>
 
-                      {/* ── DIVIDER ── */}
+                      {/* â”€â”€ DIVIDER â”€â”€ */}
                       <div className="flex items-center gap-3">
                         <div className="flex-1 h-px bg-gray-200" />
                         <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Session Summary</span>
@@ -5112,24 +5241,28 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
                                 })
                               )}
                             </div>
-                            {servicesError && (
+                            {/* Services save status - hidden as services are saved with complaint */}
+                            {false && servicesError && (
                               <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
                                 <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
                                 <p className="text-xs text-red-700">{servicesError}</p>
                               </div>
                             )}
-                            {servicesSaved && (
+                            {false && servicesSaved && (
                               <div className="mb-3 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
                                 <CheckCircle className="w-4 h-4 text-green-600" />
                                 <p className="text-xs text-green-700 font-medium">Services saved successfully!</p>
                               </div>
                             )}
-                            <button type="button" onClick={saveServicesToAppointment}
-                              disabled={savingServices || selectedServices.length === 0}
-                              className="w-full flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md hover:shadow-lg"
-                            >
-                              {savingServices ? (<><Loader2 className="w-4 h-4 animate-spin" />Saving...</>) : (<><CheckCircle className="w-4 h-4" />Save Services to Appointment</>)}
-                            </button>
+                            {/* Save Services button - hidden as services are saved automatically with complaint */}
+                            {false && (
+                              <button type="button" onClick={saveServicesToAppointment}
+                                disabled={savingServices || selectedServices.length === 0}
+                                className="w-full flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md hover:shadow-lg"
+                              >
+                                {savingServices ? (<><Loader2 className="w-4 h-4 animate-spin" />Saving...</>) : (<><CheckCircle className="w-4 h-4" />Save Services to Appointment</>)}
+                              </button>
+                            )}
                           </div>
                         )}
 
@@ -5231,7 +5364,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
                                                     </div>
                                                     <div className="text-left">
                                                       <p className="text-sm font-medium text-gray-800">{svc.name}</p>
-                                                      <p className="text-xs text-gray-500">{getCurrencySymbol(currency)} {(svc.clinicPrice != null ? svc.clinicPrice : svc.price).toFixed(2)} • {svc.durationMinutes} mins</p>
+                                                      <p className="text-xs text-gray-500">{getCurrencySymbol(currency)} {(svc.clinicPrice != null ? svc.clinicPrice : svc.price).toFixed(2)} â€¢ {svc.durationMinutes} mins</p>
                                                     </div>
                                                   </div>
                                                 </button>
@@ -5265,7 +5398,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
                                             </div>
                                             <div>
                                               <label className="block text-[9px] text-violet-600 font-medium mb-0.5">/Session</label>
-                                              <div className="px-2 py-1.5 text-xs font-bold text-center bg-violet-100 rounded-md text-violet-700 border border-violet-200">₹{sessPrice.toFixed(2)}</div>
+                                              <div className="px-2 py-1.5 text-xs font-bold text-center bg-violet-100 rounded-md text-violet-700 border border-violet-200">â‚¹{sessPrice.toFixed(2)}</div>
                                             </div>
                                           </div>
                                         </div>
@@ -5274,16 +5407,16 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
                                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 bg-violet-100 rounded-lg px-3 py-2.5">
                                       <div className="text-center">
                                         <p className="text-[9px] text-violet-600 font-medium mb-0.5">Pkg Price</p>
-                                        <p className="text-xs font-bold text-violet-800">₹{parseFloat(pkgModalPrice) || 0}</p>
+                                        <p className="text-xs font-bold text-violet-800">â‚¹{parseFloat(pkgModalPrice) || 0}</p>
                                       </div>
                                       <div className="text-center">
                                         <p className="text-[9px] text-violet-600 font-medium mb-0.5">Allocated</p>
-                                        <p className="text-xs font-bold text-violet-800">₹{pkgSelectedTreatments.reduce((sum, t) => sum + (t.allocatedPrice || 0), 0).toFixed(2)}</p>
+                                        <p className="text-xs font-bold text-violet-800">â‚¹{pkgSelectedTreatments.reduce((sum, t) => sum + (t.allocatedPrice || 0), 0).toFixed(2)}</p>
                                       </div>
                                       <div className="text-center">
                                         <p className="text-[9px] text-violet-600 font-medium mb-0.5">Remaining</p>
                                         <p className={`text-xs font-bold ${Math.abs((parseFloat(pkgModalPrice) || 0) - pkgSelectedTreatments.reduce((sum, t) => sum + (t.allocatedPrice || 0), 0)) < 0.01 ? "text-teal-600" : "text-amber-600"}`}>
-                                          ₹{((parseFloat(pkgModalPrice) || 0) - pkgSelectedTreatments.reduce((sum, t) => sum + (t.allocatedPrice || 0), 0)).toFixed(2)}
+                                          â‚¹{((parseFloat(pkgModalPrice) || 0) - pkgSelectedTreatments.reduce((sum, t) => sum + (t.allocatedPrice || 0), 0)).toFixed(2)}
                                         </p>
                                       </div>
                                     </div>
@@ -5337,7 +5470,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
                                           <h4 className="text-sm font-bold text-gray-900">{svc.name}</h4>
                                           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100">Standard</span>
                                         </div>
-                                        <p className="text-xs text-gray-500 mb-2">Service #{i + 1} • ID: {svc._id.slice(-6)}</p>
+                                        <p className="text-xs text-gray-500 mb-2">Service #{i + 1} â€¢ ID: {svc._id.slice(-6)}</p>
                                         <div className="flex items-center gap-2">
                                           <label className="text-xs text-gray-600 font-medium">Price:</label>
                                           <div className="relative">
@@ -5487,7 +5620,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
               )}
             </div>
 
-            {/* ── RIGHT SIDEBAR ── */}
+            {/* â”€â”€ RIGHT SIDEBAR â”€â”€ */}
             <div className="w-full lg:w-72 flex-shrink-0 border-l border-gray-200 overflow-y-auto scrollbar-hide bg-white lg:border-t-0 border-t max-h-[40vh] lg:max-h-none">
               <div className="p-3 sm:p-4 space-y-3">
 
@@ -5501,7 +5634,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
                   </div>
                   <div className="px-4 py-3 space-y-2">
                     {loadingPatientStats ? (
-                      <div className="py-3 text-center text-xs text-gray-400">Loading billing data…</div>
+                      <div className="py-3 text-center text-xs text-gray-400">Loading billing dataâ€¦</div>
                     ) : patientStats ? (
                       <>
                         <div className="flex items-center justify-between">
@@ -5722,7 +5855,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
                           <p className="text-[11px] font-semibold text-gray-700 mb-0.5">{formatDateTime(r.updatedAt)}</p>
                           {r.doctorName && <p className="text-[11px] text-gray-400 mb-0.5">Dr. {r.doctorName}</p>}
                           <div className="flex flex-wrap gap-2 text-[10px] text-gray-500">
-                            <span>T: {r.temperatureCelsius}°C</span>
+                            <span>T: {r.temperatureCelsius}Â°C</span>
                             <span>P: {r.pulseBpm} bpm</span>
                             <span>BP: {r.systolicBp}/{r.diastolicBp}</span>
                             {r.weightKg != null && <span>W: {r.weightKg}kg</span>}
@@ -5815,7 +5948,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
             </div>
           </div>
 
-          {/* ── FOOTER ── */}
+          {/* â”€â”€ FOOTER â”€â”€ */}
           <div className="flex items-center justify-between border-t border-gray-200 px-3 sm:px-4 md:px-5 py-2 sm:py-3 bg-white flex-shrink-0 gap-2">
             <button
               type="button"
@@ -5941,7 +6074,7 @@ const EditComplaintModal: React.FC<{
     if (!currentItem.name.trim() || !currentItem.quantity || !currentItem.uom) {
       toast.error(
         <div className="flex flex-col gap-1">
-          <span className="font-semibold">⚠ Incomplete Item</span>
+          <span className="font-semibold">âš  Incomplete Item</span>
           <span className="text-xs opacity-80">Please complete item selection, quantity and UOM</span>
         </div>,
         {

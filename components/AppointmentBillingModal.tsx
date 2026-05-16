@@ -67,6 +67,8 @@ interface Package {
   patientPackageSubId?: string;
   paidAmount?: number;
   paymentStatus?: string;
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
   treatments: Array<{
     treatmentName: string;
     treatmentSlug: string;
@@ -152,6 +154,8 @@ interface Offer {
   marginThresholdPercent?: number;
   autoApplyBestOffer?: boolean;
   allowManualOverride?: boolean;
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
 }
 
 type OfferMatchTreatment = {
@@ -1648,8 +1652,22 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
     // Skip if modal not open, no offers matched, or auto-apply is disabled
     if (!isOpen || matchedOffers.length === 0) return;
     
-    // Check if ANY matched offer has autoApplyBestOffer enabled
-    const hasAutoApply = matchedOffers.some(o => o.autoApplyBestOffer);
+    // Filter out offers created after the package before checking auto-apply
+    const eligibleOffersForAutoApply = matchedOffers.filter(offer => {
+      if (!selectedPackage) return true;
+      const packageDate = new Date(selectedPackage.createdAt || 0);
+      const offerDate = new Date(offer.createdAt || offer.updatedAt || 0);
+      return offerDate <= packageDate;
+    });
+    
+    // If no eligible offers remain after filtering, skip auto-apply
+    if (eligibleOffersForAutoApply.length === 0) {
+      console.log('[AutoApply] All offers created after package - skipping auto-apply');
+      return;
+    }
+    
+    // Check if ANY eligible offer has autoApplyBestOffer enabled
+    const hasAutoApply = eligibleOffersForAutoApply.some(o => o.autoApplyBestOffer);
     if (!hasAutoApply) {
       // console.log('[AutoApply] Auto-apply disabled - manual mode');
       return; // Manual mode - skip auto-application
@@ -1672,13 +1690,24 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
     const eligibleDiscounts: Array<{type: string, amount: number, id?: string, label?: string}> = [];
 
     // 1. Calculate offer discounts for all matched offers
+    // Only include offers that were NOT created after the package
     matchedOffers.forEach(offer => {
       // Skip bundle and cashback offers from instant discount comparison
       if (offer.offerType === 'bundle' || offer.offerType === 'cashback') {
         // console.log(`[AutoApply] Skipping ${offer.offerType} offer "${offer.title}" from instant discount comparison`);
         return;
       }
-
+      
+      // Skip offers that were created after the selected package
+      if (selectedPackage) {
+        const packageDate = new Date(selectedPackage.createdAt || 0);
+        const offerDate = new Date(offer.createdAt || offer.updatedAt || 0);
+        if (offerDate > packageDate) {
+          console.log(`[AutoApply] Skipping offer "${offer.title}" - created after package`);
+          return;
+        }
+      }
+      
       let discountAmount = 0;
       if (offer.discountMode === 'percentage') {
         discountAmount = (baseTotal * offer.discountValue) / 100;
@@ -1752,7 +1781,7 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
       setAppliedOfferIds([]);
     }
 
-  }, [isOpen, matchedOffers, agentDiscount, doctorComplaintDiscount, showAgentDiscount, showDoctorDiscount, selectedTreatments, selectedService, packageTreatmentSessions]);
+  }, [isOpen, matchedOffers, agentDiscount, doctorComplaintDiscount, showAgentDiscount, showDoctorDiscount, selectedTreatments, selectedService, packageTreatmentSessions, selectedPackage]);
 
   // Bundle Offer Matching Logic
   useEffect(() => {
@@ -1805,6 +1834,20 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
     // Find bundle offers
     const bundleOffers = activeOffers.filter(offer => offer.offerType === "bundle");
     
+    // Filter out bundle offers created after the package
+    const eligibleBundleOffers = bundleOffers.filter(offer => {
+      if (!selectedPackage) return true;
+      const packageDate = new Date(selectedPackage.createdAt || 0);
+      const offerDate = new Date(offer.createdAt || offer.updatedAt || 0);
+      return offerDate <= packageDate;
+    });
+    
+    if (eligibleBundleOffers.length === 0) {
+      billingDebugLog("[BundleMatching] No eligible bundle offers (all created after package).");
+      clearBundleStateOnce();
+      return;
+    }
+    
     if (bundleOffers.length === 0) {
       billingDebugLog("[BundleMatching] No bundle offers found.");
       clearBundleStateOnce();
@@ -1819,7 +1862,7 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
     // Track partial bundle offers (close to qualifying)
     const partialBundles: Array<{offer: Offer, eligibleCount: number, needMore: number, recommendedTreatments: string[]}> = [];
 
-    for (const offer of bundleOffers) {
+    for (const offer of eligibleBundleOffers) {
       // Skip if bundle doesn't have valid buyQty/freeQty
       if (!offer.buyQty || offer.buyQty <= 0 || !offer.freeQty || offer.freeQty <= 0) {
         continue;
@@ -2009,7 +2052,7 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
     
     // Update partial bundle offers for "Buy X more" messages
     setPartialBundleOffers(partialBundles);
-  }, [isOpen, activeOffers, selectedTreatments, selectedService, packageTreatmentSessions]);
+  }, [isOpen, activeOffers, selectedTreatments, selectedService, packageTreatmentSessions, selectedPackage]);
 
   // Cashback Offer Matching Logic
   useEffect(() => {
@@ -2045,6 +2088,22 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
     
     // Find cashback offers
     const cashbackOffers = activeOffers.filter(offer => offer.offerType === "cashback");
+    
+    // Filter out cashback offers created after the package
+    const eligibleCashbackOffers = cashbackOffers.filter(offer => {
+      if (!selectedPackage) return true;
+      const packageDate = new Date(selectedPackage.createdAt || 0);
+      const offerDate = new Date(offer.createdAt || offer.updatedAt || 0);
+      return offerDate <= packageDate;
+    });
+    
+    if (eligibleCashbackOffers.length === 0) {
+      billingDebugLog("[CashbackMatching] No eligible cashback offers (all created after package).");
+      setMatchedCashbackOffer(null);
+      setAppliedCashbackAmount(0);
+      return;
+    }
+    
     billingDebugLog('[CashbackMatching] All active offers with types:', activeOffers.map(o => ({
       title: o.title,
       offerType: o.offerType,
@@ -2072,7 +2131,7 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
     let bestCashbackOffer: Offer | null = null;
     let bestCashbackAmount = 0;
 
-    for (const offer of cashbackOffers) {
+    for (const offer of eligibleCashbackOffers) {
       // console.log(`[CashbackMatching] Processing cashback offer:`, {
       //   title: offer.title,
       //   cashbackAmount: offer.cashbackAmount,    // ← Use cashbackAmount for cashback offers
@@ -2166,7 +2225,7 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
       setAppliedCashbackAmount(0);
       setIsCashbackApplied(false);  // Also reset applied state when no offer matches
     }
-  }, [isOpen, activeOffers, selectedTreatments, selectedService, packageTreatmentSessions]);
+  }, [isOpen, activeOffers, selectedTreatments, selectedService, packageTreatmentSessions, selectedPackage]);
 
   // Fetch and override referredBy with patient's referral name when available
   useEffect(() => {
@@ -4121,7 +4180,10 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
     });
     if (!hasUnbilledTreatments) return false;
 
-    if (!packageSearchQuery.trim()) return false;
+    // If search query is empty, show all packages with unbilled treatments
+    if (!packageSearchQuery.trim()) return true;
+    
+    // Otherwise, filter by search query
     const query = packageSearchQuery.toLowerCase();
     return pkg.name.toLowerCase().includes(query);
   });
@@ -4559,7 +4621,9 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
                               </div>
                               <div className="overflow-y-auto max-h-40">
                                 {filteredAllPackages.length === 0 ? (
-                                  <div className="p-2 text-center text-xs text-gray-500">{packageSearchQuery.trim() ? "No packages found" : "Start typing..."}</div>
+                                  <div className="p-2 text-center text-xs text-gray-500">
+                                    {packageSearchQuery.trim() ? "No packages found" : "No packages available"}
+                                  </div>
                                 ) : (
                                   <div className="p-1">
                                     {filteredAllPackages.map((pkg) => (
@@ -4868,6 +4932,17 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
                         // Check if this is a partial bundle offer
                         const partialBundle = partialBundleOffers.find(p => p.offer._id === offer._id);
                         
+                        // Check if offer was created/updated after the package (only for offers, not membership/agent/doctor discount)
+                        const isOfferCreatedAfterPackage = (() => {
+                          if (!selectedPackage) return false; // No package selected, allow all offers
+                          
+                          const packageDate = new Date(selectedPackage.createdAt || 0);
+                          const offerDate = new Date(offer.createdAt || offer.updatedAt || 0);
+                          
+                          // If offer date is greater than package date, disable apply button
+                          return offerDate > packageDate;
+                        })();
+                        
                         return (
                           <div key={offer._id} className={`flex items-center justify-between p-2.5 rounded-xl border transition-all ${
                             effectiveIsApplied ? "bg-teal-50 border-teal-200 shadow-sm" : 
@@ -4963,13 +5038,20 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
                                 {isAutoApplied && (
                                   <span className="text-[8px] text-emerald-600 font-bold mt-0.5">✓ Auto-Applied (Best Offer)</span>
                                 )}
+                                
+                                {isOfferCreatedAfterPackage && (
+                                  <span className="text-[8px] text-red-600 font-bold mt-0.5">⚠ Offer created after package</span>
+                                )}
                               </div>
                             </div>
                             {/* Always show Apply button for all offers */}
                             <button
                               type="button"
-                              disabled={partialBundle && !effectiveIsApplied}
+                              disabled={(partialBundle && !effectiveIsApplied) || isOfferCreatedAfterPackage}
                               onClick={() => {
+                                  // Prevent action if offer was created after package
+                                  if (isOfferCreatedAfterPackage) return;
+                                  
                                   // Handle cashback offers differently
                                   if (offer.offerType === 'cashback') {
                                     if (isCashbackApplied && matchedCashbackOffer?._id === offer._id) {
@@ -5098,12 +5180,14 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
                                 className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all shadow-sm ${
                                   effectiveIsApplied
                                     ? "bg-teal-200 text-teal-800 hover:bg-teal-300"
+                                    : isOfferCreatedAfterPackage
+                                    ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                                     : partialBundle && !effectiveIsApplied
                                     ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                                     : "bg-white border border-gray-200 text-gray-700 hover:bg-gray-50"
                                 }`}
                               >
-                                {effectiveIsApplied ? "Applied" : partialBundle && !effectiveIsApplied ? "Buy More" : "Apply"}
+                                {effectiveIsApplied ? "Applied" : isOfferCreatedAfterPackage ? "Not Available" : partialBundle && !effectiveIsApplied ? "Buy More" : "Apply"}
                               </button>
                           </div>
                         );

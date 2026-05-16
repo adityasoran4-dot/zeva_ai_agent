@@ -395,12 +395,10 @@
                     canDelete: true,
                   });
                 } else {
-                  // Admin has set permissions - check the clinic_Appointment module
+                  // Admin has set permissions - check the clinic_ScheduledAppointment module
                   const modulePermission = res.data.permissions.find((p: any) => {
                     if (!p?.module) return false;
-                    // Check for clinic_Appointment module variations (including backward compatibility with clinic_ScheduledAppointment)
-                    if (p.module === "clinic_Appointment") return true;
-                    if (p.module === "clinic_appointment") return true;
+                    // Only check for clinic_ScheduledAppointment module (clinic/all-appointment page)
                     if (p.module === "clinic_ScheduledAppointment") return true;
                     if (p.module === "clinic_scheduled_appointment") return true;
                     if (p.module === "scheduled_appointment") return true;
@@ -475,7 +473,7 @@
 
         try {
           const res = await axios.get(
-            "/api/agent/get-module-permissions?moduleKey=clinic_Appointment",
+            "/api/agent/get-module-permissions?moduleKey=clinic_ScheduledAppointment",
             { headers }
           );
           if (res.data?.success && res.data.permissions) {

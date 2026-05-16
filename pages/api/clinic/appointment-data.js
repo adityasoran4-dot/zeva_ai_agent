@@ -35,7 +35,7 @@ export default async function handler(req, res) {
       const { checkAgentPermission } = await import("../agent/permissions-helper");
       const result = await checkAgentPermission(
         authUser._id,
-        "clinic_Appointment",
+        "clinic_ScheduledAppointment",
         "read"
       );
 
@@ -43,7 +43,7 @@ export default async function handler(req, res) {
       // This handles the case where permissions haven't been set up for this module
       if (!result.hasPermission && result.error && result.error.includes("not found in agent permissions")) {
         // Module not set up yet - allow access by default for agent/doctorStaff
-        console.log(`[appointment-data] Module clinic_Appointment not found in permissions for user ${authUser._id}, allowing access by default`);
+        console.log(`[appointment-data] Module clinic_ScheduledAppointment not found in permissions for user ${authUser._id}, allowing access by default`);
       } else if (!result.hasPermission) {
         // Permission explicitly denied
         return res.status(403).json({
