@@ -18,6 +18,7 @@ import {
   X,
   UserX,
   Eye,
+  EyeOff,
   Upload,
 } from 'lucide-react';
 import { Toaster, toast } from 'react-hot-toast';
@@ -85,7 +86,13 @@ const ManageAgentsPage = () => {
     employeeVisaBackUrl: "",
     discountType: "",
     discountAmount: "",
-    otherDocuments: []
+    otherDocuments: [],
+    bankPermissions: {
+      card: false,
+      bankTransfer: false,
+      tabby: false,
+      tamara: false
+    }
   });
   const [uploadingIdDocFront, setUploadingIdDocFront] = useState(false);
   const [uploadingIdDocBack, setUploadingIdDocBack] = useState(false);
@@ -103,6 +110,8 @@ const ManageAgentsPage = () => {
   const [treatmentAgent, setTreatmentAgent] = useState(null);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -119,6 +128,7 @@ const ManageAgentsPage = () => {
   const [totalCommission, setTotalCommission] = useState(null);
   const [commissionPercent, setCommissionPercent] = useState(null);
   const [currency, setCurrency] = useState('INR');
+  const [clinicBankDetails, setClinicBankDetails] = useState(null);
 
   // Get the appropriate token based on what's available (clinic > doctor > admin)
   // This ensures we use the correct token for the logged-in user
@@ -161,6 +171,9 @@ const ManageAgentsPage = () => {
         const res = await axios.get('/api/clinics/myallClinic', { headers });
         if (res.data.success && res.data.clinic?.currency) {
           setCurrency(res.data.clinic.currency);
+        }
+        if (res.data.success && res.data.clinic?.bankDetails) {
+          setClinicBankDetails(res.data.clinic.bankDetails);
         }
       } catch (e) { 
         console.error('Error fetching clinic currency:', e); 
@@ -516,7 +529,13 @@ const ManageAgentsPage = () => {
           employeeVisaBackUrl: p.employeeVisaBackUrl || "",
           discountType: p.discountType || "",
           discountAmount: typeof p.discountAmount === "number" ? String(p.discountAmount) : (p.discountAmount || ""),
-          otherDocuments: Array.isArray(p.otherDocuments) ? p.otherDocuments : []
+          otherDocuments: Array.isArray(p.otherDocuments) ? p.otherDocuments : [],
+          bankPermissions: {
+            card: p.bankPermissions?.card || false,
+            bankTransfer: p.bankPermissions?.bankTransfer || false,
+            tabby: p.bankPermissions?.tabby || false,
+            tamara: p.bankPermissions?.tamara || false
+          }
         });
       }
     } catch {}
@@ -839,7 +858,8 @@ const ManageAgentsPage = () => {
         discountAmount: parseFloat(profileForm.discountAmount || "0"),
         otherDocuments: Array.isArray(profileForm.otherDocuments)
           ? profileForm.otherDocuments.filter(d => d && d.name && d.url).map(d => ({ name: d.name, url: d.url }))
-          : []
+          : [],
+        bankPermissions: profileForm.bankPermissions
       };
       const res = await axios.patch("/api/lead-ms/get-agents", payload, { headers: authHeaders });
       if (res.data.success) {
@@ -1513,27 +1533,45 @@ const ManageAgentsPage = () => {
               <div className="space-y-3.5">
                 <div>
                   <label className="block text-[11px] font-medium text-teal-700 mb-1.5">New password</label>
-                  <input
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray300 dark:border-gray600 rounded-md text-xs bg-white dark:bg-gray-700 text-teal-900 dark:text-teal-100 placeholder-teal-400 dark:placeholder-teal-400 focus:ring-1 focus:ring-teal-900 dark:focus:ring-blue-500 focus:border-gray900 dark:focus:border-blue-500 outline-none transition-colors"
-                    placeholder="Enter new password"
-                    required
-                    minLength={6}
-                  />
+                  <div className="relative">
+                    <input
+                      type={showNewPassword ? 'text' : 'password'}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="w-full px-3 py-2 pr-10 border border-gray300 dark:border-gray600 rounded-md text-xs bg-white dark:bg-gray-700 text-teal-900 dark:text-teal-100 placeholder-teal-400 dark:placeholder-teal-400 focus:ring-1 focus:ring-teal-900 dark:focus:ring-blue-500 focus:border-gray900 dark:focus:border-blue-500 outline-none transition-colors"
+                      placeholder="Enter new password"
+                      required
+                      minLength={6}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-teal-400 hover:text-teal-600"
+                    >
+                      {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-[11px] font-medium text-teal-700 mb-1.5">Confirm password</label>
-                  <input
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray300 dark:border-gray600 rounded-md text-xs bg-white dark:bg-gray-700 text-teal-900 dark:text-teal-100 placeholder-teal-400 dark:placeholder-teal-400 focus:ring-1 focus:ring-teal-900 dark:focus:ring-blue-500 focus:border-gray900 dark:focus:border-blue-500 outline-none transition-colors"
-                    placeholder="Re-enter password"
-                    required
-                    minLength={6}
-                  />
+                  <div className="relative">
+                    <input
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="w-full px-3 py-2 pr-10 border border-gray300 dark:border-gray600 rounded-md text-xs bg-white dark:bg-gray-700 text-teal-900 dark:text-teal-100 placeholder-teal-400 dark:placeholder-teal-400 focus:ring-1 focus:ring-teal-900 dark:focus:ring-blue-500 focus:border-gray900 dark:focus:border-blue-500 outline-none transition-colors"
+                      placeholder="Re-enter password"
+                      required
+                      minLength={6}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-teal-400 hover:text-teal-600"
+                    >
+                      {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
               </div>
               <div className="mt-5 flex items-center justify-end gap-2">
@@ -2214,6 +2252,130 @@ const ManageAgentsPage = () => {
                       ))}
                     </div>
                    
+                  </div>
+                </div>
+
+                {/* Bank Permissions Section */}
+                <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-5">
+                  <h3 className="text-sm font-semibold text-teal-900 mb-4">Bank Permissions</h3>
+                  <div className="space-y-4">
+                    {clinicBankDetails?.card?.enabled && (
+                      <div className="flex items-center justify-between gap-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">Card</div>
+                          <div className="text-xs text-gray-500 mt-0.5">
+                            {clinicBankDetails.card.type === "flat"
+                              ? `${getCurrencySymbol(currency)} ${Number(clinicBankDetails.card.value).toFixed(2)} • Apply on: ${clinicBankDetails.card.applyOn}`
+                              : `${Number(clinicBankDetails.card.value).toFixed(0)}% • Apply on: ${clinicBankDetails.card.applyOn}`
+                            }
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setProfileForm(f => ({
+                            ...f,
+                            bankPermissions: {
+                              ...f.bankPermissions,
+                              card: !f.bankPermissions.card
+                            }
+                          }))}
+                          className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2 ${profileForm.bankPermissions.card ? 'bg-teal-600' : 'bg-gray-200'}`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${profileForm.bankPermissions.card ? 'translate-x-5' : 'translate-x-0'}`}
+                          />
+                        </button>
+                      </div>
+                    )}
+                    {clinicBankDetails?.bankTransfer?.enabled && (
+                      <div className="flex items-center justify-between gap-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">Bank Transfer</div>
+                          <div className="text-xs text-gray-500 mt-0.5">
+                            {clinicBankDetails.bankTransfer.type === "flat"
+                              ? `${getCurrencySymbol(currency)} ${Number(clinicBankDetails.bankTransfer.value).toFixed(2)} • Apply on: ${clinicBankDetails.bankTransfer.applyOn}`
+                              : `${Number(clinicBankDetails.bankTransfer.value).toFixed(0)}% • Apply on: ${clinicBankDetails.bankTransfer.applyOn}`
+                            }
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setProfileForm(f => ({
+                            ...f,
+                            bankPermissions: {
+                              ...f.bankPermissions,
+                              bankTransfer: !f.bankPermissions.bankTransfer
+                            }
+                          }))}
+                          className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2 ${profileForm.bankPermissions.bankTransfer ? 'bg-teal-600' : 'bg-gray-200'}`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${profileForm.bankPermissions.bankTransfer ? 'translate-x-5' : 'translate-x-0'}`}
+                          />
+                        </button>
+                      </div>
+                    )}
+                    {clinicBankDetails?.tabby?.enabled && (
+                      <div className="flex items-center justify-between gap-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">Tabby</div>
+                          <div className="text-xs text-gray-500 mt-0.5">
+                            {clinicBankDetails.tabby.type === "flat"
+                              ? `${getCurrencySymbol(currency)} ${Number(clinicBankDetails.tabby.value).toFixed(2)} • Apply on: ${clinicBankDetails.tabby.applyOn}`
+                              : `${Number(clinicBankDetails.tabby.value).toFixed(0)}% • Apply on: ${clinicBankDetails.tabby.applyOn}`
+                            }
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setProfileForm(f => ({
+                            ...f,
+                            bankPermissions: {
+                              ...f.bankPermissions,
+                              tabby: !f.bankPermissions.tabby
+                            }
+                          }))}
+                          className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2 ${profileForm.bankPermissions.tabby ? 'bg-teal-600' : 'bg-gray-200'}`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${profileForm.bankPermissions.tabby ? 'translate-x-5' : 'translate-x-0'}`}
+                          />
+                        </button>
+                      </div>
+                    )}
+                    {clinicBankDetails?.tamara?.enabled && (
+                      <div className="flex items-center justify-between gap-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">Tamara</div>
+                          <div className="text-xs text-gray-500 mt-0.5">
+                            {clinicBankDetails.tamara.type === "flat"
+                              ? `${getCurrencySymbol(currency)} ${Number(clinicBankDetails.tamara.value).toFixed(2)} • Apply on: ${clinicBankDetails.tamara.applyOn}`
+                              : `${Number(clinicBankDetails.tamara.value).toFixed(0)}% • Apply on: ${clinicBankDetails.tamara.applyOn}`
+                            }
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setProfileForm(f => ({
+                            ...f,
+                            bankPermissions: {
+                              ...f.bankPermissions,
+                              tamara: !f.bankPermissions.tamara
+                            }
+                          }))}
+                          className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2 ${profileForm.bankPermissions.tamara ? 'bg-teal-600' : 'bg-gray-200'}`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${profileForm.bankPermissions.tamara ? 'translate-x-5' : 'translate-x-0'}`}
+                          />
+                        </button>
+                      </div>
+                    )}
+                    {(!clinicBankDetails?.card?.enabled && !clinicBankDetails?.bankTransfer?.enabled && !clinicBankDetails?.tabby?.enabled && !clinicBankDetails?.tamara?.enabled) && (
+                      <div className="text-sm text-gray-500 py-4 text-center">
+                        No bank methods are enabled in clinic settings
+                      </div>
+                    )}
                   </div>
                 </div>
 

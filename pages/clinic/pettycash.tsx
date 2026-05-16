@@ -138,6 +138,9 @@ function PettyCashPage() {
   const [expenseEntries, setExpenseEntries] = useState<any[]>([]);
   const [manualTotal, setManualTotal] = useState(0);
   const [expenseTotal, setExpenseTotal] = useState(0);
+  const [globalCashInTotal, setGlobalCashInTotal] = useState(0);
+  const [grandManualTotal, setGrandManualTotal] = useState(0); // Global (unfiltered) manual additions
+  const [grandExpenseTotal, setGrandExpenseTotal] = useState(0); // Global (unfiltered) expense deductions
   const [manualLoading, setManualLoading] = useState(false);
 
   // Drawers
@@ -270,8 +273,9 @@ function PettyCashPage() {
       setExpenseSuccess(true);
       setExpenseVendor(""); setExpenseItems([{ itemName: "", amount: "" }]); setExpenseImages([]); setUsePettyCash(true);
       
-      // Refresh both lists
+      // Refresh both lists + global totals
       fetchManual();
+      fetchGlobalTotals();
       fetchData(page);
       
       setTimeout(() => {
@@ -324,7 +328,30 @@ function PettyCashPage() {
     }
   }, [search, startDate, endDate]);
 
-  // ── Fetch manual petty cash entries ───────────────────────────────────────
+  // ── Fetch global grand totals (no date filter) — called once on mount ──────────
+  const fetchGlobalTotals = useCallback(async () => {
+    try {
+      // Fetch global patient cash total
+      const patientRes = await axios.get("/api/clinic/pettycash-payments", {
+        headers: authHeaders(),
+        params: { page: "1", limit: "1", skipDateFilter: "true" },
+      });
+      if (patientRes.data.success) {
+        setGlobalCashInTotal(patientRes.data.summary?.totalCashIn || 0);
+      }
+      // Fetch global manual + expense total
+      const manualRes = await axios.get("/api/clinic/manual-pettycash", {
+        headers: authHeaders(),
+      });
+      if (manualRes.data.success) {
+        setGrandManualTotal(manualRes.data.grandManualTotal || 0);
+        setGrandExpenseTotal(manualRes.data.grandExpenseTotal || 0);
+      }
+    } catch {}
+  }, []);
+
+
+  // ── Fetch filtered manual petty cash entries (with date filter) ───────────────────────
   const fetchManual = useCallback(async () => {
     setManualLoading(true);
     try {
@@ -368,6 +395,12 @@ function PettyCashPage() {
     fetchData(page);
   }, [page]);
 
+  // Fetch global totals once on mount (no date filter — for Total Cash In card)
+  useEffect(() => {
+    fetchGlobalTotals();
+  }, []);
+
+
   useEffect(() => {
     fetchManual();
   }, [startDate, endDate]);
@@ -375,7 +408,7 @@ function PettyCashPage() {
   const handleSearch = () => { setPage(1); fetchData(1); };
   const handleReset = () => {
     setSearch(""); setStartDate(today); setEndDate(today); setPage(1);
-    setTimeout(() => { fetchData(1); fetchManual(); }, 0);
+    setTimeout(() => { fetchData(1); fetchManual(); fetchGlobalTotals(); }, 0);
   };
 
   // ── Add manual entry ──────────────────────────────────────────────────────
@@ -393,7 +426,8 @@ function PettyCashPage() {
       setAddSuccess(true);
       setAddName(""); setAddAmount(""); setAddNote("");
       fetchManual();
-      // refresh total
+      // refresh global totals + filtered data
+      fetchGlobalTotals();
       fetchData(page);
       setTimeout(() => setAddSuccess(false), 3000);
     } catch (e: any) {
@@ -403,8 +437,8 @@ function PettyCashPage() {
     }
   };
 
-  // Combined total (patient cash + manual total - expense total)
-  const combinedTotal = summary.totalCashIn + manualTotal - expenseTotal;
+  // Combined total for "Total Cash In" card = global patient cash + global manual additions - global expenses
+  const combinedTotal = globalCashInTotal + grandManualTotal - grandExpenseTotal;
 
   // ── Service info ──────────────────────────────────────────────────────────
   const renderServiceInfo = (record: CashRecord) => {

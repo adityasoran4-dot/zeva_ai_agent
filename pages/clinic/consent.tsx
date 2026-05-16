@@ -509,19 +509,36 @@ function UploadConsentModal({ onClose, onSuccess }: UploadConsentModalProps) {
                 Select services that require this consent form
               </p>
 
-              {/* Search */}
-              <div className="relative mb-3">
-                <Search
-                  size={14}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                />
-                <input
-                  type="text"
-                  value={serviceSearch}
-                  onChange={(e) => setServiceSearch(e.target.value)}
-                  placeholder="Search services..."
-                  className="w-full border border-gray-300 rounded-lg pl-8 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+              {/* Search + Select All */}
+              <div className="flex items-center justify-between mb-3 gap-2">
+                <div className="relative flex-1">
+                  <Search
+                    size={14}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                  />
+                  <input
+                    type="text"
+                    value={serviceSearch}
+                    onChange={(e) => setServiceSearch(e.target.value)}
+                    placeholder="Search services..."
+                    className="w-full border border-gray-300 rounded-lg pl-8 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                {!loadingServices && services.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (selectedServiceIds.length === services.length) {
+                        setSelectedServiceIds([]);
+                      } else {
+                        setSelectedServiceIds(services.map(s => s._id));
+                      }
+                    }}
+                    className="text-xs text-blue-600 hover:text-blue-800 font-medium whitespace-nowrap"
+                  >
+                    {selectedServiceIds.length === services.length ? "Deselect All" : "Select All Services"}
+                  </button>
+                )}
               </div>
 
               {/* Service list */}

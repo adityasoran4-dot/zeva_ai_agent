@@ -10,7 +10,7 @@ import AgentProfile from "../../../models/AgentProfile";
 import { getUserFromReq } from "../lead-ms/auth";
 import { checkClinicPermission } from "../lead-ms/permissions-helper";
 import { checkAgentPermission } from "../agent/permissions-helper";
-import { calculateCommissionForStaff } from "../../../lib/commissionCalculator";
+import { calculateCommissionForStaff, calculateBankDeduction } from "../../../lib/commissionCalculator";
 
 export default async function handler(req, res) {
   await dbConnect();
@@ -57,14 +57,27 @@ export default async function handler(req, res) {
             "create",
           );
 
-        // Fallback: Check clinic_ScheduledAppointment if patient_registration is denied
+        // Fallback: Check clinic_Appointment or clinic_ScheduledAppointment if patient_registration is denied
         if (!agentHasPermission) {
-          const { hasPermission: appointmentHasPermission } =
-            await checkAgentPermission(
+          let appointmentHasPermission = false;
+          
+          // Check clinic_Appointment first
+          const { hasPermission: app1 } = await checkAgentPermission(
+            clinicUser._id,
+            "clinic_Appointment",
+            "create",
+          );
+          if (app1) {
+            appointmentHasPermission = true;
+          } else {
+            // Fallback to clinic_ScheduledAppointment for backward compatibility
+            const { hasPermission: app2 } = await checkAgentPermission(
               clinicUser._id,
               "clinic_ScheduledAppointment",
               "create",
             );
+            appointmentHasPermission = app2;
+          }
 
           if (!appointmentHasPermission) {
             return res.status(403).json({
@@ -84,14 +97,27 @@ export default async function handler(req, res) {
             "create",
           );
 
-        // Fallback: Check clinic_ScheduledAppointment if patient_registration is denied
+        // Fallback: Check clinic_Appointment or clinic_ScheduledAppointment if patient_registration is denied
         if (!agentHasPermission) {
-          const { hasPermission: appointmentHasPermission } =
-            await checkAgentPermission(
+          let appointmentHasPermission = false;
+          
+          // Check clinic_Appointment first
+          const { hasPermission: app1 } = await checkAgentPermission(
+            clinicUser._id,
+            "clinic_Appointment",
+            "create",
+          );
+          if (app1) {
+            appointmentHasPermission = true;
+          } else {
+            // Fallback to clinic_ScheduledAppointment for backward compatibility
+            const { hasPermission: app2 } = await checkAgentPermission(
               clinicUser._id,
               "clinic_ScheduledAppointment",
               "create",
             );
+            appointmentHasPermission = app2;
+          }
 
           if (!appointmentHasPermission) {
             return res.status(403).json({
@@ -297,7 +323,11 @@ export default async function handler(req, res) {
     console.log("patientPackageId:", patientPackageId);
     console.log("PatientRegistration ID (userId):", userId);
 
-    if (service === "Package") {
+    const hasPendingAmount = (pendingUsed && parseFloat(pendingUsed) > 0) || 
+                              (pendingClaimUsed && parseFloat(pendingClaimUsed) > 0) || 
+                              (unpaidPackagesPaid && Array.isArray(unpaidPackagesPaid) && unpaidPackagesPaid.length > 0);
+
+    if (service === "Package" && !hasPendingAmount) {
       if (
         !packageName ||
         !Array.isArray(selectedPackageTreatments) ||
@@ -863,9 +893,69 @@ export default async function handler(req, res) {
       }
     }
 
+    // Helper to map payment method names to bankDetails keys
+    const getBankPaymentDetails = (paymentMethodName) => {
+      const methodMap = {
+        "Card": "card",
+        "Bank Transfer": "bankTransfer",
+        "BT": "bankTransfer",
+        "Tabby": "tabby",
+        "Tamara": "tamara"
+      };
+      const key = methodMap[paymentMethodName];
+      if (key && clinic.bankDetails && clinic.bankDetails[key]) {
+        return clinic.bankDetails[key];
+      }
+      return { enabled: false };
+    };
+
+    // Get the selected payment method's bank details
+    let selectedBankPaymentDetails = getBankPaymentDetails(paymentMethod);
+    console.log("[CreatePatientRegistration] Selected payment method:", paymentMethod);
+    console.log("[CreatePatientRegistration] Selected bank payment details (clinic-level):", selectedBankPaymentDetails);
+
+    // Check if we have a doctor/agent, get their bank permissions
+    if (appointment?.doctorId && selectedBankPaymentDetails.enabled) {
+      console.log("[CreatePatientRegistration] Checking agent/doctor bank permissions for doctorId:", appointment.doctorId);
+      try {
+        const agentProfile = await AgentProfile.findOne({ userId: appointment.doctorId });
+        console.log("[CreatePatientRegistration] Fetched agent profile:", agentProfile);
+        if (agentProfile) {
+          console.log("[CreatePatientRegistration] Agent profile bank permissions:", agentProfile.bankPermissions);
+        }
+        if (agentProfile && agentProfile.bankPermissions) {
+          const methodMap = {
+            "Card": "card",
+            "Bank Transfer": "bankTransfer",
+            "BT": "bankTransfer",
+            "Tabby": "tabby",
+            "Tamara": "tamara"
+          };
+          const key = methodMap[paymentMethod];
+          console.log("[CreatePatientRegistration] Payment method key:", key);
+          if (key && agentProfile.bankPermissions[key]) {
+            console.log("[CreatePatientRegistration] Doctor/agent has bank permission enabled for this method, keeping clinic-level settings");
+          } else if (key && !agentProfile.bankPermissions[key]) {
+            console.log("[CreatePatientRegistration] Doctor/agent has bank permission disabled for this method, disabling globally");
+            selectedBankPaymentDetails = { enabled: false };
+          }
+        }
+      } catch (err) {
+        console.error("[CreatePatientRegistration] Error getting agent profile for bank permissions:", err);
+      }
+    }
+    console.log("[CreatePatientRegistration] Final selected bank payment details:", selectedBankPaymentDetails);
+    const earnedAmountForCommission = amountNum; // Amount before any deductions
+    
+    // Calculate commissionable amount: paidNum minus pendingUsed (since pendingUsed is clearing past debt, not new payment)
+    const commissionablePaidAmount = Math.max(0, paidNum - pendingUsedNum);
+    console.log("[CreatePatientRegistration] Original paid amount:", paidNum);
+    console.log("[CreatePatientRegistration] Pending used amount:", pendingUsedNum);
+    console.log("[CreatePatientRegistration] Commissionable paid amount (after pendingUsed deduction):", commissionablePaidAmount);
+
     // Commission calculation and storage
     try {
-      const paidNumForCommission = paidNum;
+      const paidNumForCommission = commissionablePaidAmount;
       const referredByStr = String(referredBy || "").trim();
       if (
         paidNumForCommission > 0 &&
@@ -884,9 +974,83 @@ export default async function handler(req, res) {
         if (match) {
           const commissionPercent = Number(match.referralPercent || 0);
           if (commissionPercent > 0) {
-            const commissionAmount = Number(
-              ((paidNumForCommission * commissionPercent) / 100).toFixed(2),
+            // Check if we need to apply bank deduction before or after commission
+            const applyDeductionAfterCommission = selectedBankPaymentDetails.enabled && selectedBankPaymentDetails.applyOn === "earned";
+            console.log("[CreatePatientRegistration] Referral: applyDeductionAfterCommission:", applyDeductionAfterCommission);
+            
+            let adjustedAmount = paidNumForCommission;
+            let bankDeductionResult = {
+              enabled: false,
+              type: null,
+              value: null,
+              applyOn: null,
+              deductionAmount: 0,
+              finalEarnedAmount: earnedAmountForCommission,
+              finalPaidAmount: paidNumForCommission,
+              deductionApplied: false
+            };
+
+            if (selectedBankPaymentDetails.enabled && !applyDeductionAfterCommission) {
+              // Apply bank deduction first (applyOn: paid)
+              console.log("[CreatePatientRegistration] Calculating referral commission with bank deductions BEFORE commission");
+              bankDeductionResult = calculateBankDeduction({
+                earnedAmount: earnedAmountForCommission,
+                paidAmount: paidNumForCommission,
+                bankPaymentDetails: selectedBankPaymentDetails
+              });
+              console.log("[CreatePatientRegistration] Referral bank deduction result:", bankDeductionResult);
+              adjustedAmount = bankDeductionResult.finalPaidAmount;
+            } else if (applyDeductionAfterCommission) {
+              console.log("[CreatePatientRegistration] Will apply bank deductions AFTER referral commission");
+            }
+
+            // Calculate commission
+            let commissionAmount = Number(
+              ((adjustedAmount * commissionPercent) / 100).toFixed(2),
             );
+            console.log("[CreatePatientRegistration] Original referral commission amount before deduction:", commissionAmount);
+
+            // Now apply bank deduction to commission amount if applyOn is "earned"
+            if (applyDeductionAfterCommission) {
+              console.log("[CreatePatientRegistration] Applying bank deduction AFTER referral commission (applyOn: earned)");
+              
+              let deductionAmount = 0;
+              console.log("[CreatePatientRegistration] Referral bank payment details for deduction:", {
+                type: selectedBankPaymentDetails.type,
+                value: selectedBankPaymentDetails.value
+              });
+              
+              if (selectedBankPaymentDetails.type === "flat") {
+                deductionAmount = Number(selectedBankPaymentDetails.value);
+                console.log(`[CreatePatientRegistration] Applying flat deduction: ${deductionAmount}`);
+              } else if (selectedBankPaymentDetails.type === "percentage") {
+                deductionAmount = (commissionAmount * Number(selectedBankPaymentDetails.value)) / 100;
+                console.log(`[CreatePatientRegistration] Applying percentage deduction: ${selectedBankPaymentDetails.value}% of ${commissionAmount} = ${deductionAmount}`);
+              }
+              
+              // Apply deduction
+              commissionAmount = Math.max(0, commissionAmount - deductionAmount);
+              commissionAmount = Number(commissionAmount.toFixed(2));
+              
+              bankDeductionResult = {
+                enabled: true,
+                type: selectedBankPaymentDetails.type,
+                value: selectedBankPaymentDetails.value,
+                applyOn: selectedBankPaymentDetails.applyOn,
+                deductionAmount: Number(deductionAmount.toFixed(2)),
+                finalEarnedAmount: earnedAmountForCommission,
+                finalPaidAmount: paidNumForCommission,
+                deductionApplied: true
+              };
+              
+              console.log("[CreatePatientRegistration] Referral bank deduction on commission:", {
+                deductionAmount,
+                finalCommissionAmount: commissionAmount
+              });
+            }
+
+            console.log("[CreatePatientRegistration] Final referral commission amount:", commissionAmount);
+            
             // Optionally try to map to a staff user via email or phone
             let staffId = null;
             if (match.email || match.phone) {
@@ -903,6 +1067,8 @@ export default async function handler(req, res) {
                 staffId = userCandidate._id;
               }
             }
+            // Set commission base amount: original paid amount if applyOn is earned, adjusted amount if applyOn is paid
+            const referralCommissionBase = selectedBankPaymentDetails.enabled && selectedBankPaymentDetails.applyOn === "paid" ? adjustedAmount : paidNumForCommission;
             await Commission.create({
               clinicId: clinic._id,
               source: "referral",
@@ -916,9 +1082,19 @@ export default async function handler(req, res) {
               commissionPercent,
               amountPaid: paidNumForCommission,
               commissionAmount,
+              commissionBaseAmount: referralCommissionBase,
+              finalCommissionAmount: commissionAmount,
               invoicedDate: new Date(invoicedDate),
               notes: notes || "",
               createdBy: clinicUser._id,
+              paymentMethod: paymentMethod,
+              bankDeduction: {
+                enabled: selectedBankPaymentDetails.enabled,
+                type: selectedBankPaymentDetails.type,
+                value: selectedBankPaymentDetails.value,
+                applyOn: selectedBankPaymentDetails.applyOn,
+                deductionAmount: bankDeductionResult.deductionAmount
+              }
             });
           }
         }
@@ -1014,15 +1190,17 @@ export default async function handler(req, res) {
 
     // Doctor/Staff commission based on AgentProfile (supports flat, target-based, and after_deduction)
     try {
-      if (paidNum > 0 && appointment?.doctorId) {
+      if (commissionablePaidAmount > 0 && appointment?.doctorId) {
         // Use the commission calculator to determine commission
         const commissionResult = await calculateCommissionForStaff({
           staffId: appointment.doctorId,
           clinicId: clinic._id,
-          paidAmount: paidNum,
+          paidAmount: commissionablePaidAmount,
+          earnedAmount: earnedAmountForCommission,
           patientId: patientRegistration._id,
           appointmentId: appointment._id,
           currentBillingId: billing._id, // Pass the billing ID to exclude it from "last billing" query
+          bankPaymentDetails: selectedBankPaymentDetails,
         });
 
         if (commissionResult.shouldCreateCommission) {
@@ -1035,11 +1213,19 @@ export default async function handler(req, res) {
             patientId: patientRegistration._id,
             billingId: billing._id,
             commissionPercent: commissionResult.commissionPercentage,
-            amountPaid: paidNum,
+            amountPaid: paidNum, // Still store the full paid amount for reference
             commissionAmount: commissionResult.commissionAmount,
             invoicedDate: new Date(invoicedDate),
             notes: notes || "",
             createdBy: clinicUser._id,
+            paymentMethod: paymentMethod,
+            bankDeduction: {
+              enabled: commissionResult.bankDeduction?.enabled || false,
+              type: commissionResult.bankDeduction?.type,
+              value: commissionResult.bankDeduction?.value,
+              applyOn: commissionResult.bankDeduction?.applyOn,
+              deductionAmount: commissionResult.bankDeduction?.deductionAmount
+            }
           };
 
           // Add target-based specific fields if applicable
@@ -1089,7 +1275,14 @@ export default async function handler(req, res) {
           // and set initial finalCommissionAmount equal to the computed commissionAmount.
           // This base is used later if post-commission expenses are added on the commission page.
           const commissionType = commissionResult.commissionType;
-          let commissionBaseAmount = paidNum; // default: full paid amount (flat)
+          // If applyOn is paid, use finalPaidAmount as base; if applyOn is earned, use original commissionable amount as base
+          let commissionBaseAmount;
+          if (commissionResult.bankDeduction.deductionApplied && selectedBankPaymentDetails.applyOn === "paid") {
+            commissionBaseAmount = commissionResult.bankDeduction.finalPaidAmount || commissionablePaidAmount;
+          } else {
+            commissionBaseAmount = commissionablePaidAmount;
+          }
+          
           if (commissionType === "target_based") {
             // Base = only the amount above target (commission is earned only on excess)
             commissionBaseAmount = commissionResult.amountAboveTarget || 0;

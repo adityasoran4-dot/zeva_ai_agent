@@ -242,11 +242,14 @@ export default async function handler(req, res) {
           await pkg.save({ session });
         } else {
           // For standard package, we remove from source and add to target
+          const sourcePackage = (Array.isArray(source.packages) ? source.packages.find(p => String(p.packageId) === String(packageId)) : {});
           source.packages = (Array.isArray(source.packages) ? source.packages.filter(p => String(p.packageId) !== String(packageId)) : []);
           
           target.packages = Array.isArray(target.packages) ? target.packages : [];
           target.packages.push({ 
             packageId, 
+            packageName,
+            packageSoldBy: sourcePackage.packageSoldBy || user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Unknown',
             assignedDate: new Date(),
             paymentStatus,
             paidAmount,

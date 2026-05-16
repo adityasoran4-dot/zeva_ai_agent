@@ -246,10 +246,16 @@ export default async function handler(req, res) {
         packages: Array.isArray(packagesArray)
           ? packagesArray.map((p) => ({
               packageId: p.packageId,
+              packageName: p.packageName,
+              packageSoldBy: p.packageSoldBy || user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Unknown',
               assignedDate: p.assignedDate ? new Date(p.assignedDate) : undefined,
             }))
           : (pkgToggle === "Yes" && packageId
-              ? [{ packageId, assignedDate: new Date() }]
+              ? [{ 
+                  packageId, 
+                  assignedDate: new Date(),
+                  packageSoldBy: user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Unknown'
+                }]
               : []),
       });
 

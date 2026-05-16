@@ -77,7 +77,7 @@ export default async function handler(req, res) {
     // Log all billing records to see their pending amounts
     if (billings.length > 0) {
       const pendingAmounts = billings.map(b => ({ invoice: b.invoiceNumber, pending: b.pending, pendingUsed: b.pendingUsed }));
-      console.log(`[Patient Balance] All billing records pending amounts:`, JSON.stringify(pendingAmounts, null, 2));
+      // console.log(`[Patient Balance] All billing records pending amounts:`, JSON.stringify(pendingAmounts, null, 2));
       
       // Log advance amounts
       const advanceAmounts = billings.map(b => ({ 
@@ -87,19 +87,19 @@ export default async function handler(req, res) {
         advance: b.advance, 
         advanceUsed: b.advanceUsed 
       }));
-      console.log(`[Patient Balance] All billing records advance amounts:`, JSON.stringify(advanceAmounts, null, 2));
+      // console.log(`[Patient Balance] All billing records advance amounts:`, JSON.stringify(advanceAmounts, null, 2));
     }
     const recordsWithImages = billings.filter(b => b.pendingBalanceImage && b.pendingBalanceImage.length > 0);
-    console.log(`[Patient Balance] Records with images: ${recordsWithImages.length}`);
+    // console.log(`[Patient Balance] Records with images: ${recordsWithImages.length}`);
     if (recordsWithImages.length > 0) {
-      console.log(`[Patient Balance] Sample images from first record:`, JSON.stringify(recordsWithImages[0].pendingBalanceImage));
+      // console.log(`[Patient Balance] Sample images from first record:`, JSON.stringify(recordsWithImages[0].pendingBalanceImage));
     }
     
     // Log all billing records to see their structure
     if (billings.length > 0) {
-      console.log(`[Patient Balance] First billing record keys:`, Object.keys(billings[0]));
-      console.log(`[Patient Balance] First record pendingBalanceImage field:`, billings[0].pendingBalanceImage);
-      console.log(`[Patient Balance] Has pendingBalanceImage property:`, 'pendingBalanceImage' in billings[0]);
+      // console.log(`[Patient Balance] First billing record keys:`, Object.keys(billings[0]));
+      // console.log(`[Patient Balance] First record pendingBalanceImage field:`, billings[0].pendingBalanceImage);
+      // console.log(`[Patient Balance] Has pendingBalanceImage property:`, 'pendingBalanceImage' in billings[0]);
     }
 
     let totalPending = 0;

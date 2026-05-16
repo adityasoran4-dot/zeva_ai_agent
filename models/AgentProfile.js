@@ -68,6 +68,12 @@ const AgentProfileSchema = new mongoose.Schema(
         url: String,
       },
     ],
+    bankPermissions: {
+      card: { type: Boolean, default: false },
+      bankTransfer: { type: Boolean, default: false },
+      tabby: { type: Boolean, default: false },
+      tamara: { type: Boolean, default: false }
+    }
   },
   { timestamps: true }
 );

@@ -82,14 +82,14 @@ export default async function handler(req, res) {
     const commissions = await Commission.find(filter)
       .sort({ createdAt: -1 })
       .populate([
-        { path: "patientId", model: PatientRegistration, select: "firstName lastName mobileNumber" },
+        { path: "patientId", model: PatientRegistration, select: "firstName lastName mobileNumber emrNumber" },
         {
           path: "appointmentId",
           model: Appointment,
           select: "doctorId",
           populate: { path: "doctorId", model: User, select: "name role" },
         },
-        { path: "billingId", model: Billing, select: "invoiceNumber invoicedDate service treatment package paid pending advance advanceUsed pendingUsed isFreeConsultation freeConsultationCount membershipDiscountApplied originalAmount selectedPackageTreatments expenses expenseTotal" },
+        { path: "billingId", model: Billing, select: "invoiceNumber invoicedDate service treatment package paid pending advance advanceUsed pendingUsed isFreeConsultation freeConsultationCount membershipDiscountApplied originalAmount selectedPackageTreatments expenses expenseTotal paymentMethod" },
       ])
       .lean();
 
@@ -166,6 +166,7 @@ export default async function handler(req, res) {
         commissionId: c._id.toString(),
         patientName: `${(patient.firstName || "").trim()} ${(patient.lastName || "").trim()}`.trim(),
         patientMobile: patient.mobileNumber || "",
+        patientEmr: patient.emrNumber || "",
         invoiceNumber: billing.invoiceNumber || "",
         invoicedDate: billing.invoicedDate || c.invoicedDate || null,
         service: billing.service || "",
@@ -193,6 +194,8 @@ export default async function handler(req, res) {
         isSubmitted: !!c.isSubmitted,
         isApproved: !!c.isApproved,
         doctorName: doctor.name || "",
+        paymentMethod: c.paymentMethod || billing.paymentMethod || "",
+        bankDeduction: c.bankDeduction || null,
       };
     });
 

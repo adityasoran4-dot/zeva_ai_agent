@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { Eye, EyeOff } from 'lucide-react';
 
 const CreateAgentModal = ({ isOpen, onClose, onCreated, token, doctorToken, adminToken, defaultRole }) => {
   // Note: 'token' prop represents clinicToken (clinic users)
@@ -7,6 +8,7 @@ const CreateAgentModal = ({ isOpen, onClose, onCreated, token, doctorToken, admi
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [role, setRole] = useState(defaultRole || 'agent'); // Default to passed role or 'agent'
   const [submitting, setSubmitting] = useState(false);
 
@@ -176,14 +178,23 @@ const CreateAgentModal = ({ isOpen, onClose, onCreated, token, doctorToken, admi
             </div>
             <div>
               <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Password <span className="text-red-500">*</span></label>
-              <input 
-                type="password" 
-                value={password} 
-                onChange={(e) => setPassword(e.target.value)} 
-                placeholder="Enter password" 
-                required 
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:ring-1 focus:ring-gray-400 dark:focus:ring-blue-500 focus:border-gray-400 dark:focus:border-blue-500 outline-none transition-colors" 
-              />
+              <div className="relative">
+                <input 
+                  type={showPassword ? 'text' : 'password'} 
+                  value={password} 
+                  onChange={(e) => setPassword(e.target.value)} 
+                  placeholder="Enter password" 
+                  required 
+                  className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:ring-1 focus:ring-gray-400 dark:focus:ring-blue-500 focus:border-gray-400 dark:focus:border-blue-500 outline-none transition-colors" 
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
           </div>
           <div className="mt-4 flex items-center justify-end gap-2">

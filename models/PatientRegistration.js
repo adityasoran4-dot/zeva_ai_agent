@@ -134,6 +134,7 @@ const patientRegistrationSchema = new mongoose.Schema(
       {
         packageId: { type: mongoose.Schema.Types.ObjectId, ref: "Package" },
         packageName: { type: String, trim: true }, // Store package name for quick display
+        packageSoldBy: { type: String, trim: true }, // Name of the person who added the package
         assignedDate: { type: Date, default: Date.now },
         validityInMonths: { type: Number, default: 0 },
         startDate: { type: Date },
@@ -148,6 +149,7 @@ const patientRegistrationSchema = new mongoose.Schema(
       {
         packageId: { type: mongoose.Schema.Types.ObjectId, ref: "UserPackage" },
         packageName: { type: String, trim: true },
+        packageSoldBy: { type: String, trim: true }, // Name of the person who added the package
         totalSessions: { type: Number, min: 0 },
         remainingSessions: { type: Number, min: 0 },
         totalPrice: { type: Number, min: 0 },

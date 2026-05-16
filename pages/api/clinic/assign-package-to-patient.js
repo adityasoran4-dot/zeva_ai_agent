@@ -48,6 +48,7 @@ export default async function handler(req, res) {
     const packageData = {
       packageId,
       packageName: pkg.name || '', // Store the package name
+      packageSoldBy: user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Unknown', // Name of person who added package
       assignedDate: new Date(),
       validityInMonths: validityInMonths !== undefined ? parseInt(validityInMonths) : (pkg.validityInMonths || 0),
       startDate: startDate ? new Date(startDate) : (pkg.startDate || new Date()),
