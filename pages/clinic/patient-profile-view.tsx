@@ -6397,7 +6397,6 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                     const isDoctorDiscount = billing.isDoctorDiscountApplied;
                                     const isAgentDiscount = billing.isAgentDiscountApplied;
                                     const isMembershipDiscount = (billing.membershipDiscountApplied || 0) > 0;
-                                    const hasAnyDiscount = discountPercent > 0 || isDoctorDiscount || isAgentDiscount || isMembershipDiscount;
                                    
                                     // Refund info
                                     const isRefunded = billing.isOfferRefunded || false;
@@ -6524,7 +6523,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                                 </span>
                                               )}
                                             </div>
-                                            {!hasAnyDiscount && <span className="text-gray-300">—</span>}
+                                            {/* {!hasAnyDiscount && <span className="text-gray-300">—</span>} */}
                                           </div>
                                         </td>
                                         {/* Offer Applied */}
@@ -6797,14 +6796,9 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                     const originalAmt = billing.originalAmount || billing.amount || 0;
                                     const totalDiscount = originalAmt > billing.amount ? (originalAmt - billing.amount) : 0;
                                     const discountPercent = originalAmt > 0 ? (totalDiscount / originalAmt * 100) : 0;
-                                    const isDoctorDiscount = billing.isDoctorDiscountApplied;
-                                    const isAgentDiscount = billing.isAgentDiscountApplied;
-                                    const isMembershipDiscount = (billing.membershipDiscountApplied || 0) > 0;
-                                    const hasAnyDiscount = discountPercent > 0 || isDoctorDiscount || isAgentDiscount || isMembershipDiscount;
                                    
                                     // Refund info
                                     const isRefunded = billing.isOfferRefunded || false;
-                                    const refundedOffers = billing.refundedOffers || [];
                                    
                                     // Payment methods
                                     const paymentMethods = billing.multiplePayments && billing.multiplePayments.length > 0
@@ -6817,14 +6811,11 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                     // Free sessions
                                     const usedFreeSessionCount = billing.usedFreeSessionCount || 0;
                                     const earnedFreeSessions = billing.freeOfferSessionCount || 0;
-                                    const freeConsultation = billing.isFreeConsultation || false;
-                                    const isBundleOffer = billing.offerType === 'bundle';
                                    
                                     // Cashback
                                     const cashbackEarnedAmt = billing.cashbackEarned || 0;
                                     const cashbackEarnedFromOffer = billing.cashbackAmount || 0;
                                     const cashbackUsedAmt = billing.cashbackWalletUsed || 0;
-                                    const isCashbackApplied = billing.isCashbackApplied || false;
                                     const cashbackOfferName = billing.cashbackOfferName || '';
                                    
                                     // Pending and advance
