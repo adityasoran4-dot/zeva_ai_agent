@@ -33,7 +33,7 @@ interface LocationPickerModalProps {
 
 const LIBRARIES: "places"[] = ["places"];
 
-const defaultCenter = {
+const fallbackCenter = {
   lat: 25.2048,
   lng: 55.2708,
 };
@@ -42,36 +42,6 @@ const mapContainerStyle = {
   width: "100%",
   height: "100%",
 };
-
-const darkMapStyle: google.maps.MapTypeStyle[] = [
-  {
-    featureType: "all",
-    elementType: "labels.text.fill",
-    stylers: [
-      {
-        color: "#7c93a3",
-      },
-    ],
-  },
-  {
-    featureType: "road",
-    elementType: "geometry",
-    stylers: [
-      {
-        color: "#38414e",
-      },
-    ],
-  },
-  {
-    featureType: "water",
-    elementType: "geometry",
-    stylers: [
-      {
-        color: "#17263c",
-      },
-    ],
-  },
-];
 
 const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
   isOpen,
@@ -99,10 +69,49 @@ const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
 
   const [isSending, setIsSending] = useState(false);
 
+  const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>(
+    fallbackCenter,
+  );
+
+  const [hasDetectedLocation, setHasDetectedLocation] = useState(false);
+
   const { isLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "",
     libraries: LIBRARIES,
   });
+
+  // AUTO DETECT CURRENT LOCATION ON OPEN
+  useEffect(() => {
+    if (!isOpen) return;
+
+    if (hasDetectedLocation) return;
+
+    if (!navigator.geolocation) return;
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+
+        setMapCenter({ lat: latitude, lng: longitude });
+
+        setHasDetectedLocation(true);
+
+        if (mapRef.current) {
+          mapRef.current.panTo({ lat: latitude, lng: longitude });
+
+          mapRef.current.setZoom(17);
+        }
+      },
+      () => {
+        // Silently fallback to default center if location denied
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0,
+      },
+    );
+  }, [isOpen, hasDetectedLocation]);
 
   // AUTO FOCUS SEARCH
   useEffect(() => {
@@ -266,7 +275,8 @@ const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
 
       {
         enableHighAccuracy: true,
-        timeout: 10000,
+        timeout: 20000,
+        maximumAge: 0,
       },
     );
   };
@@ -325,6 +335,10 @@ const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
     setSelectedAddress("");
 
     setLocationName("");
+
+    setMapCenter(fallbackCenter);
+
+    setHasDetectedLocation(false);
 
     onClose();
   };
@@ -419,8 +433,8 @@ const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
             ) : (
               <GoogleMap
                 mapContainerStyle={mapContainerStyle}
-                center={selectedLocation || defaultCenter}
-                zoom={selectedLocation ? 17 : 12}
+                center={selectedLocation || mapCenter}
+                zoom={selectedLocation ? 17 : hasDetectedLocation ? 17 : 12}
                 onClick={handleMapClick}
                 onLoad={(map) => {
                   mapRef.current = map;
@@ -433,7 +447,6 @@ const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
                   fullscreenControl: false,
                   gestureHandling: "greedy",
                   clickableIcons: false,
-                  styles: darkMapStyle,
                 }}
               >
                 {selectedLocation && <MarkerF position={selectedLocation} />}
