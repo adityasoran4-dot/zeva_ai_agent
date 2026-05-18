@@ -271,7 +271,9 @@ const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
     setLocationAccuracy(null);
 
     // Try multiple times to get the most accurate position
-    const attemptLocation = (attempt: number): Promise<GeolocationPosition> => {
+    const attemptLocation = (
+      _attempt: number,
+    ): Promise<GeolocationPosition> => {
       return new Promise((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject, {
           enableHighAccuracy: true,
@@ -320,7 +322,7 @@ const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
       setIsGettingLocation(false);
 
       if (accuracy > 50) {
-        toast.warning(
+        toast.error(
           `Location accuracy: ±${Math.round(accuracy)}m (may be approximate)`,
         );
       } else {
