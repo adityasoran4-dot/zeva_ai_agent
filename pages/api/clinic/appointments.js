@@ -349,6 +349,10 @@ export default async function handler(req, res) {
               : apt.bookedFrom
                 ? apt.bookedFrom
                 : "doctor", // Include booking source, default to "doctor" for old appointments without this field
+          // Booked by information
+          bookedByRole: apt.bookedByRole || null,
+          bookedByUserId: apt.bookedByUserId?.toString() || null,
+          bookedByName: apt.bookedByName || null,
           doctorTreatments:
             doctorTreatmentsMap[apt.doctorId?._id?.toString()] || [],
           serviceId: apt.serviceId?._id?.toString() || null,
@@ -649,6 +653,19 @@ export default async function handler(req, res) {
             )
           : appointmentDate;
 
+      // Determine who booked the appointment
+      let bookedByRole = clinicUser.role;
+      let bookedByUserId = clinicUser._id;
+      let bookedByName = clinicUser.name || null;
+      
+      // For clinic role, get clinic name instead of user name
+      if (clinicUser.role === "clinic") {
+        const clinic = await Clinic.findOne({ owner: clinicUser._id }).select("name").lean();
+        if (clinic) {
+          bookedByName = clinic.name || "Clinic Admin";
+        }
+      }
+      
       const appointmentData = {
         clinicId,
         patientId,
@@ -665,6 +682,9 @@ export default async function handler(req, res) {
         createdBy: clinicUser._id,
         bookedFrom: validBookedFrom, // Use validated value - explicitly set to override default
         customTimeSlots: req.body.customTimeSlots || undefined, // Save custom time slots if provided
+        bookedByRole, // Store who booked (role)
+        bookedByUserId, // Store who booked (user ID)
+        bookedByName, // Store who booked (name)
       };
       // Optional service selection
       if (req.body.serviceId) {
@@ -807,6 +827,10 @@ export default async function handler(req, res) {
             populatedAppointment.bookedFrom === "doctor"
               ? populatedAppointment.bookedFrom
               : validBookedFrom, // Use value from database, fallback to validated value
+          // Booked by information
+          bookedByRole,
+          bookedByUserId,
+          bookedByName,
           doctorTreatments,
           serviceId: populatedAppointment.serviceId?._id?.toString() || null,
           serviceName: populatedAppointment.serviceId?.name || null,

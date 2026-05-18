@@ -2986,8 +2986,17 @@ const ClinicDashboard: NextPageWithLayout = () => {
     const fetchFinancialReports = async () => {
       try {
         setFinancialLoading(true);
-        const token = localStorage.getItem('clinicToken') || sessionStorage.getItem('clinicToken');
-        if (!token) return;
+        // Check for multiple token types to support all authorized roles
+        const token = localStorage.getItem('clinicToken') || 
+                      sessionStorage.getItem('clinicToken') ||
+                      localStorage.getItem('userToken') || 
+                      sessionStorage.getItem('userToken') ||
+                      localStorage.getItem('agentToken') || 
+                      sessionStorage.getItem('agentToken');
+        if (!token) {
+          console.warn('⚠️ No authentication token found for financial reports');
+          return;
+        }
 
         console.log('📊 Fetching financial reports for', timeRangeFilter);
         
@@ -3086,8 +3095,20 @@ const ClinicDashboard: NextPageWithLayout = () => {
             topServicesData: topServicesData.length
           });
         }
-      } catch (error) {
-        console.error('Error fetching financial reports:', error);
+      } catch (error: any) {
+        console.error('❌ Error fetching financial reports:', error);
+        if (error.response) {
+          console.error('🔴 Response status:', error.response.status);
+          console.error('🔴 Response data:', error.response.data);
+          if (error.response.status === 403) {
+            console.error('🔒 Access Denied - Check user role and clinic association');
+            console.error('🔒 User may not have permission to access financial reports');
+          } else if (error.response.status === 401) {
+            console.error('🔑 Unauthorized - Token may be invalid or expired');
+          } else if (error.response.status === 404) {
+            console.error('🏥 Clinic not found for this user');
+          }
+        }
       } finally {
         setFinancialLoading(false);
       }

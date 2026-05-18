@@ -125,6 +125,22 @@ const AppointmentSchema = new mongoose.Schema(
         ref: "Service",
       },
     ],
+    // Track who booked the appointment
+    bookedByRole: {
+      type: String,
+      enum: ["clinic", "agent", "admin", "doctor", "doctorStaff", "staff", "user"],
+      default: null,
+    },
+    bookedByUserId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    bookedByName: {
+      type: String,
+      trim: true,
+      default: null,
+    },
   },
   { timestamps: true },
 );

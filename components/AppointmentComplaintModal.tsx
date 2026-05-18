@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import React, { useEffect, useRef, useState, useMemo } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
@@ -3590,6 +3590,9 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
                         <div className="flex items-center gap-2 mb-4">
                           <Calendar className="w-4 h-4 text-blue-600" />
                           <h3 className="text-sm font-semibold text-gray-800">Next Session Booking</h3>
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
+                            Check the availability of the room 
+                          </span>
                         </div>
 
                         <div className="grid grid-cols-2 gap-4 mb-4">
