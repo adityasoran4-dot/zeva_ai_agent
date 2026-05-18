@@ -5506,31 +5506,38 @@ function AppointmentPage({
                 </div>
 
                 {/* Contact Info */}
-                {(hoveredAppointment.appointment.patientEmail ||
-                  hoveredAppointment.appointment.patientMobileNumber) && (
-                  <div className="space-y-0.5 pt-0.5 border-t border-gray-100 dark:border-gray-300">
-                    {hoveredAppointment.appointment.patientMobileNumber && (
-                      <div className="flex items-center gap-1">
-                        <span className="text-[9px] text-gray-700 dark:text-gray-800 font-medium w-12 flex-shrink-0">
-                          Mobile:
-                        </span>
-                        <span className="text-[10px] text-gray-700 dark:text-gray-800 truncate">
-                          {hoveredAppointment.appointment.patientMobileNumber}
-                        </span>
-                      </div>
-                    )}
-                    {hoveredAppointment.appointment.patientEmail && (
-                      <div className="flex items-center gap-1">
-                        <span className="text-[9px] text-gray-700 dark:text-gray-800 font-medium w-12 flex-shrink-0">
-                          Email:
-                        </span>
-                        <span className="text-[10px] text-gray-700 dark:text-gray-800 truncate">
-                          {hoveredAppointment.appointment.patientEmail}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                )}
+                {(() => {
+                  const currentUserRole = getUserInfo().role;
+                  const shouldShowContact = currentUserRole !== "agent" && currentUserRole !== "doctorStaff";
+                  const hasContactInfo = hoveredAppointment.appointment.patientEmail || hoveredAppointment.appointment.patientMobileNumber;
+                  
+                  if (!shouldShowContact || !hasContactInfo) return null;
+                  
+                  return (
+                    <div className="space-y-0.5 pt-0.5 border-t border-gray-100 dark:border-gray-300">
+                      {hoveredAppointment.appointment.patientMobileNumber && (
+                        <div className="flex items-center gap-1">
+                          <span className="text-[9px] text-gray-700 dark:text-gray-800 font-medium w-12 flex-shrink-0">
+                            Mobile:
+                          </span>
+                          <span className="text-[10px] text-gray-700 dark:text-gray-800 truncate">
+                            {hoveredAppointment.appointment.patientMobileNumber}
+                          </span>
+                        </div>
+                      )}
+                      {hoveredAppointment.appointment.patientEmail && (
+                        <div className="flex items-center gap-1">
+                          <span className="text-[9px] text-gray-700 dark:text-gray-800 font-medium w-12 flex-shrink-0">
+                            Email:
+                          </span>
+                          <span className="text-[10px] text-gray-700 dark:text-gray-800 truncate">
+                            {hoveredAppointment.appointment.patientEmail}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* Doctor & Treatment */}
                 <div className="space-y-0.5 pt-0.5 border-t border-gray-100 dark:border-gray-300">
