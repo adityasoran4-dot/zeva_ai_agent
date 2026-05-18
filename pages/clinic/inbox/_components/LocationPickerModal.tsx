@@ -75,6 +75,8 @@ const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
 
   const [hasDetectedLocation, setHasDetectedLocation] = useState(false);
 
+  const [locationAccuracy, setLocationAccuracy] = useState<number | null>(null);
+
   const { isLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "",
     libraries: LIBRARIES,
@@ -132,20 +134,45 @@ const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
 
     if (autocompleteRef.current) return;
 
+    const googlePlaces = async () => {
+      const googlePlacesResp: any =
+        await window.google.maps.importLibrary("places");
+      if (!googlePlacesResp) {
+        console.error("Places not loaded");
+        return;
+      }
+      console.log({ googlePlacesResp });
+      autocompleteRef.current = googlePlacesResp.Autocomplete(
+        searchInputRef.current,
+        {
+          fields: ["formatted_address", "geometry", "name"],
+
+          types: ["geocode"],
+        },
+      );
+    };
+
+    let placeApiLoaded = true;
+
     if (!window.google?.maps?.places) {
       console.error("Places library not loaded");
-
-      return;
+      false;
     }
 
-    autocompleteRef.current = new google.maps.places.Autocomplete(
-      searchInputRef.current,
-      {
-        fields: ["formatted_address", "geometry", "name"],
+    if (placeApiLoaded) {
+      autocompleteRef.current = new google.maps.places.Autocomplete(
+        searchInputRef.current,
+        {
+          fields: ["formatted_address", "geometry", "name"],
 
-        types: ["geocode"],
-      },
-    );
+          types: ["geocode"],
+        },
+      );
+    } else {
+      googlePlaces();
+    }
+
+    if (!autocompleteRef.current) return;
 
     autocompleteRef.current.addListener("place_changed", () => {
       const place = autocompleteRef.current?.getPlace();
@@ -188,6 +215,12 @@ const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
     };
   }, [isLoaded, isOpen]);
 
+  console.log({
+    GMAP: window.google.maps.importLibrary("places"),
+    isLoaded,
+    loadError,
+  });
+
   // REVERSE GEOCODE
   const reverseGeocode = async (lat: number, lng: number) => {
     try {
@@ -226,8 +259,8 @@ const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
     await reverseGeocode(lat, lng);
   };
 
-  // CURRENT LOCATION
-  const handleGetCurrentLocation = () => {
+  // CURRENT LOCATION - Using Google Maps for better accuracy
+  const handleGetCurrentLocation = async () => {
     if (!navigator.geolocation) {
       toast.error("Geolocation not supported");
 
@@ -235,50 +268,81 @@ const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
     }
 
     setIsGettingLocation(true);
+    setLocationAccuracy(null);
 
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const lat = position.coords.latitude;
+    // Try multiple times to get the most accurate position
+    const attemptLocation = (attempt: number): Promise<GeolocationPosition> => {
+      return new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 20000,
+          maximumAge: 0,
+        });
+      });
+    };
 
-        const lng = position.coords.longitude;
+    try {
+      // First attempt
+      let position = await attemptLocation(1);
 
-        setSelectedLocation({
+      // If accuracy is poor (>50 meters), try again for better reading
+      if (position.coords.accuracy > 50) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        position = await attemptLocation(2);
+      }
+
+      const lat = position.coords.latitude;
+      const lng = position.coords.longitude;
+      const accuracy = position.coords.accuracy;
+
+      setLocationAccuracy(accuracy);
+
+      setSelectedLocation({
+        lat,
+        lng,
+      });
+
+      setLocationName("Current Location");
+
+      if (mapRef.current) {
+        mapRef.current.panTo({
           lat,
           lng,
         });
 
-        setLocationName("Current Location");
+        // Zoom based on accuracy - closer zoom for better accuracy
+        const zoom = accuracy < 20 ? 19 : accuracy < 50 ? 17 : 15;
+        mapRef.current.setZoom(zoom);
+      }
 
-        if (mapRef.current) {
-          mapRef.current.panTo({
-            lat,
-            lng,
-          });
+      await reverseGeocode(lat, lng);
 
-          mapRef.current.setZoom(17);
-        }
+      setIsGettingLocation(false);
 
-        await reverseGeocode(lat, lng);
+      if (accuracy > 50) {
+        toast.warning(
+          `Location accuracy: ±${Math.round(accuracy)}m (may be approximate)`,
+        );
+      } else {
+        toast.success(`Current location found (±${Math.round(accuracy)}m)`);
+      }
+    } catch (error: any) {
+      console.error(error);
 
-        setIsGettingLocation(false);
-
-        toast.success("Current location found");
-      },
-
-      (error) => {
-        console.error(error);
-
+      if (error.code === 1) {
+        toast.error(
+          "Location permission denied. Please enable location access.",
+        );
+      } else if (error.code === 2) {
+        toast.error("Position unavailable. Please check your connection.");
+      } else if (error.code === 3) {
+        toast.error("Location request timed out. Please try again.");
+      } else {
         toast.error("Unable to fetch location");
+      }
 
-        setIsGettingLocation(false);
-      },
-
-      {
-        enableHighAccuracy: true,
-        timeout: 20000,
-        maximumAge: 0,
-      },
-    );
+      setIsGettingLocation(false);
+    }
   };
 
   // SEND LOCATION
@@ -335,6 +399,8 @@ const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
     setSelectedAddress("");
 
     setLocationName("");
+
+    setLocationAccuracy(null);
 
     setMapCenter(fallbackCenter);
 
@@ -481,6 +547,30 @@ const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
                         {selectedLocation.lng.toFixed(6)}
                       </span>
                     </div>
+
+                    {locationAccuracy !== null &&
+                      locationName === "Current Location" && (
+                        <div
+                          className={`flex items-center gap-2 mt-2 text-xs font-medium ${
+                            locationAccuracy < 20
+                              ? "text-green-600"
+                              : locationAccuracy < 50
+                                ? "text-yellow-600"
+                                : "text-orange-600"
+                          }`}
+                        >
+                          <span
+                            className={`w-2 h-2 rounded-full ${
+                              locationAccuracy < 20
+                                ? "bg-green-600"
+                                : locationAccuracy < 50
+                                  ? "bg-yellow-600"
+                                  : "bg-orange-600"
+                            }`}
+                          />
+                          Accuracy: ±{Math.round(locationAccuracy)}m
+                        </div>
+                      )}
                   </div>
                 </div>
               </div>
