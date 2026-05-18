@@ -1,4 +1,4 @@
-import {
+﻿import {
   ConversationType,
   MessageData,
   MessageType,
@@ -169,6 +169,10 @@ const useInbox = () => {
   const [isOpenBookAppointmentModal, setIsOpenBookAppointmentModal] =
     useState<boolean>(false);
 
+  // location picker modal
+  const [isLocationPickerOpen, setIsLocationPickerOpen] =
+    useState<boolean>(false);
+
   const statusDropdownRef = React.useRef<HTMLDivElement | null>(null);
   const statusBtnRef = React.useRef<HTMLButtonElement | null>(null);
 
@@ -337,12 +341,17 @@ const useInbox = () => {
     }
   };
 
-  const handleSendMessage = async () => {
+  const handleSendMessage = async (location?: null) => {
+    console.log({
+      selectedConversation,
+      location,
+    });
     if (!selectedConversation) return;
     if (
       !textAreaRef?.current?.value &&
       !attachedFile &&
-      attachedFiles.length === 0
+      attachedFiles.length === 0 &&
+      !location
     )
       return;
     if (!selectedProvider && !isLiveChatSelected) {
@@ -405,6 +414,7 @@ const useInbox = () => {
       source: "Zeva",
       replyToMessageId: selectedMessage,
       attachments,
+      location: location ? location : {},
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -518,6 +528,9 @@ const useInbox = () => {
             headerParameters,
             bodyParameters,
             attachments,
+
+            // location
+            location: location ? location : null,
           },
           {
             headers: {
@@ -901,12 +914,12 @@ const useInbox = () => {
       hasMoreMessages
     ) {
       const nextPage = currentMsgPage + 1;
-      const prevHeight = scrollMsgsRef.current.scrollHeight; // ✅ Store scroll height before fetching
+      const prevHeight = scrollMsgsRef.current.scrollHeight; // âœ… Store scroll height before fetching
       fetchMessages(nextPage).then(() => {
         requestAnimationFrame(() => {
           if (scrollMsgsRef.current) {
             const newHeight = scrollMsgsRef.current.scrollHeight;
-            scrollMsgsRef.current.scrollTop += newHeight - prevHeight; // ✅ Adjust scroll after messages append
+            scrollMsgsRef.current.scrollTop += newHeight - prevHeight; // âœ… Adjust scroll after messages append
           }
         });
       });
@@ -944,7 +957,7 @@ const useInbox = () => {
         },
       );
       if (data && data?.success) {
-        // Remove conversation from state
+        // Remove conversation from list (soft deleted = trashed)
         const updatedConversations = conversations.filter(
           (conv) => conv._id !== conversationId,
         );
@@ -952,12 +965,53 @@ const useInbox = () => {
         setSelectedConversation(null);
         setIsDeleteConversationModalOpen(false);
         setTotalConversations((prev) => prev - 1);
-        toast.success("Conversation deleted successfully");
+        toast.success("Conversation moved to trash");
       }
     } catch (error) {
       handleError(error);
     } finally {
       setIsDeletingConversation(false);
+    }
+  };
+
+  const handleUpdateConversationStatus = async (
+    conversationId: string,
+    status: string,
+  ) => {
+    if (!token) return;
+    try {
+      const { data } = await axios.patch(
+        `/api/conversations/update-conversation/${conversationId}`,
+        { status },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      if (data && data?.success) {
+        // If status is trashed/archived/closed, remove from current list
+        if (
+          status === "trashed" ||
+          status === "archived" ||
+          status === "closed"
+        ) {
+          const updatedConversations = conversations.filter(
+            (conv) => conv._id !== conversationId,
+          );
+          setConversations(updatedConversations);
+          setSelectedConversation(null);
+          setTotalConversations((prev) => prev - 1);
+        } else {
+          // Update conversation status in state
+          const updatedConversations = conversations.map((conv) =>
+            conv._id === conversationId ? { ...conv, status } : conv,
+          );
+          setConversations(updatedConversations as any);
+          setSelectedConversation((prev: any) =>
+            prev && prev._id === conversationId ? { ...prev, status } : prev,
+          );
+        }
+        toast.success(`Conversation marked as ${status}`);
+      }
+    } catch (error) {
+      handleError(error);
     }
   };
 
@@ -1383,6 +1437,7 @@ const useInbox = () => {
     isScheduleModalOpen,
     isFilterModalOpen,
     isOpenBookAppointmentModal,
+    isLocationPickerOpen,
     rooms,
     doctors,
     roomFetchLoading,
@@ -1424,6 +1479,7 @@ const useInbox = () => {
     setIsScheduleModalOpen,
     setIsFilterModalOpen,
     setIsOpenBookAppointmentModal,
+    setIsLocationPickerOpen,
 
     fetchConversations,
     fetchMessages,
@@ -1433,6 +1489,7 @@ const useInbox = () => {
     handleScrollMessages,
     handleScrollMsgsToBottom,
     handleDeleteConversation,
+    handleUpdateConversationStatus,
     handleAddTagToConversation,
     handleRemoveTagFromConversation,
     handleAgentSelect,

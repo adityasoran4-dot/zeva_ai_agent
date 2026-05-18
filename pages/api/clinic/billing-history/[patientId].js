@@ -45,11 +45,11 @@ export default async function handler(req, res) {
     }
 
     // Fetch all billing records for this patient and clinic, excluding pure balance adjustments
+    // BUT include advance payment records for tracking purposes
     const billings = await Billing.find({
       patientId: patientId,
       clinicId: clinicId,
       isAdvanceOnly: { $ne: true },
-      treatment: { $nin: ["Advance Payment", "Historical Advance Balance"] },
     })
       .sort({ createdAt: -1 }) // Most recent first
       .lean();

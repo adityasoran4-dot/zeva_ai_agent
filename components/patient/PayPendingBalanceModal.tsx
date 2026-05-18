@@ -124,6 +124,18 @@ const PayPendingBalanceModal: React.FC<PayPendingBalanceModalProps> = ({
       if (res.data.success && res.data.balances) {
         const advanceBal = Number(res.data.balances.advanceBalance || 0);
         setAdvanceBalance(advanceBal);
+        // Auto-enable advance balance when modal loads and balance is available
+        // (similar to package payment modal behavior)
+        if (advanceBal > 0 && !useAdvanceBalance) {
+          setUseAdvanceBalance(true);
+          // If user has already selected a pay type, recalculate with advance
+          if (payType) {
+            const entered = Number(enteredAmount);
+            if (entered > 0) {
+              calculateAmountToPay(entered, true);
+            }
+          }
+        }
       }
     } catch (e) {
       console.error('Error fetching patient balance:', e);
@@ -132,13 +144,15 @@ const PayPendingBalanceModal: React.FC<PayPendingBalanceModalProps> = ({
 
   const handlePayTypeSelect = (type: "partial" | "full") => {
     setPayType(type);
+    // Use current useAdvanceBalance state (which may have been auto-enabled)
+    const useAdvance = useAdvanceBalance;
     if (type === "partial") {
       const halfAmount = (pendingBalance / 2).toFixed(2);
       setEnteredAmount(halfAmount);
-      calculateAmountToPay(Number(halfAmount), useAdvanceBalance);
+      calculateAmountToPay(Number(halfAmount), useAdvance);
     } else {
       setEnteredAmount(pendingBalance.toFixed(2));
-      calculateAmountToPay(pendingBalance, useAdvanceBalance);
+      calculateAmountToPay(pendingBalance, useAdvance);
     }
   };
 
@@ -325,8 +339,8 @@ const PayPendingBalanceModal: React.FC<PayPendingBalanceModalProps> = ({
             </div>
           )}
 
-          {/* Advance Balance Option */}
-          {advanceBalance > 0 && payType && (
+          {/* Advance Balance Option - Show immediately if available */}
+          {advanceBalance > 0 && (
             <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
               <label className="flex items-center justify-between cursor-pointer">
                 <div className="flex items-center gap-3">
@@ -344,6 +358,9 @@ const PayPendingBalanceModal: React.FC<PayPendingBalanceModalProps> = ({
                     const entered = Number(enteredAmount);
                     if (entered > 0) {
                       calculateAmountToPay(entered, e.target.checked);
+                    } else if (payType) {
+                      // Recalculate based on current entered amount
+                      calculateAmountToPay(Number(enteredAmount) || (payType === "partial" ? pendingBalance / 2 : pendingBalance), e.target.checked);
                     }
                   }}
                   className="w-5 h-5 text-emerald-600 rounded focus:ring-emerald-500 border-gray-300"
@@ -386,7 +403,7 @@ const PayPendingBalanceModal: React.FC<PayPendingBalanceModalProps> = ({
             </div>
             {payType === "partial" && (
               <div className="text-[10px] text-gray-500 mt-1">
-                Partial payment (50% = {formatCurrency(pendingBalance / 2)}){useAdvanceBalance && advanceUsed > 0 ? ` - Advance: {formatCurrency(advanceUsed)}` : ''}
+                Partial payment (50% = {formatCurrency(pendingBalance / 2)}){useAdvanceBalance && advanceUsed > 0 ? ` - Advance: ${formatCurrency(advanceUsed)}` : ''}
               </div>
             )}
           </div>

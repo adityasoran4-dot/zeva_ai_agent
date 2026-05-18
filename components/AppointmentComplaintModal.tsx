@@ -33,7 +33,7 @@ import {
   NotebookPen,
   CheckCircle,
   XCircle,
-  MessageCircle,
+  
   Search,
   Loader2,
   Phone,
@@ -253,15 +253,14 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
   const [consentSent, setConsentSent] = useState<boolean>(false);
  
   // Consent status tracking
-  interface ConsentStatusData {
-    status: "not-sent" | "sent" | "viewed" | "signed";
-    sentVia?: "WhatsApp" | "SMS";
-    sentAt?: string;
-    viewedAt?: string;
-    signedAt?: string;
-  }
-  const [consentStatus, setConsentStatus] = useState<ConsentStatusData | null>(null);
-  const [sendingVia, setSendingVia] = useState<"WhatsApp" | "SMS" | null>(null);
+  // interface ConsentStatusData {
+  //   status: "not-sent" | "sent" | "viewed" | "signed";
+  //   sentVia?: "WhatsApp" | "SMS";
+  //   sentAt?: string;
+  //   viewedAt?: string;
+  //   signedAt?: string;
+  // }
+  // const [sendingVia, setSendingVia] = useState<"WhatsApp" | "SMS" | null>(null);
 
   // Tab state
   type TabType = "complaint" | "progress" | "prescription";
@@ -641,7 +640,6 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
       setNextSessionRoom("");
       setUpcomingAppointments([]);
       setLoadingUpcoming(false);
-      setConsentStatus(null);
       setConsentForms([]);
       setDoctorDiscount(null);
       setIsDoctorDiscountApplied(false);
@@ -702,7 +700,6 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
     setProgressNotes([]);
     setPrescriptionHistory([]);
     setUpcomingAppointments([]);
-    setConsentStatus(null);
     setItems([]);
     setMedicines([emptyMedicine()]);
     setAftercareInstructions("");
@@ -2036,7 +2033,7 @@ const AppointmentComplaintModal: React.FC<AppointmentComplaintModalProps> = ({
 
                     {/* Send Consent */}
                     <div className="flex flex-wrap items-center gap-1 w-full sm:w-auto">
-                      <select value={selectedConsentId} onChange={(e) => { setSelectedConsentId(e.target.value); setConsentSent(false); setConsentStatus(null); }} className="border border-gray-200 rounded-md sm:rounded-lg px-2 py-1 sm:py-1.5 text-[10px] sm:text-xs bg-white text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-300 w-full sm:max-w-[130px]">
+                      <select value={selectedConsentId} onChange={(e) => { setSelectedConsentId(e.target.value); setConsentSent(false); }} className="border border-gray-200 rounded-md sm:rounded-lg px-2 py-1 sm:py-1.5 text-[10px] sm:text-xs bg-white text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-300 w-full sm:max-w-[130px]">
                         <option value="">Select Consent</option>
                         {consentForms.map((cf) => (<option key={cf._id} value={cf._id}>{cf.formName}</option>))}
                       </select>

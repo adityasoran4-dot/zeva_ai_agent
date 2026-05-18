@@ -341,12 +341,7 @@ export const handleWhatsappSendMessage = async (msgData) => {
     } else if (msgData.type === "location") {
       // Location message
       apiPayload.type = "location";
-      apiPayload.location = {
-        longitude: msgData.longitude,
-        latitude: msgData.latitude,
-        name: msgData.locationName || "",
-        address: msgData.address || "",
-      };
+      apiPayload.location = msgData.location;
     } else if (msgData.type === "contacts") {
       // Contact message (vCard)
       apiPayload.type = "contacts";

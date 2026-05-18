@@ -88,8 +88,20 @@ export default async function handler(req, res) {
     headerParameters = [],
     bodyParameters = [],
     isWhatsappCallRequest = false,
+    location,
     ...rest
   } = req.body;
+
+  /*
+
+  location:{
+    latitude,
+    longitude, 
+    address,
+    name
+  }
+  
+  */
 
   try {
     // console.log({ clinicId });
@@ -215,13 +227,24 @@ export default async function handler(req, res) {
       channel,
       messageType,
       direction,
-      content,
+      content: location
+        ? `📍 Location: ${location.name || "Shared Location"}\n${location.address || `${location.latitude}, ${location.longitude}`}`
+        : content,
       mediaUrl,
       mediaType,
       source,
       status: "sending",
       provider: providerId,
       replyToMessageId, // it can be null or message id in case of whatsapp reply
+      metadata: location
+        ? {
+            type: "location",
+            latitude: parseFloat(location.latitude),
+            longitude: parseFloat(location.longitude),
+            name: location.name || "Shared Location",
+            address: location.address || "",
+          }
+        : {},
     });
 
     // assign this message as a recentMessage
@@ -268,7 +291,26 @@ export default async function handler(req, res) {
         const replyToMsg = await Message.findById(replyToMessageId);
         quotedMessageId = quotedMessageId || replyToMsg.providerMessageId;
       }
-      if (!templateId) {
+      if (location) {
+        msgData = {
+          channel: "whatsapp",
+          to: toPhoneNumber,
+          messaging_product: "whatsapp",
+          recipient_type: "individual",
+          type: "location",
+          location: {
+            latitude: parseFloat(location.latitude),
+            longitude: parseFloat(location.longitude),
+            name: location.name || "Shared Location",
+            address: location.address || "",
+          },
+          clientMessageId: newMessage?._id, // Optional: Your message tracking ID
+          credentials: {
+            accessToken,
+            phoneNumberId,
+          },
+        };
+      } else if (!templateId) {
         msgData = {
           channel: "whatsapp",
           to: toPhoneNumber,

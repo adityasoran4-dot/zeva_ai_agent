@@ -348,7 +348,55 @@ const processWhatsAppWebhook = async (req) => {
             }
             mediaType = "document";
           }
-          console.log({ mediaType, mediaUrl });
+          // Handle location messages
+          let locationMetadata = null;
+          if (message.type === "location" && message.location) {
+            const locLat = message.location.latitude;
+            const locLng = message.location.longitude;
+            let locName = message.location.name || "";
+            let locAddress = message.location.address || "";
+
+            // Reverse geocode if name/address are missing
+            if (!locName || !locAddress) {
+              try {
+                const geoRes = await fetch(
+                  `https://maps.googleapis.com/maps/api/geocode/json?latlng=${locLat},${locLng}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`,
+                );
+                const geoData = await geoRes.json();
+                if (geoData.status === "OK" && geoData.results?.length > 0) {
+                  const result = geoData.results[0];
+                  if (!locAddress) locAddress = result.formatted_address || "";
+                  if (!locName) {
+                    // Use the most specific component as name
+                    const poi = geoData.results.find((r) =>
+                      r.types?.some((t) =>
+                        [
+                          "point_of_interest",
+                          "establishment",
+                          "premise",
+                        ].includes(t),
+                      ),
+                    );
+                    locName = poi
+                      ? poi.formatted_address?.split(",")[0] || ""
+                      : result.formatted_address?.split(",")[0] || "";
+                  }
+                }
+              } catch (geoErr) {
+                console.error("Reverse geocoding failed:", geoErr);
+              }
+            }
+
+            locationMetadata = {
+              type: "location",
+              latitude: locLat,
+              longitude: locLng,
+              name: locName,
+              address: locAddress,
+            };
+          }
+
+          console.log({ mediaType, mediaUrl, locationMetadata });
 
           let replyToMessageId = null;
           if (message?.context?.id) {
@@ -371,7 +419,12 @@ const processWhatsAppWebhook = async (req) => {
             recipientId: findLead?._id,
             direction: "incoming",
             content:
-              message.text?.body || caption || message?.button?.text || "",
+              message.text?.body ||
+              caption ||
+              message?.button?.text ||
+              (locationMetadata
+                ? `📍 ${locationMetadata.name || locationMetadata.address || "Location"}`
+                : ""),
             status: "received",
             source: "Zeva",
             providerMessageId: message.id, // whatsapp message id  like "wamid.HBXXXXXXXXXX"
@@ -379,6 +432,7 @@ const processWhatsAppWebhook = async (req) => {
             mediaType,
             mediaUrl,
             fileName: message._fetchedFilename || undefined,
+            ...(locationMetadata && { metadata: locationMetadata }),
           });
           conversation.recentMessage = newMessage?._id;
           conversation.unreadMessages.push(newMessage?._id);
