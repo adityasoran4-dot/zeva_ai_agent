@@ -982,9 +982,15 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
    
     // If adding to patient, open payment modal first
     setPkgTotalAmount(packagePrice);
+    setPkgEnteredAmount(packagePrice);
     setPkgPaidAmount(packagePrice);
     setPkgPaymentType("Full");
     setPkgPaymentMethod("Cash");
+    // Reset balance usage checkboxes to unchecked (optional selection)
+    setPkgUseAdvanceBalance(false);
+    setPkgUseClaimBalance(false);
+    setPkgAdvanceUsedAmount(0);
+    setPkgClaimUsedAmount(0);
    
     // Ensure treatments have proper number types
     const normalizedTreatments = pkgSelectedTreatments.map(t => ({
@@ -1174,10 +1180,15 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
     if (selectedPkg) {
       setPkgTotalAmount(selectedPkg.totalPrice || 0);
       setPkgEnteredAmount(selectedPkg.totalPrice || 0);
-      // Initialize pkgPaidAmount to full amount - advance will be auto-calculated when modal loads
+      // Initialize pkgPaidAmount to full amount - will be recalculated if user enables balance usage
       setPkgPaidAmount(selectedPkg.totalPrice || 0);
       setPkgPaymentType("Full");
       setPkgPendingToAssign(selectedPkg);
+      // Reset balance usage checkboxes to unchecked (optional selection)
+      setPkgUseAdvanceBalance(false);
+      setPkgUseClaimBalance(false);
+      setPkgAdvanceUsedAmount(0);
+      setPkgClaimUsedAmount(0);
       // Fetch patient balance before showing payment modal
       fetchPkgPatientBalance();
       setShowPackagePaymentModal(true);
@@ -1185,11 +1196,15 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
   };
 
   // Helper function to calculate amount to pay based on entered amount and balance usage
-  const calculatePkgAmountToPay = (enteredAmt: number) => {
+  const calculatePkgAmountToPay = (enteredAmt: number, useAdvance?: boolean, useClaim?: boolean) => {
     let totalBalanceUsed = 0;
+    
+    // Use passed values if provided, otherwise use state (for backward compatibility)
+    const shouldUseAdvance = useAdvance !== undefined ? useAdvance : pkgUseAdvanceBalance;
+    const shouldUseClaim = useClaim !== undefined ? useClaim : pkgUseClaimBalance;
    
     // Calculate advance used
-    if (pkgUseAdvanceBalance) {
+    if (shouldUseAdvance) {
       const advanceToUse = Math.min(pkgAvailableBalance.advanceBalance, enteredAmt);
       setPkgAdvanceUsedAmount(advanceToUse);
       totalBalanceUsed += advanceToUse;
@@ -1198,7 +1213,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
     }
    
     // Calculate claim used on remaining after advance
-    if (pkgUseClaimBalance) {
+    if (shouldUseClaim) {
       const remainingAfterAdvance = Math.max(0, enteredAmt - totalBalanceUsed);
       const claimToUse = Math.min(pkgAvailableBalance.claimAmount, remainingAfterAdvance);
       setPkgClaimUsedAmount(claimToUse);
@@ -4798,17 +4813,6 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                               </div>
                             ) : (
                               <>
-                            {/* Auto-enable advance balance when modal loads and balance is available */}
-                            {(() => {
-                              if (!pkgLoadingBalance && pkgAvailableBalance.advanceBalance > 0 && !pkgUseAdvanceBalance) {
-                                // Auto-enable advance balance
-                                setPkgUseAdvanceBalance(true);
-                                // Recalculate based on entered amount
-                                calculatePkgAmountToPay(pkgEnteredAmount);
-                              }
-                              return null;
-                            })()}
-                           
                             <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl flex items-center justify-between shadow-sm">
                               <div className="flex items-center gap-3">
                                 <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center">
@@ -4870,9 +4874,10 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                         type="checkbox"
                                         checked={pkgUseAdvanceBalance}
                                         onChange={(e) => {
-                                          setPkgUseAdvanceBalance(e.target.checked);
-                                          // Recalculate amount to pay based on entered amount and whether advance is enabled
-                                          calculatePkgAmountToPay(pkgEnteredAmount);
+                                          const checked = e.target.checked;
+                                          setPkgUseAdvanceBalance(checked);
+                                          // Pass the new checkbox value directly to avoid async state issue
+                                          calculatePkgAmountToPay(pkgEnteredAmount, checked, pkgUseClaimBalance);
                                         }}
                                         className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500 border-gray-300"
                                       />
@@ -4895,9 +4900,10 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                         type="checkbox"
                                         checked={pkgUseClaimBalance}
                                         onChange={(e) => {
-                                          setPkgUseClaimBalance(e.target.checked);
-                                          // Recalculate amount to pay based on entered amount and whether claim is enabled
-                                          calculatePkgAmountToPay(pkgEnteredAmount);
+                                          const checked = e.target.checked;
+                                          setPkgUseClaimBalance(checked);
+                                          // Pass the new checkbox value directly to avoid async state issue
+                                          calculatePkgAmountToPay(pkgEnteredAmount, pkgUseAdvanceBalance, checked);
                                         }}
                                         className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 border-gray-300"
                                       />
@@ -6348,28 +6354,28 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                         <div className="overflow-x-auto">
                           <div className="min-w-full">
                             {/* Desktop Table View */}
-                            <table className="min-w-full divide-y divide-gray-100 hidden lg:table">
+                            <table className="w-full divide-y divide-gray-100 hidden lg:table">
                               <thead className="bg-slate-50">
                                 <tr>
-                                  <th className="px-3 py-3 text-left text-[10px] font-bold text-gray-600 uppercase tracking-wider">Invoice</th>
-                                  <th className="px-3 py-3 text-left text-[10px] font-bold text-gray-600 uppercase tracking-wider">Date</th>
-                                  <th className="px-3 py-3 text-left text-[10px] font-bold text-gray-600 uppercase tracking-wider">Treatment / Package</th>
-                                  <th className="px-3 py-3 text-center text-[10px] font-bold text-gray-600 uppercase tracking-wider">Discount</th>
-                                  <th className="px-3 py-3 text-center text-[10px] font-bold text-gray-600 uppercase tracking-wider">Offer Applied</th>
-                                  <th className="px-3 py-3 text-center text-[10px] font-bold text-gray-600 uppercase tracking-wider">Free Sessions</th>
-                                  <th className="px-3 py-3 text-center text-[10px] font-bold text-gray-600 uppercase tracking-wider">Cashback</th>
-                                  <th className="px-3 py-3 text-right text-[10px] font-bold text-gray-600 uppercase tracking-wider">Original</th>
-                                  <th className="px-3 py-3 text-right text-[10px] font-bold text-gray-600 uppercase tracking-wider">Total</th>
-                                  <th className="px-3 py-3 text-right text-[10px] font-bold text-gray-600 uppercase tracking-wider">Paid</th>
-                                  <th className="px-3 py-3 text-right text-[10px] font-bold text-red-600 uppercase tracking-wider">Pending</th>
-                                  <th className="px-3 py-3 text-right text-[10px] font-bold text-gray-600 uppercase tracking-wider">Advance</th>
-                                  <th className="px-3 py-3 text-right text-[10px] font-bold text-gray-600 uppercase tracking-wider">Adv. Used</th>
-                                  <th className="px-3 py-3 text-right text-[10px] font-bold text-gray-600 uppercase tracking-wider">Claim Used</th>
-                                  <th className="px-3 py-3 text-right text-[10px] font-bold text-gray-600 uppercase tracking-wider">Pend. Used</th>
-                                  <th className="px-3 py-3 text-center text-[10px] font-bold text-gray-600 uppercase tracking-wider">Qty</th>
-                                  <th className="px-3 py-3 text-left text-[10px] font-bold text-gray-600 uppercase tracking-wider">Method</th>
-                                  <th className="px-3 py-3 text-left text-[10px] font-bold text-gray-600 uppercase tracking-wider">Refund</th>
-                                  <th className="px-3 py-3 text-center text-[10px] font-bold text-gray-600 uppercase tracking-wider">View</th>
+                                  <th className="px-2 py-2 text-left text-[9px] font-bold text-gray-600 uppercase tracking-wider">Invoice</th>
+                                  <th className="px-2 py-2 text-left text-[9px] font-bold text-gray-600 uppercase tracking-wider">Date</th>
+                                  <th className="px-2 py-2 text-left text-[9px] font-bold text-gray-600 uppercase tracking-wider">Treatment/Package</th>
+                                  <th className="px-2 py-2 text-center text-[9px] font-bold text-gray-600 uppercase tracking-wider">Disc.</th>
+                                  <th className="px-2 py-2 text-center text-[9px] font-bold text-gray-600 uppercase tracking-wider">Offer</th>
+                                  <th className="px-2 py-2 text-center text-[9px] font-bold text-gray-600 uppercase tracking-wider">Free</th>
+                                  <th className="px-2 py-2 text-center text-[9px] font-bold text-gray-600 uppercase tracking-wider">CB</th>
+                                  <th className="px-2 py-2 text-right text-[9px] font-bold text-gray-600 uppercase tracking-wider">Orig.</th>
+                                  <th className="px-2 py-2 text-right text-[9px] font-bold text-gray-600 uppercase tracking-wider">Total</th>
+                                  <th className="px-2 py-2 text-right text-[9px] font-bold text-gray-600 uppercase tracking-wider">Paid</th>
+                                  <th className="px-2 py-2 text-right text-[9px] font-bold text-red-600 uppercase tracking-wider">Pend.</th>
+                                  <th className="px-2 py-2 text-right text-[9px] font-bold text-gray-600 uppercase tracking-wider">Adv.</th>
+                                  <th className="px-2 py-2 text-right text-[9px] font-bold text-gray-600 uppercase tracking-wider">Adv.U</th>
+                                  <th className="px-2 py-2 text-right text-[9px] font-bold text-gray-600 uppercase tracking-wider">Claim</th>
+                                  <th className="px-2 py-2 text-right text-[9px] font-bold text-gray-600 uppercase tracking-wider">Pend.U</th>
+                                  <th className="px-2 py-2 text-center text-[9px] font-bold text-gray-600 uppercase tracking-wider">Qty</th>
+                                  <th className="px-2 py-2 text-left text-[9px] font-bold text-gray-600 uppercase tracking-wider">Method</th>
+                                  <th className="px-2 py-2 text-left text-[9px] font-bold text-gray-600 uppercase tracking-wider">Refund</th>
+                                  <th className="px-2 py-2 text-center text-[9px] font-bold text-gray-600 uppercase tracking-wider">View</th>
                                 </tr>
                               </thead>
                               <tbody className="bg-white divide-y divide-gray-100">
@@ -6436,26 +6442,26 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                     return (
                                       <tr key={billing._id || index} className={`transition-colors ${isRefunded ? 'bg-red-50 hover:bg-red-100 border-l-4 border-l-red-500' : `hover:bg-gray-50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}`}>
                                         {/* Invoice */}
-                                        <td className="px-3 py-3 whitespace-nowrap">
-                                          <div className="text-xs font-bold text-gray-900">{billing.invoiceNumber || `INV-${String(index + 1).padStart(4, '0')}`}</div>
-                                          <div className="text-[9px] text-gray-400">{billing.service || 'Treatment'}</div>
+                                        <td className="px-2 py-2 whitespace-nowrap">
+                                          <div className="text-[10px] font-bold text-gray-900">{billing.invoiceNumber || `INV-${String(index + 1).padStart(4, '0')}`}</div>
+                                          <div className="text-[8px] text-gray-400">{billing.service || 'Treatment'}</div>
                                         </td>
                                         {/* Date */}
-                                        <td className="px-3 py-3 whitespace-nowrap">
-                                          <div className="text-xs text-gray-700">
+                                        <td className="px-2 py-2 whitespace-nowrap">
+                                          <div className="text-[10px] text-gray-700">
                                             {billing.invoicedDate ? new Date(billing.invoicedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}
                                           </div>
                                         </td>
                                         {/* Treatment / Package */}
-                                        <td className="px-3 py-3">
-                                          <div className="text-xs text-gray-700 max-w-[150px]" title={billing.package || billing.treatment}>
+                                        <td className="px-2 py-2">
+                                          <div className="text-[10px] text-gray-700 max-w-[120px]" title={billing.package || billing.treatment}>
                                             {billing.package ? (
                                               <div className="flex flex-col">
                                                 <span className="font-semibold text-indigo-700 flex items-center gap-1">
                                                   <Package className="w-3 h-3" />
                                                   {billing.package}
                                                 </span>
-                                                <span className="text-[9px] text-gray-500 truncate">
+                                                <span className="text-[8px] text-gray-500 truncate">
                                                   {Array.isArray(billing.selectedPackageTreatments) && billing.selectedPackageTreatments.length > 0
                                                     ? billing.selectedPackageTreatments.map((t: any) => t.treatmentName).join(', ')
                                                     : billing.treatment || '-'}
@@ -6466,10 +6472,10 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                             )}
                                             {/* Show unpaid packages that were paid in this billing */}
                                             {billing.unpaidPackagesPaid && billing.unpaidPackagesPaid.length > 0 && (
-                                              <div className="mt-1 space-y-0.5">
+                                              <div className="mt-0.5 space-y-0.5">
                                                 {billing.unpaidPackagesPaid.map((pkg: any, idx: number) => (
-                                                  <div key={idx} className="text-[9px] text-blue-700 flex items-center gap-1 bg-blue-50 px-1.5 py-0.5 rounded">
-                                                    <Check className="w-2.5 h-2.5 text-blue-600" strokeWidth={3} />
+                                                  <div key={idx} className="text-[8px] text-blue-700 flex items-center gap-1 bg-blue-50 px-1 py-0.5 rounded">
+                                                    <Check className="w-2 h-2 text-blue-600" strokeWidth={3} />
                                                     <span className="truncate">
                                                       Pkg: {pkg.packageName || 'Package'} ({getCurrencySymbol(currency)}{pkg.amount?.toFixed(2)})
                                                     </span>
@@ -6480,26 +6486,26 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                           </div>
                                         </td>
                                         {/* Discount */}
-                                        <td className="px-3 py-3 text-center">
-                                          <div className="flex flex-col items-center gap-1">
+                                        <td className="px-2 py-2 text-center">
+                                          <div className="flex flex-col items-center gap-0.5">
                                             {discountPercent > 0 && (
-                                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-700 border border-amber-200">
+                                              <span className="inline-flex items-center px-1 py-0.5 rounded text-[8px] font-bold bg-amber-100 text-amber-700 border border-amber-200">
                                                 {discountPercent.toFixed(1)}% OFF
                                               </span>
                                             )}
                                             <div className="flex flex-wrap justify-center gap-0.5">
                                               {isMembershipDiscount && (
-                                                <span className="text-[8px] uppercase tracking-wider text-emerald-600 bg-emerald-50 px-1 py-0.5 rounded font-bold border border-emerald-100">
+                                                <span className="text-[7px] uppercase tracking-wider text-emerald-600 bg-emerald-50 px-1 py-0.5 rounded font-bold border border-emerald-100">
                                                   Memb
                                                 </span>
                                               )}
                                               {isDoctorDiscount && (
-                                                <span className="text-[8px] uppercase tracking-wider text-orange-600 bg-orange-50 px-1 py-0.5 rounded font-bold border border-orange-100">
+                                                <span className="text-[7px] uppercase tracking-wider text-orange-600 bg-orange-50 px-1 py-0.5 rounded font-bold border border-orange-100">
                                                   Doctor
                                                 </span>
                                               )}
                                               {isAgentDiscount && (
-                                                <span className="text-[8px] uppercase tracking-wider text-blue-600 bg-blue-50 px-1 py-0.5 rounded font-bold border border-blue-100">
+                                                <span className="text-[7px] uppercase tracking-wider text-blue-600 bg-blue-50 px-1 py-0.5 rounded font-bold border border-blue-100">
                                                   Agent
                                                 </span>
                                               )}
@@ -6508,7 +6514,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                           </div>
                                         </td>
                                         {/* Offer Applied */}
-                                        <td className="px-3 py-3 text-center">
+                                        <td className="px-2 py-2 text-center">
                                           {offerType || cashbackOfferName ? (
                                             <div className="flex flex-col items-center gap-0.5">
                                               {/* Main Offer (Instant/Bonus/Bundle) */}
@@ -6548,8 +6554,8 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                           )}
                                         </td>
                                         {/* Free Sessions */}
-                                        <td className="px-3 py-3 text-center">
-                                          <div className="flex flex-col items-center gap-0.5 text-[9px]">
+                                        <td className="px-2 py-2 text-center">
+                                          <div className="flex flex-col items-center gap-0.5 text-[8px]">
                                             {/* Used Free Sessions (consumed from bundle) */}
                                             {usedFreeSessionCount > 0 && (
                                               <div className="flex flex-col items-center gap-0.5">
@@ -6595,8 +6601,8 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                           </div>
                                         </td>
                                         {/* Cashback */}
-                                        <td className="px-3 py-3 text-center">
-                                          <div className="flex flex-col items-center gap-0.5 text-[9px]">
+                                        <td className="px-2 py-2 text-center">
+                                          <div className="flex flex-col items-center gap-0.5 text-[8px]">
                                             {/* Cashback Offer Name */}
                                             {cashbackOfferName && isCashbackApplied && (
                                               <span className="text-[8px] font-bold text-cyan-700 bg-cyan-50 px-1.5 py-0.5 rounded border border-cyan-200">
@@ -6625,67 +6631,67 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                           </div>
                                         </td>
                                         {/* Original Amount */}
-                                        <td className="px-3 py-3 text-right">
-                                          <span className="text-xs text-gray-500">{formatAED(originalAmt)}</span>
+                                        <td className="px-2 py-2 text-right">
+                                          <span className="text-[10px] text-gray-500">{formatAED(originalAmt)}</span>
                                         </td>
                                         {/* Total */}
-                                        <td className="px-3 py-3 text-right">
-                                          <span className="text-xs font-bold text-gray-900">{formatAED(billing.amount || 0)}</span>
+                                        <td className="px-2 py-2 text-right">
+                                          <span className="text-[10px] font-bold text-gray-900">{formatAED(billing.amount || 0)}</span>
                                         </td>
                                         {/* Paid */}
-                                        <td className="px-3 py-3 text-right">
-                                          <span className="text-xs font-semibold text-green-600">{formatAED(billing.paid || 0)}</span>
+                                        <td className="px-2 py-2 text-right">
+                                          <span className="text-[10px] font-semibold text-green-600">{formatAED(billing.paid || 0)}</span>
                                         </td>
                                         {/* Pending */}
-                                        <td className="px-3 py-3 text-right">
-                                          <span className={`text-xs font-bold ${pendingAmt > 0 ? 'text-red-600' : 'text-gray-400'}`}>
+                                        <td className="px-2 py-2 text-right">
+                                          <span className={`text-[10px] font-bold ${pendingAmt > 0 ? 'text-red-600' : 'text-gray-400'}`}>
                                             {formatAED(pendingAmt)}
                                           </span>
                                         </td>
                                         {/* Advance */}
-                                        <td className="px-3 py-3 text-right">
-                                          <span className={`text-xs ${advanceAmt > 0 ? 'text-teal-600 font-semibold' : 'text-gray-400'}`}>
+                                        <td className="px-2 py-2 text-right">
+                                          <span className={`text-[10px] ${advanceAmt > 0 ? 'text-teal-600 font-semibold' : 'text-gray-400'}`}>
                                             {formatAED(advanceAmt)}
                                           </span>
                                         </td>
                                         {/* Advance Used */}
-                                        <td className="px-3 py-3 text-right">
-                                          <span className={`text-xs ${advanceUsed > 0 ? 'text-indigo-600 font-medium' : 'text-gray-400'}`}>
+                                        <td className="px-2 py-2 text-right">
+                                          <span className={`text-[10px] ${advanceUsed > 0 ? 'text-indigo-600 font-medium' : 'text-gray-400'}`}>
                                             {formatAED(advanceUsed)}
                                           </span>
                                         </td>
                                         {/* Claim Amount Used */}
-                                        <td className="px-3 py-3 text-right">
-                                          <span className={`text-xs ${claimUsed > 0 ? 'text-blue-600 font-medium' : 'text-gray-400'}`}>
+                                        <td className="px-2 py-2 text-right">
+                                          <span className={`text-[10px] ${claimUsed > 0 ? 'text-blue-600 font-medium' : 'text-gray-400'}`}>
                                             {formatAED(claimUsed)}
                                           </span>
                                         </td>
                                         {/* Pending Used */}
-                                        <td className="px-3 py-3 text-right">
-                                          <span className={`text-xs ${pendingUsed > 0 ? 'text-orange-600 font-medium' : 'text-gray-400'}`}>
+                                        <td className="px-2 py-2 text-right">
+                                          <span className={`text-[10px] ${pendingUsed > 0 ? 'text-orange-600 font-medium' : 'text-gray-400'}`}>
                                             {formatAED(pendingUsed)}
                                           </span>
                                         </td>
                                         {/* Qty */}
-                                        <td className="px-3 py-3 text-center">
-                                          <span className="text-xs text-gray-600">{billing.quantity || 1}</span>
+                                        <td className="px-2 py-2 text-center">
+                                          <span className="text-[10px] text-gray-600">{billing.quantity || 1}</span>
                                         </td>
                                         {/* Payment Method */}
-                                        <td className="px-3 py-3 whitespace-nowrap">
-                                          <span className="text-xs text-gray-700">{paymentMethods}</span>
+                                        <td className="px-2 py-2 whitespace-nowrap">
+                                          <span className="text-[10px] text-gray-700">{paymentMethods}</span>
                                         </td>
                                         {/* Refund Details */}
-                                        <td className="px-3 py-3">
+                                        <td className="px-2 py-2">
                                           {isRefunded ? (
-                                            <div className="flex flex-col gap-1">
-                                              <div className="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-bold bg-red-100 text-red-700 border border-red-200 w-fit">
+                                            <div className="flex flex-col gap-0.5">
+                                              <div className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-bold bg-red-100 text-red-700 border border-red-200 w-fit">
                                                 <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
                                                   <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
                                                 </svg>
                                                 REFUNDED
                                               </div>
                                               {refundedOffers.length > 0 && (
-                                                <div className="text-[8px] text-gray-600 space-y-0.5 max-w-[200px]">
+                                                <div className="text-[7px] text-gray-600 space-y-0.5 max-w-[150px]">
                                                   {refundedOffers.map((offer: any, idx: number) => (
                                                     <div key={idx} className="flex items-start gap-1">
                                                       <span className="text-red-500 mt-0.5">•</span>
@@ -6714,20 +6720,20 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                               )}
                                             </div>
                                           ) : (
-                                            <span className="text-xs text-gray-400">—</span>
+                                            <span className="text-[10px] text-gray-400">—</span>
                                           )}
                                         </td>
                                         {/* View Button */}
-                                        <td className="px-3 py-3 text-center">
+                                        <td className="px-2 py-2 text-center">
                                           <button
                                             onClick={() => {
                                               setSelectedPaymentHistoryBilling(billing);
                                               setShowPaymentHistoryModal(true);
                                             }}
-                                            className="inline-flex items-center justify-center px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white text-[10px] font-bold shadow-md hover:shadow-lg transition-all duration-200 transform hover:scale-105"
+                                            className="inline-flex items-center justify-center p-1.5 rounded-lg bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white shadow-md hover:shadow-lg transition-all duration-200 transform hover:scale-105"
+                                            title="View Details"
                                           >
-                                            <Eye className="w-3 h-3 mr-1" />
-                                            View
+                                            <Eye className="w-3.5 h-3.5" />
                                           </button>
                                         </td>
                                       </tr>
@@ -6736,19 +6742,29 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                               </tbody>
                             </table>
 
-                            {/* Tablet Table View - Fewer columns */}
-                            <table className="min-w-full divide-y divide-gray-100 hidden md:table lg:hidden">
+                            {/* Tablet Table View - All 19 columns */}
+                            <table className="w-full divide-y divide-gray-100 hidden md:table lg:hidden">
                               <thead className="bg-slate-50">
                                 <tr>
-                                  <th className="px-3 py-3 text-left text-[10px] font-bold text-gray-600 uppercase">Invoice</th>
-                                  <th className="px-3 py-3 text-left text-[10px] font-bold text-gray-600 uppercase">Treatment</th>
-                                  <th className="px-3 py-3 text-center text-[10px] font-bold text-gray-600 uppercase">Disc.</th>
-                                  <th className="px-3 py-3 text-center text-[10px] font-bold text-gray-600 uppercase">Offer</th>
-                                  <th className="px-3 py-3 text-right text-[10px] font-bold text-gray-600 uppercase">Original</th>
-                                  <th className="px-3 py-3 text-right text-[10px] font-bold text-gray-600 uppercase">Total</th>
-                                  <th className="px-3 py-3 text-right text-[10px] font-bold text-gray-600 uppercase">Paid</th>
-                                  <th className="px-3 py-3 text-right text-[10px] font-bold text-gray-600 uppercase">Pending</th>
-                                  <th className="px-3 py-3 text-center text-[10px] font-bold text-gray-600 uppercase">Qty</th>
+                                  <th className="px-2 py-2 text-left text-[8px] font-bold text-gray-600 uppercase tracking-wider">Invoice</th>
+                                  <th className="px-2 py-2 text-left text-[8px] font-bold text-gray-600 uppercase tracking-wider">Date</th>
+                                  <th className="px-2 py-2 text-left text-[8px] font-bold text-gray-600 uppercase tracking-wider">Treatment/Package</th>
+                                  <th className="px-2 py-2 text-center text-[8px] font-bold text-gray-600 uppercase tracking-wider">Disc.</th>
+                                  <th className="px-2 py-2 text-center text-[8px] font-bold text-gray-600 uppercase tracking-wider">Offer</th>
+                                  <th className="px-2 py-2 text-center text-[8px] font-bold text-gray-600 uppercase tracking-wider">Free</th>
+                                  <th className="px-2 py-2 text-center text-[8px] font-bold text-gray-600 uppercase tracking-wider">CB</th>
+                                  <th className="px-2 py-2 text-right text-[8px] font-bold text-gray-600 uppercase tracking-wider">Orig.</th>
+                                  <th className="px-2 py-2 text-right text-[8px] font-bold text-gray-600 uppercase tracking-wider">Total</th>
+                                  <th className="px-2 py-2 text-right text-[8px] font-bold text-gray-600 uppercase tracking-wider">Paid</th>
+                                  <th className="px-2 py-2 text-right text-[8px] font-bold text-red-600 uppercase tracking-wider">Pend.</th>
+                                  <th className="px-2 py-2 text-right text-[8px] font-bold text-gray-600 uppercase tracking-wider">Adv.</th>
+                                  <th className="px-2 py-2 text-right text-[8px] font-bold text-gray-600 uppercase tracking-wider">Adv.U</th>
+                                  <th className="px-2 py-2 text-right text-[8px] font-bold text-gray-600 uppercase tracking-wider">Claim</th>
+                                  <th className="px-2 py-2 text-right text-[8px] font-bold text-gray-600 uppercase tracking-wider">Pend.U</th>
+                                  <th className="px-2 py-2 text-center text-[8px] font-bold text-gray-600 uppercase tracking-wider">Qty</th>
+                                  <th className="px-2 py-2 text-left text-[8px] font-bold text-gray-600 uppercase tracking-wider">Method</th>
+                                  <th className="px-2 py-2 text-left text-[8px] font-bold text-gray-600 uppercase tracking-wider">Refund</th>
+                                  <th className="px-2 py-2 text-center text-[8px] font-bold text-gray-600 uppercase tracking-wider">View</th>
                                 </tr>
                               </thead>
                               <tbody className="bg-white divide-y divide-gray-100">
@@ -6764,94 +6780,150 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                     return invoiceMatch || treatmentMatch;
                                   })
                                   .map((billing: any, index: number) => {
+                                    // Calculate discount
                                     const originalAmt = billing.originalAmount || billing.amount || 0;
-                                    const discountPct = originalAmt > 0 && billing.amount < originalAmt ? ((originalAmt - billing.amount) / originalAmt * 100) : 0;
+                                    const totalDiscount = originalAmt > billing.amount ? (originalAmt - billing.amount) : 0;
+                                    const discountPercent = originalAmt > 0 ? (totalDiscount / originalAmt * 100) : 0;
+                                    const isDoctorDiscount = billing.isDoctorDiscountApplied;
+                                    const isAgentDiscount = billing.isAgentDiscountApplied;
+                                    const isMembershipDiscount = (billing.membershipDiscountApplied || 0) > 0;
+                                    const hasAnyDiscount = discountPercent > 0 || isDoctorDiscount || isAgentDiscount || isMembershipDiscount;
+                                   
+                                    // Refund info
+                                    const isRefunded = billing.isOfferRefunded || false;
+                                    const refundedOffers = billing.refundedOffers || [];
+                                   
+                                    // Payment methods
+                                    const paymentMethods = billing.multiplePayments && billing.multiplePayments.length > 0
+                                      ? billing.multiplePayments.map((mp: any) => mp.paymentMethod).join(" + ")
+                                      : (billing.paymentMethod || "–");
+                                   
+                                    // Offer type
                                     const offerType = billing.offerType || null;
-                                    const earnedFreeSessionNames = billing.offerFreeSession || [];
-                                    const usedFreeSessionNames = billing.usedFreeSessions || [];
+                                    
+                                    // Free sessions
                                     const usedFreeSessionCount = billing.usedFreeSessionCount || 0;
-                                    // const earnedFreeSessions = billing.freeOfferSessionCount || 0;
+                                    const earnedFreeSessions = billing.freeOfferSessionCount || 0;
+                                    const freeConsultation = billing.isFreeConsultation || false;
                                     const isBundleOffer = billing.offerType === 'bundle';
-                                    // const cashbackEarnedAmt = billing.cashbackEarned || 0;
-                                    // const cashbackEarnedFromOffer = billing.cashbackAmount || 0;
-                                    // const cashbackUsedAmt = billing.cashbackWalletUsed || 0;
+                                   
+                                    // Cashback
+                                    const cashbackEarnedAmt = billing.cashbackEarned || 0;
+                                    const cashbackEarnedFromOffer = billing.cashbackAmount || 0;
+                                    const cashbackUsedAmt = billing.cashbackWalletUsed || 0;
                                     const isCashbackApplied = billing.isCashbackApplied || false;
                                     const cashbackOfferName = billing.cashbackOfferName || '';
+                                   
+                                    // Pending and advance
+                                    const pendingAmt = billing.pending || 0;
+                                    const advanceAmt = billing.advance || 0;
+                                    const advanceUsed = billing.advanceUsed || 0;
+                                    const claimUsed = billing.claimAmountUsed || 0;
+                                    const pendingUsed = billing.pendingUsed || 0;
                                     return (
-                                      <tr key={billing._id || index} className={`hover:bg-gray-50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
-                                        <td className="px-3 py-3 whitespace-nowrap">
-                                          <div className="text-xs font-bold text-gray-900">{billing.invoiceNumber || `INV-${String(index + 1).padStart(4, '0')}`}</div>
-                                          <div className="text-[9px] text-gray-400">{billing.invoicedDate ? new Date(billing.invoicedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}</div>
+                                      <tr key={billing._id || index} className={`transition-colors ${isRefunded ? 'bg-red-50 hover:bg-red-100 border-l-4 border-l-red-500' : `hover:bg-gray-50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}`}>
+                                        {/* Invoice */}
+                                        <td className="px-2 py-2 whitespace-nowrap">
+                                          <div className="text-[9px] font-bold text-gray-900">{billing.invoiceNumber || `INV-${String(index + 1).padStart(4, '0')}`}</div>
+                                          <div className="text-[7px] text-gray-400">{billing.service || 'Treatment'}</div>
                                         </td>
-                                        <td className="px-3 py-3">
-                                          <div className="text-xs text-gray-700 max-w-[120px]" title={billing.treatment || billing.package}>
+                                        {/* Date */}
+                                        <td className="px-2 py-2 whitespace-nowrap">
+                                          <div className="text-[9px] text-gray-700">
+                                            {billing.invoicedDate ? new Date(billing.invoicedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'N/A'}
+                                          </div>
+                                        </td>
+                                        {/* Treatment / Package */}
+                                        <td className="px-2 py-2">
+                                          <div className="text-[9px] text-gray-700 max-w-[80px]" title={billing.package || billing.treatment}>
                                             {billing.package ? (
                                               <span className="font-semibold text-indigo-700">{billing.package}</span>
                                             ) : (billing.treatment || '-')}
                                           </div>
-                                          {/* Show unpaid packages that were paid in this billing */}
-                                          {billing.unpaidPackagesPaid && billing.unpaidPackagesPaid.length > 0 && (
-                                            <div className="mt-1 space-y-0.5">
-                                              {billing.unpaidPackagesPaid.map((pkg: any, idx: number) => (
-                                                <div key={idx} className="text-[9px] text-blue-700 flex items-center gap-1 bg-blue-50 px-1.5 py-0.5 rounded">
-                                                  <Check className="w-2.5 h-2.5 text-blue-600" strokeWidth={3} />
-                                                  <span className="truncate">
-                                                    Pkg: {pkg.packageName || 'Package'} ({getCurrencySymbol(currency)}{pkg.amount?.toFixed(2)})
-                                                  </span>
-                                                </div>
-                                              ))}
-                                            </div>
-                                          )}
-                                          {isBundleOffer && earnedFreeSessionNames.length > 0 && (
-                                            <div className="text-[8px] text-pink-600 truncate mt-0.5" title={earnedFreeSessionNames.join(', ')}>
-                                              Free: {earnedFreeSessionNames.slice(0, 1).join(', ')}{earnedFreeSessionNames.length > 1 ? '...' : ''}
-                                            </div>
-                                          )}
-                                          {usedFreeSessionCount > 0 && (
-                                            <div className="text-[8px] text-red-600 truncate mt-0.5" title={usedFreeSessionNames.join(', ')}>
-                                              Used: {usedFreeSessionNames.slice(0, 1).join(', ')}{usedFreeSessionNames.length > 1 ? '...' : ''}
-                                            </div>
-                                          )}
                                         </td>
-                                        <td className="px-3 py-3 text-center">
-                                          {discountPct > 0 ? (
-                                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-700">{discountPct.toFixed(1)}%</span>
+                                        {/* Discount */}
+                                        <td className="px-2 py-2 text-center">
+                                          {discountPercent > 0 ? (
+                                            <span className="inline-flex items-center px-1 py-0.5 rounded text-[7px] font-bold bg-amber-100 text-amber-700">{discountPercent.toFixed(1)}%</span>
                                           ) : <span className="text-gray-300">—</span>}
                                         </td>
-                                        <td className="px-3 py-3 text-center">
+                                        {/* Offer */}
+                                        <td className="px-2 py-2 text-center">
                                           {offerType || cashbackOfferName ? (
-                                            <div className="flex flex-col items-center gap-0.5">
-                                              {offerType && (
-                                                <>
-                                                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold ${
-                                                    offerType === 'instant_discount' ? 'bg-purple-100 text-purple-700' :
-                                                    offerType === 'cashback' ? 'bg-cyan-100 text-cyan-700' :
-                                                    offerType === 'bundle' ? 'bg-pink-100 text-pink-700' : 'bg-gray-100 text-gray-700'
-                                                  }`}>
-                                                    {offerType === 'instant_discount' ? 'Inst' : offerType === 'cashback' ? 'CB' : offerType === 'bundle' ? 'Bndl' : '—'}
-                                                  </span>
-                                                </>
-                                              )}
-                                              {cashbackOfferName && isCashbackApplied && (
-                                                <>
-                                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-cyan-100 text-cyan-700 mt-0.5">
-                                                    Cashback
-                                                  </span>
-                                                  <span className="text-[8px] text-cyan-600 truncate max-w-[80px]" title={cashbackOfferName}>
-                                                    {cashbackOfferName}
-                                                  </span>
-                                                </>
-                                              )}
-                                            </div>
+                                            <span className={`inline-flex items-center px-1 py-0.5 rounded text-[7px] font-bold ${
+                                              offerType === 'instant_discount' ? 'bg-purple-100 text-purple-700' :
+                                              offerType === 'cashback' ? 'bg-cyan-100 text-cyan-700' :
+                                              offerType === 'bundle' ? 'bg-pink-100 text-pink-700' : 'bg-gray-100 text-gray-700'
+                                            }`}>
+                                              {offerType === 'instant_discount' ? 'Inst' : offerType === 'cashback' ? 'CB' : offerType === 'bundle' ? 'Bndl' : '—'}
+                                            </span>
                                           ) : <span className="text-gray-300">—</span>}
                                         </td>
-                                        <td className="px-3 py-3 text-right"><span className="text-xs text-gray-500">{formatAED(originalAmt)}</span></td>
-                                        <td className="px-3 py-3 text-right"><span className="text-xs font-bold text-gray-900">{formatAED(billing.amount || 0)}</span></td>
-                                        <td className="px-3 py-3 text-right"><span className="text-xs font-semibold text-green-600">{formatAED(billing.paid || 0)}</span></td>
-                                        <td className="px-3 py-3 text-right">
-                                          <span className={`text-xs font-bold ${(billing.pending || 0) > 0 ? 'text-red-600' : 'text-gray-400'}`}>{formatAED(billing.pending || 0)}</span>
+                                        {/* Free */}
+                                        <td className="px-2 py-2 text-center">
+                                          <div className="text-[7px]">
+                                            {usedFreeSessionCount > 0 && <span className="text-red-600">U:{usedFreeSessionCount}</span>}
+                                            {earnedFreeSessions > 0 && <span className="text-green-600">E:{earnedFreeSessions}</span>}
+                                            {usedFreeSessionCount === 0 && earnedFreeSessions === 0 && <span className="text-gray-300">—</span>}
+                                          </div>
                                         </td>
-                                        <td className="px-3 py-3 text-center"><span className="text-xs text-gray-600">{billing.quantity || 1}</span></td>
+                                        {/* CB */}
+                                        <td className="px-2 py-2 text-center">
+                                          <div className="text-[7px]">
+                                            {(cashbackEarnedAmt > 0 || cashbackEarnedFromOffer > 0) && <span className="text-cyan-600">+{formatAED(cashbackEarnedAmt > 0 ? cashbackEarnedAmt : cashbackEarnedFromOffer)}</span>}
+                                            {cashbackUsedAmt > 0 && <span className="text-orange-600">-{formatAED(cashbackUsedAmt)}</span>}
+                                            {cashbackEarnedAmt === 0 && cashbackEarnedFromOffer === 0 && cashbackUsedAmt === 0 && <span className="text-gray-300">—</span>}
+                                          </div>
+                                        </td>
+                                        {/* Original */}
+                                        <td className="px-2 py-2 text-right"><span className="text-[9px] text-gray-500">{formatAED(originalAmt)}</span></td>
+                                        {/* Total */}
+                                        <td className="px-2 py-2 text-right"><span className="text-[9px] font-bold text-gray-900">{formatAED(billing.amount || 0)}</span></td>
+                                        {/* Paid */}
+                                        <td className="px-2 py-2 text-right"><span className="text-[9px] font-semibold text-green-600">{formatAED(billing.paid || 0)}</span></td>
+                                        {/* Pending */}
+                                        <td className="px-2 py-2 text-right">
+                                          <span className={`text-[9px] font-bold ${pendingAmt > 0 ? 'text-red-600' : 'text-gray-400'}`}>{formatAED(pendingAmt)}</span>
+                                        </td>
+                                        {/* Advance */}
+                                        <td className="px-2 py-2 text-right">
+                                          <span className={`text-[9px] ${advanceAmt > 0 ? 'text-teal-600 font-semibold' : 'text-gray-400'}`}>{formatAED(advanceAmt)}</span>
+                                        </td>
+                                        {/* Adv.U */}
+                                        <td className="px-2 py-2 text-right">
+                                          <span className={`text-[9px] ${advanceUsed > 0 ? 'text-indigo-600 font-medium' : 'text-gray-400'}`}>{formatAED(advanceUsed)}</span>
+                                        </td>
+                                        {/* Claim */}
+                                        <td className="px-2 py-2 text-right">
+                                          <span className={`text-[9px] ${claimUsed > 0 ? 'text-blue-600 font-medium' : 'text-gray-400'}`}>{formatAED(claimUsed)}</span>
+                                        </td>
+                                        {/* Pend.U */}
+                                        <td className="px-2 py-2 text-right">
+                                          <span className={`text-[9px] ${pendingUsed > 0 ? 'text-orange-600 font-medium' : 'text-gray-400'}`}>{formatAED(pendingUsed)}</span>
+                                        </td>
+                                        {/* Qty */}
+                                        <td className="px-2 py-2 text-center"><span className="text-[9px] text-gray-600">{billing.quantity || 1}</span></td>
+                                        {/* Method */}
+                                        <td className="px-2 py-2 whitespace-nowrap"><span className="text-[9px] text-gray-700">{paymentMethods}</span></td>
+                                        {/* Refund */}
+                                        <td className="px-2 py-2">
+                                          {isRefunded ? (
+                                            <span className="inline-flex items-center px-1 py-0.5 rounded text-[7px] font-bold bg-red-100 text-red-700">REF</span>
+                                          ) : <span className="text-[9px] text-gray-400">—</span>}
+                                        </td>
+                                        {/* View */}
+                                        <td className="px-2 py-2 text-center">
+                                          <button
+                                            onClick={() => {
+                                              setSelectedPaymentHistoryBilling(billing);
+                                              setShowPaymentHistoryModal(true);
+                                            }}
+                                            className="inline-flex items-center justify-center p-1 rounded-lg bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white shadow-md transition-all"
+                                            title="View Details"
+                                          >
+                                            <Eye className="w-3 h-3" />
+                                          </button>
+                                        </td>
                                       </tr>
                                     );
                                   })}
@@ -7036,8 +7108,22 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                       </div>
                                      
                                       {/* Payment Method */}
-                                      <div className="text-[10px] text-gray-500">
+                                      <div className="text-[10px] text-gray-500 mb-3">
                                         <span className="font-medium">Payment:</span> {paymentMethods}
+                                      </div>
+                                      
+                                      {/* View Button */}
+                                      <div className="flex justify-end">
+                                        <button
+                                          onClick={() => {
+                                            setSelectedPaymentHistoryBilling(billing);
+                                            setShowPaymentHistoryModal(true);
+                                          }}
+                                          className="inline-flex items-center justify-center p-2 rounded-lg bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white shadow-md hover:shadow-lg transition-all duration-200"
+                                          title="View Details"
+                                        >
+                                          <Eye className="w-4 h-4" />
+                                        </button>
                                       </div>
                                     </div>
                                   );
@@ -10370,8 +10456,8 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                   </div>
                 )}
 
-                {/* Payment History from billing records */}
-                {selectedPaymentHistoryBilling.paymentHistory && selectedPaymentHistoryBilling.paymentHistory.length > 0 && (
+                {/* Payment History from billing records - HIDDEN */}
+                {false && selectedPaymentHistoryBilling.paymentHistory && selectedPaymentHistoryBilling.paymentHistory.length > 0 && (
                   <div>
                     <h4 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
                       <div className="p-1.5 bg-purple-100 rounded-full">
@@ -10486,7 +10572,8 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                   </div>
                 )}
 
-                {/* Additional Billing Info */}
+                {/* Additional Billing Info - HIDDEN */}
+                {false && (
                 <div className="mt-4 pt-4 border-t border-gray-200">
                   <h4 className="text-sm font-bold text-gray-800 mb-3">Additional Information</h4>
                   <div className="grid grid-cols-2 gap-3">
@@ -10563,6 +10650,8 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                     </div>
                   )}
                 </div>
+                )}
+
               </div>
 
               {/* Footer */}

@@ -215,20 +215,20 @@ const UserPackagesPage: NextPageWithLayout = () => {
         <title>User Packages | Zeva360</title>
       </Head>
 
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100">
         {/* Header Section */}
-        <div className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
+        <div className="bg-white shadow-sm border-b border-green-200">
+        <div className="w-full px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 flex items-center gap-2 sm:gap-3">
-                <Package className="w-6 h-6 sm:w-8 sm:h-8 text-indigo-600" />
+                <Package className="w-6 h-6 sm:w-8 sm:h-8 text-emerald-600" />
                 <span>User Created Packages</span>
               </h1>
               <p className="text-xs sm:text-sm text-gray-500 mt-1">Manage and review patient-created treatment packages</p>
             </div>
             <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-              <div className="bg-indigo-100 text-indigo-700 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-lg font-medium text-xs sm:text-sm">
+              <div className="bg-emerald-100 text-emerald-700 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-lg font-medium text-xs sm:text-sm">
                 Pending: {pendingPackages.length}
               </div>
               <div className="bg-green-100 text-green-700 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-lg font-medium text-xs sm:text-sm">
@@ -247,29 +247,29 @@ const UserPackagesPage: NextPageWithLayout = () => {
               placeholder="Search by patient name or EMR number..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition duration-150 ease-in-out"
+              className="block w-full pl-10 pr-3 py-3 border border-green-300 rounded-lg leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm transition duration-150 ease-in-out"
             />
           </div>
         </div>
       </div>
 
       {/* Two Slider Tabs */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="bg-white rounded-xl shadow-lg overflow-hidden mb-4 sm:mb-6">
-          <div className="flex border-b border-gray-200">
+      <div className="w-full px-3 sm:px-4 md:px-6 lg:px-8 py-6">
+        <div className="bg-white rounded-xl shadow-lg overflow-hidden mb-4 sm:mb-6 border border-green-100">
+          <div className="flex border-b border-green-200">
             <button
               onClick={() => setActiveTab('pending')}
               className={`flex-1 py-3 sm:py-4 px-3 sm:px-6 text-center font-semibold transition-all duration-200 flex items-center justify-center gap-1.5 sm:gap-2 text-xs sm:text-sm ${
                 activeTab === 'pending'
-                  ? 'bg-yellow-50 text-yellow-700 border-b-2 border-yellow-500'
-                  : 'bg-white text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+                  ? 'bg-emerald-50 text-emerald-700 border-b-2 border-emerald-500'
+                  : 'bg-white text-gray-500 hover:bg-green-50 hover:text-gray-700'
               }`}
             >
               <Clock className="w-4 h-4 sm:w-5 sm:h-5" />
               <span className="hidden sm:inline">Pending Approval</span>
               <span className="sm:hidden">Pending</span>
               {pendingPackages.length > 0 && (
-                <span className="ml-1 sm:ml-2 bg-yellow-500 text-white px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] sm:text-sm">
+                <span className="ml-1 sm:ml-2 bg-emerald-500 text-white px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] sm:text-sm">
                   {pendingPackages.length}
                 </span>
               )}
@@ -279,7 +279,7 @@ const UserPackagesPage: NextPageWithLayout = () => {
               className={`flex-1 py-3 sm:py-4 px-3 sm:px-6 text-center font-semibold transition-all duration-200 flex items-center justify-center gap-1.5 sm:gap-2 text-xs sm:text-sm ${
                 activeTab === 'approved'
                   ? 'bg-green-50 text-green-700 border-b-2 border-green-500'
-                  : 'bg-white text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+                  : 'bg-white text-gray-500 hover:bg-green-50 hover:text-gray-700'
               }`}
             >
               <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -297,7 +297,7 @@ const UserPackagesPage: NextPageWithLayout = () => {
           <div className="p-6">
             {loading ? (
               <div className="flex items-center justify-center py-12">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div>
                 <span className="ml-3 text-gray-600">Loading packages...</span>
               </div>
             ) : error ? (
@@ -318,24 +318,24 @@ const UserPackagesPage: NextPageWithLayout = () => {
                 )}
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {currentPackages.map((pkg) => (
                   <div
                     key={pkg._id}
-                    className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-lg transition-shadow duration-200 overflow-hidden"
+                    className="bg-white border border-green-200 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden"
                   >
                     {/* Card Header */}
-                    <div className="bg-gradient-to-r from-indigo-500 to-purple-600 px-6 py-4">
-                      <h3 className="text-lg font-bold text-white mb-1">
+                    <div className="bg-gradient-to-r from-emerald-500 to-green-600 px-4 py-3">
+                      <h3 className="text-sm font-bold text-white mb-0.5">
                         {pkg.packageName}
                       </h3>
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-white/90 text-sm">
-                          <User className="w-4 h-4" />
+                        <div className="flex items-center gap-1.5 text-white/90 text-xs">
+                          <User className="w-3.5 h-3.5" />
                           <span>{getPatientName(pkg.patientId)}</span>
                         </div>
                         {pkg.patientId?.emrNumber && (
-                          <span className="text-xs bg-white/20 px-2 py-1 rounded text-white">
+                          <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded text-white">
                             EMR: {pkg.patientId.emrNumber}
                           </span>
                         )}
@@ -343,70 +343,70 @@ const UserPackagesPage: NextPageWithLayout = () => {
                     </div>
 
                     {/* Card Body */}
-                    <div className="p-6 space-y-4">
+                    <div className="p-4 space-y-3">
                       {/* Price & Sessions */}
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-gray-50 p-3 rounded-lg">
-                          <div className="flex items-center gap-2 text-gray-600 text-sm mb-1">
-                            <DollarSign className="w-4 h-4" />
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-green-50 p-2.5 rounded-lg border border-green-100">
+                          <div className="flex items-center gap-1.5 text-green-700 text-xs mb-0.5">
+                            <DollarSign className="w-3.5 h-3.5" />
                             <span>Total Price</span>
                           </div>
-                          <p className="text-xl font-bold text-gray-900">
+                          <p className="text-base font-bold text-green-900">
                             {getCurrencySymbol(currency)}{pkg.totalPrice.toLocaleString()}
                           </p>
                         </div>
-                        <div className="bg-gray-50 p-3 rounded-lg">
-                          <div className="flex items-center gap-2 text-gray-600 text-sm mb-1">
-                            <Package className="w-4 h-4" />
+                        <div className="bg-green-50 p-2.5 rounded-lg border border-green-100">
+                          <div className="flex items-center gap-1.5 text-green-700 text-xs mb-0.5">
+                            <Package className="w-3.5 h-3.5" />
                             <span>Sessions</span>
                           </div>
-                          <p className="text-xl font-bold text-gray-900">
+                          <p className="text-base font-bold text-green-900">
                             {pkg.remainingSessions}/{pkg.totalSessions}
                           </p>
                         </div>
                       </div>
 
                       {/* Status Badges */}
-                      <div className="flex flex-wrap gap-2">
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(pkg.status)}`}>
+                      <div className="flex flex-wrap gap-1.5">
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-medium border ${getStatusColor(pkg.status)}`}>
                           {pkg.status.toUpperCase()}
                         </span>
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${getPaymentStatusColor(pkg.paymentStatus)}`}>
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-medium ${getPaymentStatusColor(pkg.paymentStatus)}`}>
                           {pkg.paymentStatus.toUpperCase()}
                         </span>
                       </div>
 
                       {/* Date Range */}
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <Calendar className="w-4 h-4" />
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-1.5 text-xs text-green-700">
+                          <Calendar className="w-3.5 h-3.5" />
                           <span>Start: {formatDate(pkg.startDate)}</span>
                         </div>
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <Calendar className="w-4 h-4" />
+                        <div className="flex items-center gap-1.5 text-xs text-green-700">
+                          <Calendar className="w-3.5 h-3.5" />
                           <span>End: {formatDate(pkg.endDate)}</span>
                         </div>
                       </div>
 
                       {/* Treatments */}
                       {pkg.treatments && pkg.treatments.length > 0 && (
-                        <div className="border-t border-gray-200 pt-4">
-                          <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                            <TrendingUp className="w-4 h-4" />
+                        <div className="border-t border-green-200 pt-3">
+                          <h4 className="text-xs font-semibold text-green-800 mb-1.5 flex items-center gap-1.5">
+                            <TrendingUp className="w-3.5 h-3.5" />
                             Treatments ({pkg.treatments.length})
                           </h4>
-                          <div className="space-y-2 max-h-32 overflow-y-auto">
+                          <div className="space-y-1.5 max-h-24 overflow-y-auto">
                             {pkg.treatments.map((treatment, idx) => (
-                              <div key={idx} className="text-sm">
+                              <div key={idx} className="text-xs">
                                 <div className="flex justify-between items-center">
-                                  <span className="text-gray-700 font-medium truncate">
+                                  <span className="text-green-800 font-medium truncate">
                                     {treatment.treatmentName}
                                   </span>
-                                  <span className="text-gray-500 text-xs">
+                                  <span className="text-green-600 text-[10px]">
                                     {treatment.usedSessions}/{treatment.sessions} sessions
                                   </span>
                                 </div>
-                                <div className="text-xs text-gray-500">
+                                <div className="text-[10px] text-green-600">
                                   {getCurrencySymbol(currency)}{treatment.allocatedPrice.toLocaleString()}
                                 </div>
                               </div>
@@ -417,24 +417,24 @@ const UserPackagesPage: NextPageWithLayout = () => {
 
                       {/* Actions */}
                       {activeTab === 'pending' && (
-                        <div className="border-t border-gray-200 pt-4">
+                        <div className="border-t border-green-200 pt-3">
                           <button
                             onClick={() => handleViewDetails(pkg)}
-                            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-lg font-medium transition-colors duration-200 flex items-center justify-center gap-2"
+                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200 flex items-center justify-center gap-1.5"
                           >
-                            <Eye className="w-4 h-4" />
+                            <Eye className="w-3.5 h-3.5" />
                             View Details
                           </button>
                         </div>
                       )}
 
                       {activeTab === 'approved' && (
-                        <div className="border-t border-gray-200 pt-4">
+                        <div className="border-t border-green-200 pt-3">
                           <button
                             onClick={() => handleViewDetails(pkg)}
-                            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-lg font-medium transition-colors duration-200 flex items-center justify-center gap-2"
+                            className="w-full bg-green-600 hover:bg-green-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200 flex items-center justify-center gap-1.5"
                           >
-                            <Eye className="w-4 h-4" />
+                            <Eye className="w-3.5 h-3.5" />
                             View Details
                           </button>
                         </div>
@@ -450,13 +450,13 @@ const UserPackagesPage: NextPageWithLayout = () => {
 
       {/* Package Details Modal */}
       {showModal && selectedPackage && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-green-200">
             {/* Modal Header */}
-            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-4 rounded-t-xl flex items-center justify-between sticky top-0 z-10">
+            <div className="bg-gradient-to-r from-emerald-600 to-green-600 px-6 py-4 rounded-t-xl flex items-center justify-between sticky top-0 z-10">
               <div>
                 <h2 className="text-2xl font-bold text-white">{selectedPackage.packageName}</h2>
-                <p className="text-indigo-100 text-sm mt-1">Package Details</p>
+                <p className="text-emerald-100 text-sm mt-1">Package Details</p>
               </div>
               <button
                 onClick={closeModal}
@@ -469,20 +469,20 @@ const UserPackagesPage: NextPageWithLayout = () => {
             {/* Modal Body */}
             <div className="p-6 space-y-6">
               {/* Patient Information */}
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                  <User className="w-5 h-5 text-indigo-600" />
+              <div className="bg-green-50 rounded-lg p-4 border border-green-100">
+                <h3 className="text-lg font-semibold text-green-900 mb-3 flex items-center gap-2">
+                  <User className="w-5 h-5 text-emerald-600" />
                   Patient Information
                 </h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-sm text-gray-500">Name</p>
-                    <p className="font-medium text-gray-900">{getPatientName(selectedPackage.patientId)}</p>
+                    <p className="text-sm text-green-700">Name</p>
+                    <p className="font-medium text-green-900">{getPatientName(selectedPackage.patientId)}</p>
                   </div>
                   {selectedPackage.patientId?.emrNumber && (
                     <div>
-                      <p className="text-sm text-gray-500">EMR Number</p>
-                      <p className="font-medium text-gray-900">{selectedPackage.patientId.emrNumber}</p>
+                      <p className="text-sm text-green-700">EMR Number</p>
+                      <p className="font-medium text-green-900">{selectedPackage.patientId.emrNumber}</p>
                     </div>
                   )}
                 </div>
@@ -490,26 +490,26 @@ const UserPackagesPage: NextPageWithLayout = () => {
 
               {/* Package Overview */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg">
-                  <div className="flex items-center gap-2 text-blue-700 mb-2">
+                <div className="bg-gradient-to-br from-emerald-50 to-green-100 p-4 rounded-lg border border-emerald-100">
+                  <div className="flex items-center gap-2 text-emerald-700 mb-2">
                     <DollarSign className="w-5 h-5" />
                     <span className="text-sm font-medium">Total Price</span>
                   </div>
-                  <p className="text-2xl font-bold text-blue-900">{getCurrencySymbol(currency)}{selectedPackage.totalPrice.toLocaleString()}</p>
+                  <p className="text-2xl font-bold text-emerald-900">{getCurrencySymbol(currency)}{selectedPackage.totalPrice.toLocaleString()}</p>
                 </div>
-                <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg">
+                <div className="bg-gradient-to-br from-green-50 to-emerald-100 p-4 rounded-lg border border-green-100">
                   <div className="flex items-center gap-2 text-green-700 mb-2">
                     <Package className="w-5 h-5" />
                     <span className="text-sm font-medium">Sessions</span>
                   </div>
                   <p className="text-2xl font-bold text-green-900">{selectedPackage.remainingSessions}/{selectedPackage.totalSessions}</p>
                 </div>
-                <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-lg">
-                  <div className="flex items-center gap-2 text-purple-700 mb-2">
+                <div className="bg-gradient-to-br from-teal-50 to-green-100 p-4 rounded-lg border border-teal-100">
+                  <div className="flex items-center gap-2 text-teal-700 mb-2">
                     <Calendar className="w-5 h-5" />
                     <span className="text-sm font-medium">Duration</span>
                   </div>
-                  <p className="text-sm font-bold text-purple-900">
+                  <p className="text-sm font-bold text-teal-900">
                     {formatDate(selectedPackage.startDate)} - {formatDate(selectedPackage.endDate)}
                   </p>
                 </div>
@@ -517,14 +517,14 @@ const UserPackagesPage: NextPageWithLayout = () => {
 
               {/* Status Information */}
               <div className="grid grid-cols-2 gap-4">
-                <div className="border border-gray-200 rounded-lg p-4">
-                  <p className="text-sm text-gray-500 mb-2">Package Status</p>
+                <div className="border border-green-200 rounded-lg p-4">
+                  <p className="text-sm text-green-700 mb-2">Package Status</p>
                   <span className={`px-3 py-1.5 rounded-full text-sm font-medium border ${getStatusColor(selectedPackage.status)}`}>
                     {selectedPackage.status.toUpperCase()}
                   </span>
                 </div>
-                <div className="border border-gray-200 rounded-lg p-4">
-                  <p className="text-sm text-gray-500 mb-2">Payment Status</p>
+                <div className="border border-green-200 rounded-lg p-4">
+                  <p className="text-sm text-green-700 mb-2">Payment Status</p>
                   <span className={`px-3 py-1.5 rounded-full text-sm font-medium ${getPaymentStatusColor(selectedPackage.paymentStatus)}`}>
                     {selectedPackage.paymentStatus.toUpperCase()}
                   </span>
@@ -534,32 +534,32 @@ const UserPackagesPage: NextPageWithLayout = () => {
               {/* Treatments */}
               {selectedPackage.treatments && selectedPackage.treatments.length > 0 && (
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                    <TrendingUp className="w-5 h-5 text-indigo-600" />
+                  <h3 className="text-lg font-semibold text-green-900 mb-3 flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5 text-emerald-600" />
                     Treatments Included ({selectedPackage.treatments.length})
                   </h3>
                   <div className="space-y-3">
                     {selectedPackage.treatments.map((treatment, idx) => (
-                      <div key={idx} className="bg-white border border-gray-200 rounded-lg p-4">
+                      <div key={idx} className="bg-white border border-green-200 rounded-lg p-4">
                         <div className="flex justify-between items-start mb-2">
                           <div>
-                            <h4 className="font-semibold text-gray-900">{treatment.treatmentName}</h4>
-                            <p className="text-sm text-gray-500">Treatment Slug: {treatment.treatmentSlug}</p>
+                            <h4 className="font-semibold text-green-900">{treatment.treatmentName}</h4>
+                            <p className="text-sm text-green-700">Treatment Slug: {treatment.treatmentSlug}</p>
                           </div>
                           <div className="text-right">
-                            <p className="text-lg font-bold text-gray-900">{getCurrencySymbol(currency)}{treatment.allocatedPrice.toLocaleString()}</p>
-                            <p className="text-sm text-gray-500">{treatment.usedSessions}/{treatment.sessions} sessions used</p>
+                            <p className="text-lg font-bold text-green-900">{getCurrencySymbol(currency)}{treatment.allocatedPrice.toLocaleString()}</p>
+                            <p className="text-sm text-green-700">{treatment.usedSessions}/{treatment.sessions} sessions used</p>
                           </div>
                         </div>
                         {/* Progress Bar */}
                         <div className="mt-2">
-                          <div className="flex justify-between text-xs text-gray-600 mb-1">
+                          <div className="flex justify-between text-xs text-green-700 mb-1">
                             <span>Progress</span>
                             <span>{Math.round((treatment.usedSessions / treatment.sessions) * 100)}%</span>
                           </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div className="w-full bg-green-200 rounded-full h-2">
                             <div
-                              className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
+                              className="bg-emerald-600 h-2 rounded-full transition-all duration-300"
                               style={{ width: `${(treatment.usedSessions / treatment.sessions) * 100}%` }}
                             />
                           </div>
@@ -571,16 +571,16 @@ const UserPackagesPage: NextPageWithLayout = () => {
               )}
 
               {/* Additional Information */}
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h3 className="text-lg font-semibold text-gray-800 mb-3">Additional Information</h3>
+              <div className="bg-green-50 rounded-lg p-4 border border-green-100">
+                <h3 className="text-lg font-semibold text-green-900 mb-3">Additional Information</h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-sm text-gray-500">Created At</p>
-                    <p className="font-medium text-gray-900">{formatDate(selectedPackage.createdAt)}</p>
+                    <p className="text-sm text-green-700">Created At</p>
+                    <p className="font-medium text-green-900">{formatDate(selectedPackage.createdAt)}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500">Session Price</p>
-                    <p className="font-medium text-gray-900">{getCurrencySymbol(currency)}{selectedPackage.sessionPrice.toLocaleString()}</p>
+                    <p className="text-sm text-green-700">Session Price</p>
+                    <p className="font-medium text-green-900">{getCurrencySymbol(currency)}{selectedPackage.sessionPrice.toLocaleString()}</p>
                   </div>
                 </div>
               </div>
