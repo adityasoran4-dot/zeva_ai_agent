@@ -134,6 +134,10 @@ interface Appointment {
   serviceIds?: string[];
   serviceNames?: string[];
   bookedFrom?: "doctor" | "room"; // Track which column the appointment was booked from
+  // Booked by information
+  bookedByRole?: string | null;
+  bookedByUserId?: string | null;
+  bookedByName?: string | null;
   doctorTreatments?: Array<{
     mainTreatment: string;
     mainTreatmentSlug: string;
@@ -5600,6 +5604,27 @@ function AppointmentPage({
                       <span className="text-[10px] text-red-600 dark:text-red-400 font-semibold">
                         {hoveredAppointment.appointment.emergency}
                       </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Booked By */}
+                {hoveredAppointment.appointment.bookedByName && (
+                  <div className="pt-0.5 border-t border-gray-100 dark:border-gray-300">
+                    <div className="flex items-start gap-1">
+                      <span className="text-[9px] text-gray-700 dark:text-gray-800 font-medium w-12 flex-shrink-0">
+                        Booked by:
+                      </span>
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-[10px] text-gray-700 dark:text-gray-800 font-semibold">
+                          {hoveredAppointment.appointment.bookedByName}
+                        </span>
+                        {hoveredAppointment.appointment.bookedByRole && (
+                          <span className="text-[9px] text-gray-500 dark:text-gray-600">
+                            ({hoveredAppointment.appointment.bookedByRole})
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}

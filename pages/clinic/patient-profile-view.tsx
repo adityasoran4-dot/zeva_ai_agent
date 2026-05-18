@@ -982,7 +982,6 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
    
     // If adding to patient, open payment modal first
     setPkgTotalAmount(packagePrice);
-    setPkgEnteredAmount(packagePrice);
     setPkgPaidAmount(packagePrice);
     setPkgPaymentType("Full");
     setPkgPaymentMethod("Cash");
@@ -1180,7 +1179,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
     if (selectedPkg) {
       setPkgTotalAmount(selectedPkg.totalPrice || 0);
       setPkgEnteredAmount(selectedPkg.totalPrice || 0);
-      // Initialize pkgPaidAmount to full amount - will be recalculated if user enables balance usage
+      // Initialize pkgPaidAmount to full amount - advance will be auto-calculated when modal loads
       setPkgPaidAmount(selectedPkg.totalPrice || 0);
       setPkgPaymentType("Full");
       setPkgPendingToAssign(selectedPkg);
@@ -4813,6 +4812,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                               </div>
                             ) : (
                               <>
+                           
                             <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl flex items-center justify-between shadow-sm">
                               <div className="flex items-center gap-3">
                                 <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center">
@@ -6352,8 +6352,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                         </div>
                        
                         <div className="overflow-x-auto">
-                          <div className="min-w-full">
-                            {/* Desktop Table View */}
+                          {/* Desktop Table View */}
                             <table className="w-full divide-y divide-gray-100 hidden lg:table">
                               <thead className="bg-slate-50">
                                 <tr>
@@ -6455,6 +6454,21 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                         {/* Treatment / Package */}
                                         <td className="px-2 py-2">
                                           <div className="text-[10px] text-gray-700 max-w-[120px]" title={billing.package || billing.treatment}>
+                                            {/* Advance Payment Badge */}
+                                            {billing.treatment === "Advance Payment" && (
+                                              <div className="flex items-center gap-1 mb-0.5">
+                                                <span className="inline-flex items-center px-1 py-0.5 rounded text-[7px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">
+                                                  💰 Advance
+                                                </span>
+                                              </div>
+                                            )}
+                                            {billing.pastAdvance > 0 && billing.treatment !== "Advance Payment" && (
+                                              <div className="flex items-center gap-1 mb-0.5">
+                                                <span className="inline-flex items-center px-1 py-0.5 rounded text-[7px] font-bold bg-amber-100 text-amber-700 border border-amber-200">
+                                                  📜 Past ({billing.pastAdvanceType || 'Hist.'})
+                                                </span>
+                                              </div>
+                                            )}
                                             {billing.package ? (
                                               <div className="flex flex-col">
                                                 <span className="font-semibold text-indigo-700 flex items-center gap-1">
@@ -6495,17 +6509,17 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                             )}
                                             <div className="flex flex-wrap justify-center gap-0.5">
                                               {isMembershipDiscount && (
-                                                <span className="text-[7px] uppercase tracking-wider text-emerald-600 bg-emerald-50 px-1 py-0.5 rounded font-bold border border-emerald-100">
+                                                <span className="text-[8px] uppercase tracking-wider text-emerald-600 bg-emerald-50 px-1 py-0.5 rounded font-bold border border-emerald-100">
                                                   Memb
                                                 </span>
                                               )}
                                               {isDoctorDiscount && (
-                                                <span className="text-[7px] uppercase tracking-wider text-orange-600 bg-orange-50 px-1 py-0.5 rounded font-bold border border-orange-100">
+                                                <span className="text-[8px] uppercase tracking-wider text-orange-600 bg-orange-50 px-1 py-0.5 rounded font-bold border border-orange-100">
                                                   Doctor
                                                 </span>
                                               )}
                                               {isAgentDiscount && (
-                                                <span className="text-[7px] uppercase tracking-wider text-blue-600 bg-blue-50 px-1 py-0.5 rounded font-bold border border-blue-100">
+                                                <span className="text-[8px] uppercase tracking-wider text-blue-600 bg-blue-50 px-1 py-0.5 rounded font-bold border border-blue-100">
                                                   Agent
                                                 </span>
                                               )}
@@ -6603,7 +6617,6 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                         {/* Cashback */}
                                         <td className="px-2 py-2 text-center">
                                           <div className="flex flex-col items-center gap-0.5 text-[8px]">
-                                            {/* Cashback Offer Name */}
                                             {cashbackOfferName && isCashbackApplied && (
                                               <span className="text-[8px] font-bold text-cyan-700 bg-cyan-50 px-1.5 py-0.5 rounded border border-cyan-200">
                                                 {cashbackOfferName}
@@ -7129,7 +7142,6 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                   );
                                 })}
                             </div>
-                          </div>
                         </div>
 
                         {/* Summary Section - Total Billed, Total Paid, Outstanding */}
@@ -10456,7 +10468,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                   </div>
                 )}
 
-                {/* Payment History from billing records - HIDDEN */}
+                {/* [COMMENTED OUT] Payment History from billing records */}
                 {false && selectedPaymentHistoryBilling.paymentHistory && selectedPaymentHistoryBilling.paymentHistory.length > 0 && (
                   <div>
                     <h4 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
@@ -10572,10 +10584,10 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                   </div>
                 )}
 
-                {/* Additional Billing Info - HIDDEN */}
+                {/* [COMMENTED OUT] Additional Billing Info */}
                 {false && (
-                <div className="mt-4 pt-4 border-t border-gray-200">
-                  <h4 className="text-sm font-bold text-gray-800 mb-3">Additional Information</h4>
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <h4 className="text-sm font-bold text-gray-800 mb-3">Additional Information</h4>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="bg-gray-50 rounded-lg p-3">
                       <p className="text-[10px] text-gray-500 uppercase mb-1">Advance Balance Used</p>
@@ -10651,9 +10663,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                   )}
                 </div>
                 )}
-
               </div>
-
               {/* Footer */}
               <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
                 <div className="text-xs text-gray-500">
