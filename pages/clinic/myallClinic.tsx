@@ -2802,7 +2802,7 @@ function ClinicManagementDashboard(): ReactElement {
                           {isPending && (
                             <div className="mt-3 pt-3 border-t border-gray-100">
                               <p className="text-xs text-orange-600 text-center">
-                                ⚠️ Click "Update Profile" to save this document
+                                ⚠️ Click "Save Changes" to save this document
                               </p>
                             </div>
                           )}

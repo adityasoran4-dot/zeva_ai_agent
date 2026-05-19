@@ -33,6 +33,7 @@ function ClinicReferralPage() {
   });
   const [errors, setErrors] = useState({});
   const [toast, setToast] = useState(null);
+  const [showModal, setShowModal] = useState(false);
 
   const showToast = useCallback((message, type = "success") => {
     setToast({ message, type });
@@ -121,6 +122,7 @@ function ClinicReferralPage() {
         );
         if (res.data.success) {
           showToast("Referral updated", "success");
+          setShowModal(false);
           resetForm();
           load();
         } else {
@@ -141,6 +143,7 @@ function ClinicReferralPage() {
         );
         if (res.data.success) {
           showToast("Referral created", "success");
+          setShowModal(false);
           resetForm();
           load();
         } else {
@@ -165,6 +168,7 @@ function ClinicReferralPage() {
       addExpense: !!item.addExpense,
     });
     setErrors({});
+    setShowModal(true);
   };
 
   const handleDelete = async (id) => {
@@ -200,7 +204,7 @@ function ClinicReferralPage() {
           </button>
         </div>
       )}
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-8xl mx-auto">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
           <div className="flex items-center justify-between mb-3">
             <div>
@@ -209,16 +213,92 @@ function ClinicReferralPage() {
             </div>
             <button
               className="px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs rounded-md flex items-center gap-1"
-              onClick={() => resetForm()}
+              onClick={() => {
+                resetForm();
+                setShowModal(true);
+              }}
             >
               <Plus className="w-4 h-4" />
               New
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
             <div className="border rounded-lg p-3">
-              <h3 className="text-xs font-semibold text-teal-900 mb-2">{editing ? "Edit Referral" : "Create Referral"}</h3>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-xs font-semibold text-teal-900">Referrals</h3>
+                <button className="px-2 py-1 text-[10px] border border-gray-300 rounded-md" onClick={load}>
+                  Refresh
+                </button>
+              </div>
+              {loading ? (
+                <div className="text-xs text-gray-700">Loading...</div>
+              ) : items.length === 0 ? (
+                <div className="text-xs text-gray-700">No referrals</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-[10px]">
+                    <thead>
+                      <tr className="text-left text-gray-600">
+                        <th className="px-2 py-1">Name</th>
+                        <th className="px-2 py-1">Phone</th>
+                        <th className="px-2 py-1">Email</th>
+                        <th className="px-2 py-1">Referral %</th>
+                        <th className="px-2 py-1">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {items.map((it) => (
+                        <tr key={it._id} className="border-t">
+                          <td className="px-2 py-1">{[it.firstName, it.lastName].filter(Boolean).join(" ")}</td>
+                          <td className="px-2 py-1">{it.phone}</td>
+                          <td className="px-2 py-1">{it.email || "—"}</td>
+                          <td className="px-2 py-1">{it.referralPercent ?? 0}</td>
+                          <td className="px-2 py-1">
+                            <div className="flex items-center gap-2">
+                              <button className="p-1 rounded hover:bg-teal-100" onClick={() => startEdit(it)} title="Edit">
+                                <Edit2 className="w-3 h-3 text-teal-700" />
+                              </button>
+                              <button className="p-1 rounded hover:bg-red-100" onClick={() => handleDelete(it._id)} title="Delete">
+                                <Trash2 className="w-3 h-3 text-red-600" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Modal Popup */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 backdrop-blur-sm flex items-center justify-center p-1 sm:p-2 z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-[500px] max-h-[98vh] overflow-hidden flex flex-col">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-3 py-3 border-b border-gray-200 flex-shrink-0">
+              <div className="min-w-0 flex-1">
+                <h3 className="text-sm font-bold text-teal-900 truncate">
+                  {editing ? "Edit Referral" : "Create Referral"}
+                </h3>
+              </div>
+              <button 
+                className="p-1.5 rounded-md hover:bg-gray-100 transition-colors flex-shrink-0 ml-2"
+                onClick={() => {
+                  setShowModal(false);
+                  resetForm();
+                }}
+              >
+                <X className="w-4 h-4 text-gray-500" />
+              </button>
+            </div>
+            
+            {/* Modal Body */}
+            <div className="p-3 overflow-y-auto flex-1">
               <div className="space-y-2">
                 <div>
                   <label className="block text-[10px] font-medium text-gray-700 mb-0.5">First Name <span className="text-red-500">*</span></label>
@@ -272,7 +352,7 @@ function ClinicReferralPage() {
                   />
                   {errors.referralPercent && <p className="text-red-500 text-[9px] mt-0.5">{errors.referralPercent}</p>}
                 </div>
-                <div className="flex justify-end gap-2">
+                <div className="flex justify-end gap-2 pt-2">
                   <div className="mr-auto flex items-center gap-2">
                     <input
                       id="addExpense"
@@ -286,11 +366,15 @@ function ClinicReferralPage() {
                       Add an expense
                     </label>
                   </div>
-                  {editing && (
-                    <button className="px-3 py-1 border border-gray-300 rounded-md text-[10px]" onClick={resetForm}>
-                      Cancel
-                    </button>
-                  )}
+                  <button 
+                    className="px-3 py-1 border border-gray-300 rounded-md text-[10px]"
+                    onClick={() => {
+                      setShowModal(false);
+                      resetForm();
+                    }}
+                  >
+                    Cancel
+                  </button>
                   <button
                     className={`px-3 py-1 text-[10px] rounded-md text-white ${saving ? "bg-gray-500" : "bg-teal-600 hover:bg-teal-700"}`}
                     onClick={handleSave}
@@ -301,57 +385,9 @@ function ClinicReferralPage() {
                 </div>
               </div>
             </div>
-
-            <div className="border rounded-lg p-3">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-xs font-semibold text-teal-900">Referrals</h3>
-                <button className="px-2 py-1 text-[10px] border border-gray-300 rounded-md" onClick={load}>
-                  Refresh
-                </button>
-              </div>
-              {loading ? (
-                <div className="text-xs text-gray-700">Loading...</div>
-              ) : items.length === 0 ? (
-                <div className="text-xs text-gray-700">No referrals</div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-[10px]">
-                    <thead>
-                      <tr className="text-left text-gray-600">
-                        <th className="px-2 py-1">Name</th>
-                        <th className="px-2 py-1">Phone</th>
-                        <th className="px-2 py-1">Email</th>
-                        <th className="px-2 py-1">Referral %</th>
-                        <th className="px-2 py-1">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {items.map((it) => (
-                        <tr key={it._id} className="border-t">
-                          <td className="px-2 py-1">{[it.firstName, it.lastName].filter(Boolean).join(" ")}</td>
-                          <td className="px-2 py-1">{it.phone}</td>
-                          <td className="px-2 py-1">{it.email || "—"}</td>
-                          <td className="px-2 py-1">{it.referralPercent ?? 0}</td>
-                          <td className="px-2 py-1">
-                            <div className="flex items-center gap-2">
-                              <button className="p-1 rounded hover:bg-teal-100" onClick={() => startEdit(it)} title="Edit">
-                                <Edit2 className="w-3 h-3 text-teal-700" />
-                              </button>
-                              <button className="p-1 rounded hover:bg-red-100" onClick={() => handleDelete(it._id)} title="Delete">
-                                <Trash2 className="w-3 h-3 text-red-600" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

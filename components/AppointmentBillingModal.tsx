@@ -4201,47 +4201,56 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
 
   return (
     <>
-      <div className="fixed inset-0 z-[200] flex items-center justify-center p-1 sm:p-2 bg-black/50 backdrop-blur-md transition-all duration-300 animate-in fade-in">
+      <div className="fixed inset-0 z-[200] flex items-center justify-center p-0 sm:p-2 bg-black/50 backdrop-blur-md transition-all duration-300 animate-in fade-in">
         <div
-          className="bg-white rounded-xl shadow-2xl w-full  max-h-[96vh] overflow-hidden flex flex-col transform transition-all duration-300 scale-100 opacity-100 animate-in slide-in-from-bottom-4 zoom-in-95"
+          className="bg-white rounded-none sm:rounded-xl shadow-2xl w-full h-full sm:h-auto sm:max-h-[96vh] overflow-hidden flex flex-col transform transition-all duration-300 scale-100 opacity-100 animate-in slide-in-from-bottom-4 zoom-in-95"
           style={{ minHeight: "600px" }}
         >
           {/* ── NEW HEADER ── */}
-          <div className="bg-white border-b border-gray-200 px-6 py-4">
-            <div className="flex items-start justify-between gap-4">
-              {/* Left: Patient Info */}
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-teal-500 flex items-center justify-center text-white font-bold text-base flex-shrink-0">
-                  {appointment.patientName?.charAt(0)?.toUpperCase() || "P"}
-                </div>
-                <div>
-                  <div className="text-sm font-bold text-gray-900 leading-tight">
-                    {appointment.patientName || "-"}
+          <div className="bg-white border-b border-gray-200 px-3 sm:px-6 py-3 sm:py-4">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
+              {/* Top row on mobile: Patient Info + Close */}
+              <div className="flex items-center justify-between sm:justify-start gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-teal-500 flex items-center justify-center text-white font-bold text-sm sm:text-base flex-shrink-0">
+                    {appointment.patientName?.charAt(0)?.toUpperCase() || "P"}
                   </div>
-                  <div className="text-xs text-gray-500 mt-0.5">{appointment.emrNumber && `MRN: ${appointment.emrNumber}`}</div>
+                  <div className="min-w-0">
+                    <div className="text-sm font-bold text-gray-900 leading-tight truncate">
+                      {appointment.patientName || "-"}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-0.5 truncate">{appointment.emrNumber && `MRN: ${appointment.emrNumber}`}</div>
+                  </div>
                 </div>
+                <button
+                  onClick={onClose}
+                  className="sm:hidden p-1.5 hover:bg-gray-100 rounded transition-all text-gray-500 hover:text-gray-800 flex-shrink-0"
+                  aria-label="Close"
+                >
+                  <X className="w-5 h-5" />
+                </button>
               </div>
          
               {/* Center: Invoice + Appointment Details */}
-              <div className="flex items-center gap-6 text-center flex-shrink-0">
-                <div>
+              <div className="flex flex-wrap items-center gap-3 sm:gap-4 lg:gap-6 text-center">
+                <div className="min-w-[80px]">
                   <div className="text-[9px] text-gray-400 uppercase tracking-wider">Invoice Number</div>
-                  <div className="text-xs font-bold text-gray-800">{formData.invoiceNumber || "-"}</div>
+                  <div className="text-[11px] sm:text-xs font-bold text-gray-800 truncate">{formData.invoiceNumber || "-"}</div>
                 </div>
                 <div>
                   <div className="text-[9px] text-gray-400 uppercase tracking-wider">Date</div>
-                  <div className="text-xs font-semibold text-gray-800">
+                  <div className="text-[11px] sm:text-xs font-semibold text-gray-800">
                     {formData.invoicedDate ? new Date(formData.invoicedDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "-"}
                   </div>
                 </div>
                 <div>
                   <div className="text-[9px] text-gray-400 uppercase tracking-wider">Doctor</div>
-                  <div className="text-xs font-semibold text-gray-800">{appointment.doctorName || "-"}</div>
+                  <div className="text-[11px] sm:text-xs font-semibold text-gray-800 truncate max-w-[100px] sm:max-w-none">{appointment.doctorName || "-"}</div>
                 </div>
                 {appointment.startDate && (
                   <div>
                     <div className="text-[9px] text-gray-400 uppercase tracking-wider">Apt. Date</div>
-                    <div className="text-xs font-semibold text-gray-800">
+                    <div className="text-[11px] sm:text-xs font-semibold text-gray-800">
                       {new Date(appointment.startDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })}
                     </div>
                   </div>
@@ -4249,7 +4258,7 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
                 {(appointment.fromTime || appointment.toTime) && (
                   <div>
                     <div className="text-[9px] text-gray-400 uppercase tracking-wider">Time</div>
-                    <div className="text-xs font-semibold text-gray-800">
+                    <div className="text-[11px] sm:text-xs font-semibold text-gray-800">
                       {appointment.fromTime}{appointment.toTime ? `–${appointment.toTime}` : ""}
                     </div>
                   </div>
@@ -4261,7 +4270,7 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
                     value={selectedConsentId}
                     onChange={(e) => { setSelectedConsentId(e.target.value); setConsentSent(false); }}
                     disabled={sendingConsent}
-                    className="text-[10px] border border-gray-200 rounded px-2 py-1 bg-white text-gray-600 focus:outline-none focus:ring-1 focus:ring-blue-300 max-w-[120px]"
+                    className="text-[10px] border border-gray-200 rounded px-2 py-1 bg-white text-gray-600 focus:outline-none focus:ring-1 focus:ring-blue-300 max-w-[100px] sm:max-w-[120px]"
                   >
                     <option value="">Select Consent</option>
                     {consentForms.map((form) => (
@@ -4285,7 +4294,7 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
                   type="button"
                   onClick={generateInvoicePDF}
                   disabled={isGeneratingPDF || (!selectedTreatments.length && !selectedPackage)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] bg-teal-600 text-white rounded hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-semibold shadow-sm"
+                  className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 text-[10px] bg-teal-600 text-white rounded hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-semibold shadow-sm"
                 >
                   {isGeneratingPDF ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -4297,28 +4306,28 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
               </div>
          
               {/* Right: Pending, Advance, Visits */}
-              <div className="flex items-center gap-4 flex-shrink-0">
-                <div className="text-right">
+              <div className="flex items-center gap-3 sm:gap-4 flex-shrink-0">
+                <div className="text-center sm:text-right">
                   <div className="text-[9px] text-gray-400 uppercase tracking-wider">Pending</div>
-                  <div className={`text-sm font-bold ${apiPendingBalance > 0 ? "text-red-600" : "text-gray-400"}`}>
+                  <div className={`text-xs sm:text-sm font-bold ${apiPendingBalance > 0 ? "text-red-600" : "text-gray-400"}`}>
                     {getCurrencySymbol(currency)} {apiPendingBalance.toFixed(2)}
                   </div>
                 </div>
-                <div className="text-right">
+                <div className="text-center sm:text-right">
                   <div className="text-[9px] text-gray-400 uppercase tracking-wider">Advance</div>
-                  <div className={`text-sm font-bold ${apiAdvanceBalance > 0 ? "text-emerald-600" : "text-gray-400"}`}>
+                  <div className={`text-xs sm:text-sm font-bold ${apiAdvanceBalance > 0 ? "text-emerald-600" : "text-gray-400"}`}>
                     {getCurrencySymbol(currency)} {apiAdvanceBalance.toFixed(2)}
                   </div>
                 </div>
-                <div className="text-right">
+                <div className="text-center sm:text-right">
                   <div className="text-[9px] text-gray-400 uppercase tracking-wider">Visits</div>
-                  <div className="text-sm font-bold text-blue-600">
+                  <div className="text-xs sm:text-sm font-bold text-blue-600">
                     {visitCount !== null ? visitCount : <span className="text-gray-400">–</span>}
                   </div>
                 </div>
                 <button
                   onClick={onClose}
-                  className="p-1 hover:bg-gray-100 rounded transition-all text-gray-500 hover:text-gray-800 ml-2"
+                  className="hidden sm:block p-1 hover:bg-gray-100 rounded transition-all text-gray-500 hover:text-gray-800 ml-2"
                   aria-label="Close"
                 >
                   <X className="w-4 h-4" />
@@ -4332,7 +4341,7 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
             <form
               id="billing-form"
               onSubmit={handleSubmit}
-              className="p-6 space-y-4"
+              className="p-3 sm:p-6 space-y-4"
             >
               {errors.general && (
                 <div className="bg-red-50 border-l-2 border-red-500 rounded p-2 flex items-start gap-2 text-red-700 shadow-sm animate-in slide-in-from-top-2 fade-in" role="alert">
@@ -4521,7 +4530,7 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
                                     isJustAdded ? "border-emerald-400 bg-emerald-50 ring-2 ring-emerald-200" : "border-gray-200"
                                   }`}
                                 >
-                                  <div className="flex items-center justify-between">
+                                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                                     <div className="flex items-center gap-2 flex-1 min-w-0">
                                       {/* Toggle (enable/disable treatment in invoice) */}
                                       <button
@@ -4568,13 +4577,13 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
                                         )}
                                       </div>
                                     </div>
-                                    <div className="flex items-center gap-2 flex-shrink-0">
+                                    <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0 flex-wrap">
                                       {/* Qty control */}
                                       <button type="button" onClick={() => handleQuantityChange(treatment.treatmentSlug, Math.max(1, treatment.quantity - 1))} className="w-6 h-6 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700 text-xs font-bold">−</button>
                                       <span className="text-xs font-semibold text-gray-900 w-5 text-center">{treatment.quantity}</span>
                                       <button type="button" onClick={() => handleQuantityChange(treatment.treatmentSlug, treatment.quantity + 1)} className="w-6 h-6 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700 text-xs font-bold">+</button>
                                       <span className="text-[10px] text-gray-500 ml-1">@ {getCurrencySymbol(currency)} {treatment.price.toFixed(2)} each</span>
-                                      <span className="text-xs font-bold text-gray-900 ml-2">{getCurrencySymbol(currency)} {treatment.totalPrice.toFixed(2)}</span>
+                                      <span className="text-xs font-bold text-gray-900 ml-auto sm:ml-2">{getCurrencySymbol(currency)} {treatment.totalPrice.toFixed(2)}</span>
                                     </div>
                                   </div>
                                 </div>
@@ -4836,7 +4845,7 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
 
                       return (
                         <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded-lg">
-                          <div className="grid grid-cols-3 gap-2 text-xs">
+                          <div className="grid grid-cols-3 gap-1 sm:gap-2 text-xs">
                             <div className="text-center">
                               <div className="text-gray-500 text-[10px]">Original</div>
                               <div className="font-semibold line-through text-gray-500">{getCurrencySymbol(currency)} {parseFloat(formData.originalAmount || "0").toFixed(2)}</div>
@@ -5310,7 +5319,7 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
                       )}
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-3">
                       <div>
                         <div className="flex items-center justify-between mb-1">
                           <label className="text-[10px] font-semibold text-gray-600">Total Amount <span className="text-red-500">*</span></label>
@@ -5615,7 +5624,7 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
                   </div>
 
                   {/* Referred By / Notes */}
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="bg-white rounded-xl border border-gray-200 p-3">
                       <label className="block text-[10px] font-semibold text-gray-600 mb-1">Referred By</label>
                       <input type="text" value={formData.referredBy}
@@ -5634,7 +5643,7 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
                   </div>
 
                   {/* Billing Summary */}
-                  <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border border-gray-200 p-4">
+                  <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border border-gray-200 p-3 sm:p-4">
                     <div className="flex items-center gap-2 mb-3">
                       <svg className="w-4 h-4 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
@@ -5852,14 +5861,14 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
                   </div>
                
                   {/* Action Buttons */}
-                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-200">
+                  <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 pt-2 border-t border-gray-200">
                     <button type="button" onClick={onClose}
-                      className="px-4 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                      className="px-4 py-2.5 sm:py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
                     >
                       Cancel
                     </button>
                     <button type="submit" disabled={loading}
-                      className="px-4 py-2 text-xs font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="px-4 py-2.5 sm:py-2 text-xs font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {loading ? "Creating..." : isAlreadyBilled ? "Create Additional Billing" : "Create Billing"}
                     </button>
@@ -6387,7 +6396,7 @@ const AppointmentBillingModal: React.FC<AppointmentBillingModalProps> = ({
                           {smartDepartments.map((dept) => (
                             <div key={dept._id}>
                               <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">{dept.name}</p>
-                              <div className="grid grid-cols-3 gap-2">
+                              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                                 {dept.services.map((svc) => {
                                   // Services use serviceSlug or _id as identifier - match both
                                   const serviceIdentifier = svc.serviceSlug || svc._id;

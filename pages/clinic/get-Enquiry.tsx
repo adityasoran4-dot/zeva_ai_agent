@@ -491,7 +491,7 @@ function ClinicEnquiries({ contextOverride = null }: { contextOverride?: "clinic
       />
       {/* Compact Unique Header */}
       <div className="bg-white dark:bg-teal-800 rounded-lg border border-teal-200 dark:border-teal-700 shadow-sm mb-4 sm:mb-6">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-5">
+        <div className="max-w-9xl mx-auto px-4 sm:px-6 py-4 sm:py-5">
           <div className="flex items-center justify-between mb-4">
             {/* Left: Brand */}
             <div className="flex items-center gap-2">
@@ -575,7 +575,7 @@ function ClinicEnquiries({ contextOverride = null }: { contextOverride?: "clinic
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+      <div className="max-w-9xl mx-auto px-4 sm:px-6">
         {/* Compact Search Bar & Controls - Unique Style */}
         <div className="bg-white dark:bg-teal-800 rounded-lg shadow-sm border border-teal-200 dark:border-teal-700 p-4 sm:p-5 mb-4 sm:mb-6 space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">

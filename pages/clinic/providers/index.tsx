@@ -233,7 +233,7 @@ const ProvidersPage: NextPageWithLayout = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       {/* Header */}
-      <div className="px-6 pt-8 max-w-7xl mx-auto">
+      <div className="px-6 pt-8 max-w-9xl mx-auto">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
           <div>
             <div className="flex items-center gap-3 mb-2">
@@ -344,7 +344,7 @@ const ProvidersPage: NextPageWithLayout = () => {
       </div>
 
       {/* Main Content */}
-      <div className="px-6 py-8 max-w-7xl mx-auto">
+      <div className="px-6 py-8 max-w-9xl mx-auto">
         {/* Controls */}
         <div className="bg-white rounded-2xl p-6 border border-gray-200 mb-6">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">

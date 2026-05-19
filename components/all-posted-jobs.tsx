@@ -1133,153 +1133,178 @@ const JobManagement: React.FC<JobManagementProps> = ({
       {/* Confirmation Modal */}
       {showConfirmModal && <ConfirmationModal />}
 
-      {/* Preview Modal - Compact & Sleek */}
+      {/* Preview Modal - Enhanced UI */}
       {previewJob && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-2">
-          <div className="bg-white rounded-lg shadow-2xl max-w-xl w-full overflow-hidden flex flex-col">
-            {/* Compact Header */}
-            <div className="flex items-center justify-between p-2 border-b border-gray-200 bg-gray-50">
-              <div className="flex items-center gap-1.5">
-                <Eye className="w-4 h-4 text-gray-700" />
-                <h2 className="text-sm font-bold text-gray-900">Job Preview</h2>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-6xl w-full overflow-hidden flex flex-col">
+            {/* Enhanced Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-100 bg-gradient-to-r from-teal-50 to-cyan-50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-teal-600 flex items-center justify-center shadow-lg">
+                  <Eye className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900">Job Preview</h2>
+                  <p className="text-xs text-gray-600">Review your job posting details</p>
+                </div>
               </div>
               <button
                 onClick={() => setPreviewJob(null)}
-                className="p-1 text-gray-400 hover:text-gray-700 hover:bg-gray-200 rounded transition-colors"
+                className="p-2 text-gray-500 hover:text-gray-700 hover:bg-white hover:shadow-sm rounded-xl transition-all"
               >
-                <X className="w-3 h-3" />
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Compact Content */}
-            <div className="overflow-y-auto max-h-[80vh]">
-              <div className="p-3 space-y-2">
+            {/* Enhanced Content */}
+            <div className="overflow-y-auto max-h-[75vh]">
+              <div className="p-6 space-y-6">
                 {/* Title & Company */}
-                <div>
-                  <h3 className="text-base font-bold text-gray-900 mb-0.5">{previewJob.jobTitle}</h3>
-                  <div className="flex items-center gap-1 text-[10px] text-gray-700">
-                    <Building2 className="w-3 h-3" />
-                    <span className="font-bold">{previewJob.companyName || previewJob.clinicName || previewJob.hospitalName}</span>
+                <div className="space-y-3">
+                  <h3 className="text-2xl font-bold text-gray-900">{previewJob.jobTitle}</h3>
+                  <div className="flex items-center gap-2 text-sm text-gray-700">
+                    <Building2 className="w-4 h-4 text-teal-600" />
+                    <span className="font-semibold">{previewJob.companyName || previewJob.clinicName || previewJob.hospitalName}</span>
                   </div>
                 </div>
 
                 {/* Quick Info Badges */}
-                <div className="flex flex-wrap gap-1">
+                <div className="flex flex-wrap gap-2">
                   {previewJob.department && (
-                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[9px] font-medium border border-blue-200">
-                      <Briefcase className="w-2.5 h-2.5" />
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-100 text-blue-800 rounded-full text-xs font-semibold shadow-sm">
+                      <Briefcase className="w-3.5 h-3.5" />
                       {previewJob.department}
                     </span>
                   )}
                   {previewJob.jobType && (
-                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-green-50 text-green-700 rounded text-[9px] font-medium border border-green-200">
-                      <Clock className="w-2.5 h-2.5" />
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-100 text-green-800 rounded-full text-xs font-semibold shadow-sm">
+                      <Clock className="w-3.5 h-3.5" />
                       {previewJob.jobType}
                     </span>
                   )}
                   {previewJob.location && (
-                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-purple-50 text-purple-700 rounded text-[9px] font-medium border border-purple-200">
-                      <MapPin className="w-2.5 h-2.5" />
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-100 text-purple-800 rounded-full text-xs font-semibold shadow-sm">
+                      <MapPin className="w-3.5 h-3.5" />
                       {previewJob.location}
                     </span>
                   )}
                   {previewJob.salary && (
-                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded text-[9px] font-semibold border border-emerald-200">
-                      <DollarSign className="w-2.5 h-2.5" />
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-100 text-emerald-800 rounded-full text-xs font-bold shadow-sm">
+                      <DollarSign className="w-3.5 h-3.5" />
                       {formatSalary(previewJob.salary, currency)}
                     </span>
                   )}
                 </div>
 
-                {/* Compact Details Grid - 4 Columns */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 pt-2 border-t border-gray-100">
+                {/* Enhanced Details Grid - 2 Columns */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-4 border-t border-gray-100">
                   {previewJob.companyName || previewJob.clinicName || previewJob.hospitalName ? (
-                    <div className="flex items-start gap-1">
-                      <Building2 className="w-3 h-3 text-gray-700 mt-0.5 flex-shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-[9px] text-gray-700 font-bold">Company</p>
-                        <p className="text-[10px] text-gray-900 font-semibold truncate">{previewJob.companyName || previewJob.clinicName || previewJob.hospitalName}</p>
+                    <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100">
+                      <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+                        <Building2 className="w-4 h-4 text-blue-700" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide mb-1">Company</p>
+                        <p className="text-sm text-gray-900 font-semibold">{previewJob.companyName || previewJob.clinicName || previewJob.hospitalName}</p>
                       </div>
                     </div>
                   ) : null}
                   {previewJob.department && (
-                    <div className="flex items-start gap-1">
-                      <Briefcase className="w-3 h-3 text-gray-700 mt-0.5 flex-shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-[9px] text-gray-700 font-bold">Department</p>
-                        <p className="text-[10px] text-gray-900 font-semibold truncate">{previewJob.department}</p>
+                    <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100">
+                      <div className="w-8 h-8 rounded-lg bg-teal-100 flex items-center justify-center flex-shrink-0">
+                        <Briefcase className="w-4 h-4 text-teal-700" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide mb-1">Department</p>
+                        <p className="text-sm text-gray-900 font-semibold">{previewJob.department}</p>
                       </div>
                     </div>
                   )}
                   {previewJob.qualification && (
-                    <div className="flex items-start gap-1">
-                      <GraduationCap className="w-3 h-3 text-gray-700 mt-0.5 flex-shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-[9px] text-gray-700 font-bold">Qualification</p>
-                        <p className="text-[10px] text-gray-900 font-semibold truncate">{previewJob.qualification}</p>
+                    <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100">
+                      <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center flex-shrink-0">
+                        <GraduationCap className="w-4 h-4 text-purple-700" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide mb-1">Qualification</p>
+                        <p className="text-sm text-gray-900 font-semibold">{previewJob.qualification}</p>
                       </div>
                     </div>
                   )}
                   {previewJob.jobType && (
-                    <div className="flex items-start gap-1">
-                      <Clock className="w-3 h-3 text-gray-700 mt-0.5 flex-shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-[9px] text-gray-700 font-bold">Job Type</p>
-                        <p className="text-[10px] text-gray-900 font-semibold truncate">{previewJob.jobType}</p>
+                    <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100">
+                      <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center flex-shrink-0">
+                        <Clock className="w-4 h-4 text-green-700" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide mb-1">Job Type</p>
+                        <p className="text-sm text-gray-900 font-semibold">{previewJob.jobType}</p>
                       </div>
                     </div>
                   )}
                   {previewJob.noOfOpenings !== undefined && (
-                    <div className="flex items-start gap-1">
-                      <Users className="w-3 h-3 text-gray-700 mt-0.5 flex-shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-[9px] text-gray-700 font-bold">No. of Openings</p>
-                        <p className="text-[10px] text-gray-900 font-semibold">{previewJob.noOfOpenings}</p>
+                    <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100">
+                      <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center flex-shrink-0">
+                        <Users className="w-4 h-4 text-orange-700" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide mb-1">No. of Openings</p>
+                        <p className="text-sm text-gray-900 font-semibold">{previewJob.noOfOpenings}</p>
                       </div>
                     </div>
                   )}
                   {previewJob.workingDays && (
-                    <div className="flex items-start gap-1">
-                      <Calendar className="w-3 h-3 text-gray-700 mt-0.5 flex-shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-[9px] text-gray-700 font-bold">Working Days</p>
-                        <p className="text-[10px] text-gray-900 font-semibold truncate">{previewJob.workingDays}</p>
+                    <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100">
+                      <div className="w-8 h-8 rounded-lg bg-cyan-100 flex items-center justify-center flex-shrink-0">
+                        <Calendar className="w-4 h-4 text-cyan-700" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide mb-1">Working Days</p>
+                        <p className="text-sm text-gray-900 font-semibold">{previewJob.workingDays}</p>
                       </div>
                     </div>
                   )}
                   {previewJob.establishment && (
-                    <div className="flex items-start gap-1">
-                      <Building2 className="w-3 h-3 text-gray-700 mt-0.5 flex-shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-[9px] text-gray-700 font-bold">Establishment</p>
-                        <p className="text-[10px] text-gray-900 font-semibold truncate">{previewJob.establishment}</p>
+                    <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100">
+                      <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center flex-shrink-0">
+                        <Building2 className="w-4 h-4 text-indigo-700" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide mb-1">Establishment</p>
+                        <p className="text-sm text-gray-900 font-semibold">{previewJob.establishment}</p>
                       </div>
                     </div>
                   )}
                   {previewJob.jobTiming && (
-                    <div className="flex items-start gap-1">
-                      <Clock className="w-3 h-3 text-gray-700 mt-0.5 flex-shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-[9px] text-gray-700 font-bold">Job Timing</p>
-                        <p className="text-[10px] text-gray-900 font-semibold truncate">{previewJob.jobTiming}</p>
+                    <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100">
+                      <div className="w-8 h-8 rounded-lg bg-yellow-100 flex items-center justify-center flex-shrink-0">
+                        <Clock className="w-4 h-4 text-yellow-700" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide mb-1">Job Timing</p>
+                        <p className="text-sm text-gray-900 font-semibold">{previewJob.jobTiming}</p>
                       </div>
                     </div>
                   )}
                   {previewJob.experience && (
-                    <div className="flex items-start gap-1">
-                      <Briefcase className="w-3 h-3 text-gray-700 mt-0.5 flex-shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-[9px] text-gray-700 font-bold">Experience</p>
-                        <p className="text-[10px] text-gray-900 font-semibold truncate">{previewJob.experience}</p>
+                    <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100">
+                      <div className="w-8 h-8 rounded-lg bg-pink-100 flex items-center justify-center flex-shrink-0">
+                        <Briefcase className="w-4 h-4 text-pink-700" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide mb-1">Experience</p>
+                        <p className="text-sm text-gray-900 font-semibold">{previewJob.experience}</p>
                       </div>
                     </div>
                   )}
                   {previewJob.createdAt && (
-                    <div className="flex items-start gap-1">
-                      <Calendar className="w-3 h-3 text-gray-700 mt-0.5 flex-shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-[9px] text-gray-700 font-bold">Created</p>
-                        <p className="text-[10px] text-gray-900 font-semibold truncate">
+                    <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100">
+                      <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+                        <Calendar className="w-4 h-4 text-gray-700" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide mb-1">Created</p>
+                        <p className="text-sm text-gray-900 font-semibold">
                           {new Date(previewJob.createdAt).toLocaleDateString()}
                         </p>
                       </div>
@@ -1287,62 +1312,58 @@ const JobManagement: React.FC<JobManagementProps> = ({
                   )}
                 </div>
 
-                {/* Description - Larger Box */}
+                {/* Description - Enhanced */}
                 {previewJob.description && (
-                  <div className="pt-2 border-t border-gray-100 mt-2">
-                    <h4 className="text-[10px] font-bold text-gray-900 mb-1.5 flex items-center gap-1">
-                      <FileText className="w-3 h-3" />
-                      Description
+                  <div className="pt-6 border-t border-gray-100">
+                    <h4 className="text-base font-bold text-gray-900 mb-3 flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-lg bg-teal-100 flex items-center justify-center">
+                        <FileText className="w-4 h-4 text-teal-700" />
+                      </div>
+                      Job Description
                     </h4>
                     <div 
-                      className="max-w-none text-gray-700 text-[10px] leading-relaxed p-2 bg-gray-50 rounded border border-gray-200 min-h-[80px]"
+                      className="text-gray-700 text-sm leading-relaxed p-5 bg-gradient-to-br from-gray-50 to-white rounded-xl border border-gray-100 shadow-inner"
                       dangerouslySetInnerHTML={{ __html: previewJob.description }}
                     />
                   </div>
                 )}
 
-                {/* Skills - Compact */}
+                {/* Skills - Enhanced */}
                 {previewJob.skills && previewJob.skills.length > 0 && (
-                  <div className="pt-2 border-t border-gray-100">
-                    <h4 className="text-[10px] font-bold text-gray-900 mb-1 flex items-center gap-1">
-                      <Briefcase className="w-3 h-3" />
-                      Skills
+                  <div className="pt-6 border-t border-gray-100">
+                    <h4 className="text-base font-bold text-gray-900 mb-3 flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+                        <Briefcase className="w-4 h-4 text-blue-700" />
+                      </div>
+                      Required Skills
                     </h4>
-                    <div className="flex flex-wrap gap-1">
-                      {previewJob.skills.slice(0, 6).map((skill, index) => (
-                        <span key={index} className="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[9px] font-medium border border-blue-200">
+                    <div className="flex flex-wrap gap-2">
+                      {previewJob.skills.map((skill, index) => (
+                        <span key={index} className="px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-full text-sm font-medium shadow-md hover:shadow-lg transition-all">
                           {skill}
                         </span>
                       ))}
-                      {previewJob.skills.length > 6 && (
-                        <span className="px-1.5 py-0.5 bg-gray-100 text-gray-700 rounded text-[9px] font-medium">
-                          +{previewJob.skills.length - 6} more
-                        </span>
-                      )}
                     </div>
                   </div>
                 )}
 
-                {/* Perks - Compact */}
+                {/* Perks - Enhanced */}
                 {previewJob.perks && previewJob.perks.length > 0 && (
-                  <div className="pt-2 border-t border-gray-100">
-                    <h4 className="text-[10px] font-bold text-gray-900 mb-1 flex items-center gap-1">
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-                      </svg>
+                  <div className="pt-6 border-t border-gray-100">
+                    <h4 className="text-base font-bold text-gray-900 mb-3 flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
+                        <svg className="w-4 h-4 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                        </svg>
+                      </div>
                       Perks & Benefits
                     </h4>
-                    <div className="flex flex-wrap gap-1">
-                      {previewJob.perks.slice(0, 5).map((perk, index) => (
-                        <span key={index} className="px-1.5 py-0.5 bg-green-50 text-green-700 rounded text-[9px] font-medium border border-green-200">
+                    <div className="flex flex-wrap gap-2">
+                      {previewJob.perks.map((perk, index) => (
+                        <span key={index} className="px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-full text-sm font-medium shadow-md hover:shadow-lg transition-all">
                           {perk}
                         </span>
                       ))}
-                      {previewJob.perks.length > 5 && (
-                        <span className="px-1.5 py-0.5 bg-gray-100 text-gray-700 rounded text-[9px] font-medium">
-                          +{previewJob.perks.length - 5} more
-                        </span>
-                      )}
                     </div>
                   </div>
                 )}

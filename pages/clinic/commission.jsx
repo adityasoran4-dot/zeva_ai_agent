@@ -365,7 +365,7 @@ function ClinicCommissionPage() {
           </button>
         </div>
       )}
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-9xl mx-auto">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
             <div>
@@ -491,79 +491,79 @@ function ClinicCommissionPage() {
 
         {/* Modal Popup */}
         {showModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-40 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 z-50">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-[98vw] sm:max-w-5xl md:max-w-6xl lg:max-w-7xl max-h-[92vh] sm:max-h-[88vh] overflow-hidden flex flex-col">
+          <div className="fixed inset-0 bg-black bg-opacity-40 backdrop-blur-sm flex items-center justify-center p-1 sm:p-2 z-50">
+            <div className="bg-white mt-3 rounded-lg shadow-xl max-h-[95vh] w-[98vw] sm:w-[95vw] md:w-[90vw] lg:w-[85vw] xl:w-[80vw] overflow-hidden flex flex-col">
               {/* Modal Header */}
-              <div className="flex items-center justify-between px-3 py-3 sm:p-6 border-b border-gray-200 flex-shrink-0">
+              <div className="flex items-center justify-between px-2 py-2 border-b border-gray-200 flex-shrink-0">
                 <div className="min-w-0 flex-1">
-                  <h3 className="text-base sm:text-xl font-bold text-teal-900 truncate">
+                  <h3 className="text-sm font-bold text-teal-900 truncate">
                     {selectedPerson?.source === "referral" ? "Referral History" : "Doctor/Staff History"}
                   </h3>
-                  <p className="text-xs sm:text-sm text-teal-600 mt-0.5 sm:mt-1 truncate">{selectedPerson?.name || ""}</p>
+                  <p className="text-[10px] text-teal-600 mt-0.5 truncate">{selectedPerson?.name || ""}</p>
                 </div>
                 <button 
-                  className="p-2 rounded-md hover:bg-gray-100 transition-colors flex-shrink-0 ml-2"
+                  className="p-1.5 rounded-md hover:bg-gray-100 transition-colors flex-shrink-0 ml-1"
                   onClick={() => setShowModal(false)}
                 >
-                  <X className="w-5 h-5 text-gray-500" />
+                  <X className="w-4 h-4 text-gray-500" />
                 </button>
               </div>
               
               {/* Modal Body */}
-              <div className="p-2 sm:p-5 overflow-y-auto flex-1">
+              <div className="p-1.5 overflow-y-auto flex-1">
                 {modalLoading ? (
-                  <div className="text-center py-6">
-                    <div className="inline-flex items-center px-4 py-2 bg-teal-50 rounded-lg">
-                      <div className="w-4 h-4 border-2 border-teal-600 border-t-transparent rounded-full animate-spin mr-2"></div>
-                      <span className="text-teal-700 font-medium">Loading history...</span>
+                  <div className="text-center py-4">
+                    <div className="inline-flex items-center px-3 py-1.5 bg-teal-50 rounded-lg">
+                      <div className="w-3.5 h-3.5 border-2 border-teal-600 border-t-transparent rounded-full animate-spin mr-2"></div>
+                      <span className="text-teal-700 font-medium text-[10px]">Loading history...</span>
                     </div>
                   </div>
                 ) : filteredModalItems.length === 0 ? (
-                  <div className="text-center py-6">
-                    <div className="text-teal-600">No records found</div>
+                  <div className="text-center py-4">
+                    <div className="text-teal-600 text-[10px]">No records found</div>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto max-h-[75vh] sm:max-h-[72vh]">
-                    <table className="min-w-[900px] md:min-w-full text-xs sm:text-sm">
-                      <thead className="bg-gray-50 sticky top-0">
+                  <div className="overflow-hidden">
+                    <table className="min-w-full text-[9px]">
+                      <thead className="bg-gray-50">
                         <tr>
-                          <th className="px-2 sm:px-4 py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Patient</th>
-                          <th className="px-2 sm:px-4 py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">EMR</th>
-                          <th className="px-2 sm:px-4 py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Invoice</th>
-                          <th className="px-2 sm:px-4 py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Paid</th>
-                          <th className="px-2 sm:px-4 py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Referral Deducted</th>
-                          <th className="px-2 sm:px-4 py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Bank Deduction</th>
-                          <th className="px-2 sm:px-4 py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Payment Details</th>
-                          <th className="px-2 sm:px-4 py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Earned</th>
-                          <th className="px-2 sm:px-4 py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Commission</th>
-                          <th className="px-2 sm:px-4 py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Doctor</th>
-                          <th className="px-2 sm:px-4 py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Date</th>
-                          <th className="px-2 sm:px-4 py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Action</th>
+                          <th className="px-1.5 py-2 text-left text-[8px] font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Patient</th>
+                          <th className="px-1.5 py-2 text-left text-[8px] font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">EMR</th>
+                          <th className="px-1.5 py-2 text-left text-[8px] font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Invoice</th>
+                          <th className="px-1.5 py-2 text-left text-[8px] font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Paid</th>
+                          <th className="px-1.5 py-2 text-left text-[8px] font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Ref. Ded.</th>
+                          <th className="px-1.5 py-2 text-left text-[8px] font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Bank Ded.</th>
+                          <th className="px-1.5 py-2 text-left text-[8px] font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Payment</th>
+                          <th className="px-1.5 py-2 text-left text-[8px] font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Earned</th>
+                          <th className="px-1.5 py-2 text-left text-[8px] font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Comm.</th>
+                          <th className="px-1.5 py-2 text-left text-[8px] font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Doctor</th>
+                          <th className="px-1.5 py-2 text-left text-[8px] font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Date</th>
+                          <th className="px-1.5 py-2 text-left text-[8px] font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Action</th>
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
                         {filteredModalItems.map((it) => (
                           <React.Fragment key={it.commissionId}>
                             <tr className="hover:bg-gray-50">
-                              <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">{it.patientName || "—"}</td>
-                              <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">{it.patientEmr || "—"}</td>
-                              <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">{it.invoiceNumber || "—"}</td>
-                              <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">{getCurrencySymbol(currency)} {Number(it.paidAmount || 0).toFixed(2)}</td>
-                              <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+                              <td className="px-1.5 py-1.5 whitespace-nowrap text-[9px]">{it.patientName || "—"}</td>
+                              <td className="px-1.5 py-1.5 whitespace-nowrap text-[9px]">{it.patientEmr || "—"}</td>
+                              <td className="px-1.5 py-1.5 whitespace-nowrap text-[9px]">{it.invoiceNumber || "—"}</td>
+                              <td className="px-1.5 py-1.5 whitespace-nowrap text-[9px]">{getCurrencySymbol(currency)} {Number(it.paidAmount || 0).toFixed(2)}</td>
+                              <td className="px-1.5 py-1.5 whitespace-nowrap text-[9px]">
                                 {Number(it.referralCommissionDeducted || 0) > 0 ? (
                                   `${getCurrencySymbol(currency)} ${Number(it.referralCommissionDeducted).toFixed(2)}`
                                 ) : "—"}
                               </td>
-                              <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+                              <td className="px-1.5 py-1.5 whitespace-nowrap text-[9px]">
                                 {it.bankDeduction?.deductionAmount ? (
                                   `${getCurrencySymbol(currency)} ${Number(it.bankDeduction.deductionAmount).toFixed(2)}`
                                 ) : "—"}
                               </td>
-                              <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+                              <td className="px-1.5 py-1.5 whitespace-nowrap text-[8px]">
                                 {it.paymentMethod === "Cash" ? (
-                                  <span className="text-gray-700 text-[9px]">Cash</span>
+                                  <span className="text-gray-700">Cash</span>
                                 ) : it.paymentMethod && it.bankDeduction?.enabled ? (
-                                  <div className="flex flex-col gap-0.5 text-[9px]">
+                                  <div className="flex flex-col gap-0.5">
                                     <span className="font-medium text-gray-700">{it.paymentMethod}</span>
                                     <span className="text-gray-600">
                                       {it.bankDeduction.type === "flat" ? (
@@ -571,31 +571,29 @@ function ClinicCommissionPage() {
                                       ) : (
                                         `${Number(it.bankDeduction.value).toFixed(0)}%`
                                       )}
-                                      {" • "}
-                                      Apply on: {it.bankDeduction.applyOn}
                                     </span>
                                   </div>
                                 ) : (
-                                  <span className="text-gray-400 text-[9px]">—</span>
+                                  <span className="text-gray-400">—</span>
                                 )}
                               </td>
-                              <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+                              <td className="px-1.5 py-1.5 whitespace-nowrap text-[9px]">
                                 {Number((it.finalCommissionAmount ?? it.commissionAmount) || 0) > 0
                                   ? `${getCurrencySymbol(currency)} ${Number((it.finalCommissionAmount ?? it.commissionAmount) || 0).toFixed(2)}`
                                   : "—"}
                               </td>
-                              <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+                              <td className="px-1.5 py-1.5 whitespace-nowrap text-[9px]">
                                 {Number((it.finalCommissionAmount ?? it.commissionAmount) || 0) > 0
                                   ? `${getCurrencySymbol(currency)} ${Number((it.finalCommissionAmount ?? it.commissionAmount) || 0).toFixed(2)} (${Number(it.commissionPercent || 0)}%)`
                                   : "—"}
                               </td>
-                              <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">{it.doctorName || "—"}</td>
-                              <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">{it.invoicedDate ? new Date(it.invoicedDate).toLocaleDateString() : "—"}</td>
-                              <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
-                                <div className="flex items-center gap-1 sm:gap-1.5">
+                              <td className="px-1.5 py-1.5 whitespace-nowrap text-[9px]">{it.doctorName || "—"}</td>
+                              <td className="px-1.5 py-1.5 whitespace-nowrap text-[9px]">{it.invoicedDate ? new Date(it.invoicedDate).toLocaleDateString() : "—"}</td>
+                              <td className="px-1.5 py-1.5 whitespace-nowrap">
+                                <div className="flex items-center gap-1">
                                   <button
                                     onClick={() => toggleRow(it)}
-                                    className="px-1.5 sm:px-2 py-1 text-[10px] sm:text-xs rounded-md bg-teal-600 hover:bg-teal-700 text-white whitespace-nowrap"
+                                    className="px-1.5 py-1 text-[8px] rounded-md bg-teal-600 hover:bg-teal-700 text-white whitespace-nowrap"
                                   >
                                     {expandedRow === it.commissionId ? "Hide" : "View"}
                                   </button>
@@ -603,16 +601,16 @@ function ClinicCommissionPage() {
                                   <button
                                     onClick={() => handleToggleSubmit(it.commissionId)}
                                     title={it.isSubmitted ? "Unmark submission" : "Mark as submitted"}
-                                    className={`p-1 sm:p-1.5 rounded-md transition-all ${
+                                    className={`p-1 rounded-md transition-all ${
                                       it.isSubmitted
                                         ? "bg-emerald-600 text-white hover:bg-emerald-700"
                                         : "bg-gray-100 text-gray-400 hover:bg-emerald-50 hover:text-emerald-600 border border-gray-200"
                                     }`}
                                   >
-                                    <Check className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                                    <Check className="w-2.5 h-2.5" />
                                   </button>
                                   {it.isApproved && (
-                                    <span className="inline-flex items-center px-1 sm:px-1.5 py-0.5 rounded-full text-[8px] sm:text-[10px] bg-emerald-100 text-emerald-700 font-semibold whitespace-nowrap">
+                                    <span className="inline-flex items-center px-1 py-0.5 rounded-full text-[7px] bg-emerald-100 text-emerald-700 font-semibold whitespace-nowrap">
                                       Approved
                                     </span>
                                   )}
@@ -621,54 +619,54 @@ function ClinicCommissionPage() {
                             </tr>
                             {expandedRow === it.commissionId && (
                               <tr className="bg-gray-50/60">
-                                <td colSpan={12} className="px-2 sm:px-4 py-2 sm:py-3">
-                                  <div className="rounded-lg border border-gray-200 bg-white p-2 sm:p-3 shadow-sm overflow-x-auto">
-                                    <div className="flex flex-col sm:flex-row items-start justify-between gap-2 mb-2">
-                                      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                                        <span className="text-[10px] sm:text-xs font-semibold text-gray-700">Details:</span>
+                                <td colSpan={12} className="px-1.5 py-1.5">
+                                  <div className="rounded-lg border border-gray-200 bg-white p-1.5 shadow-sm overflow-hidden">
+                                    <div className="flex flex-col sm:flex-row items-start justify-between gap-1.5 mb-1.5">
+                                      <div className="flex flex-wrap items-center gap-1">
+                                        <span className="text-[9px] font-semibold text-gray-700">Details:</span>
                                         {it.service === "Package" ? (
                                           <>
-                                            <span className="inline-flex items-center px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[11px] bg-indigo-100 text-indigo-700 font-medium">
+                                            <span className="inline-flex items-center px-1 py-0.5 rounded-full text-[8px] bg-indigo-100 text-indigo-700 font-medium">
                                               Package: {it.package || "—"}
                                             </span>
                                             {Array.isArray(it.selectedPackageTreatments) && it.selectedPackageTreatments.length > 0 && (
-                                              <span className="inline-flex items-center px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[11px] bg-cyan-100 text-cyan-700 font-medium">
+                                              <span className="inline-flex items-center px-1 py-0.5 rounded-full text-[8px] bg-cyan-100 text-cyan-700 font-medium">
                                                 Sess used: {it.selectedPackageTreatments.reduce((s, t) => s + (Number(t.sessions) || 0), 0)}
                                               </span>
                                             )}
                                           </>
                                         ) : (
                                           <>
-                                            <span className="inline-flex items-center px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[11px] bg-emerald-100 text-emerald-700 font-medium">
+                                            <span className="inline-flex items-center px-1 py-0.5 rounded-full text-[8px] bg-emerald-100 text-emerald-700 font-medium">
                                               Treatment: {it.treatment || it.service || "—"}
                                             </span>
                                           </>
                                         )}
                                         {it.isFreeConsultation ? (
-                                          <span className="inline-flex items-center px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[11px] bg-amber-100 text-amber-700 font-semibold">
-                                            Free consult used{it.freeConsultationCount ? ` (${it.freeConsultationCount})` : ""}
+                                          <span className="inline-flex items-center px-1 py-0.5 rounded-full text-[8px] bg-amber-100 text-amber-700 font-semibold">
+                                            Free consult{it.freeConsultationCount ? ` (${it.freeConsultationCount})` : ""}
                                           </span>
                                         ) : null}
                                         {Number(it.membershipDiscountApplied || 0) > 0 && (
-                                          <span className="inline-flex items-center px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[11px] bg-teal-100 text-teal-700 font-medium">
+                                          <span className="inline-flex items-center px-1 py-0.5 rounded-full text-[8px] bg-teal-100 text-teal-700 font-medium">
                                             Discount: {getCurrencySymbol(currency)}{Number(it.membershipDiscountApplied).toFixed(2)}
                                           </span>
                                         )}
                                       </div>
-                                      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
+                                      <div className="flex flex-wrap items-center gap-1 w-full sm:w-auto">
                                         {(() => {
                                           const totalPending = Number((it.totalPendingBalance ?? it.pendingAmount ?? 0) || 0);
                                           const totalAdvance = Number((it.totalAdvanceBalance ?? it.advanceAmount ?? 0) || 0);
                                           return (
                                             <>
                                               {totalPending > 0 && (
-                                                <span className="inline-flex items-center px-1.5 sm:px-2 py-0.5 rounded-md text-[9px] sm:text-[11px] font-semibold text-rose-700 bg-rose-50 border border-rose-100">
-                                                  Total Pending: {getCurrencySymbol(currency)} {totalPending.toFixed(2)}
+                                                <span className="inline-flex items-center px-1 py-0.5 rounded-md text-[8px] font-semibold text-rose-700 bg-rose-50 border border-rose-100">
+                                                  Pending: {getCurrencySymbol(currency)} {totalPending.toFixed(2)}
                                                 </span>
                                               )}
                                               {totalAdvance > 0 && (
-                                                <span className="inline-flex items-center px-1.5 sm:px-2 py-0.5 rounded-md text-[9px] sm:text-[11px] font-semibold text-green-700 bg-green-50 border border-green-100">
-                                                  Total Advance: {getCurrencySymbol(currency)} {totalAdvance.toFixed(2)}
+                                                <span className="inline-flex items-center px-1 py-0.5 rounded-md text-[8px] font-semibold text-green-700 bg-green-50 border border-green-100">
+                                                  Advance: {getCurrencySymbol(currency)} {totalAdvance.toFixed(2)}
                                                 </span>
                                               )}
                                             </>
@@ -676,14 +674,14 @@ function ClinicCommissionPage() {
                                         })()}
                                       </div>
                                     </div>
-                                    <div className="border-t border-gray-100 my-2" />
+                                    <div className="border-t border-gray-100 my-1" />
                                     {/* Package treatments list if present */}
                                     {it.service === "Package" && Array.isArray(it.selectedPackageTreatments) && it.selectedPackageTreatments.length > 0 && (
-                                      <div className="mb-2">
-                                        <div className="text-[11px] text-gray-600 font-semibold mb-1">Treatments in this bill:</div>
-                                        <div className="flex flex-wrap gap-1.5">
+                                      <div className="mb-1.5">
+                                        <div className="text-[9px] text-gray-600 font-semibold mb-0.5">Treatments:</div>
+                                        <div className="flex flex-wrap gap-1">
                                           {it.selectedPackageTreatments.map((pt, idx) => (
-                                            <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-gray-100 text-gray-700">
+                                            <span key={idx} className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[8px] bg-gray-100 text-gray-700">
                                               {pt.treatmentName} — {pt.sessions} sess
                                             </span>
                                           ))}
@@ -692,26 +690,26 @@ function ClinicCommissionPage() {
                                     )}
                                     {/* Expenses for this billing */}
                                     {(Number(it.expenseTotal || 0) > 0 || Number(it.complaintExpenseTotal || 0) > 0) && (
-                                      <div className="mb-2">
-                                        <div className="text-[11px] text-gray-600 font-semibold mb-1">Expenses used for this bill:</div>
-                                        <div className="flex flex-wrap gap-1.5">
+                                      <div className="mb-1.5">
+                                        <div className="text-[9px] text-gray-600 font-semibold mb-0.5">Expenses:</div>
+                                        <div className="flex flex-wrap gap-1">
                                           {(Array.isArray(it.expenses) ? it.expenses : []).map((ex, iEx) => (
-                                            <span key={`be-${iEx}`} className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-amber-100 text-amber-800 border border-amber-200">
+                                            <span key={`be-${iEx}`} className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[8px] bg-amber-100 text-amber-800 border border-amber-200">
                                               {ex.name}: {getCurrencySymbol(currency)}{Number(ex.amount || 0).toFixed(2)}
                                             </span>
                                           ))}
                                           {Array.isArray(it.complaintExpenses) && it.complaintExpenses.length > 0 && it.complaintExpenses.map((cx, idx) => (
-                                            <span key={`ce-${idx}`} className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-orange-100 text-orange-800 border border-orange-200">
+                                            <span key={`ce-${idx}`} className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[8px] bg-orange-100 text-orange-800 border border-orange-200">
                                               {cx.name} • {cx.quantity} {cx.uom} • {getCurrencySymbol(currency)}{Number(cx.totalAmount || 0).toFixed(2)}
                                             </span>
                                           ))}
                                           {(Number(it.expenseTotal || 0) > 0) && (
-                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-amber-200 text-amber-900 font-semibold">
+                                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[8px] bg-amber-200 text-amber-900 font-semibold">
                                               Manual total: {getCurrencySymbol(currency)}{Number(it.expenseTotal || 0).toFixed(2)}
                                             </span>
                                           )}
                                           {(Number(it.complaintExpenseTotal || 0) > 0) && (
-                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-orange-200 text-orange-900 font-semibold">
+                                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[8px] bg-orange-200 text-orange-900 font-semibold">
                                               Items total: {getCurrencySymbol(currency)}{Number(it.complaintExpenseTotal || 0).toFixed(2)}
                                             </span>
                                           )}
@@ -719,52 +717,52 @@ function ClinicCommissionPage() {
                                       </div>
                                     )}
                                     {/* Commission base amount summary */}
-                                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                                    <div className="mt-1 flex flex-wrap items-center gap-1">
                                       {Number(it.commissionBaseAmount || 0) > 0 && (
-                                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold text-teal-700 bg-teal-50 border border-teal-200">
-                                          Commission Base: {getCurrencySymbol(currency)}{Number(it.commissionBaseAmount || 0).toFixed(2)}
+                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[8px] font-semibold text-teal-700 bg-teal-50 border border-teal-200">
+                                          Comm Base: {getCurrencySymbol(currency)}{Number(it.commissionBaseAmount || 0).toFixed(2)}
                                         </span>
                                       )}
-                                      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200">
-                                        Final Commission: {getCurrencySymbol(currency)}{Number(it.finalCommissionAmount || it.commissionAmount || 0).toFixed(2)} ({Number(it.commissionPercent || 0)}%)
+                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[8px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200">
+                                        Final Comm: {getCurrencySymbol(currency)}{Number(it.finalCommissionAmount || it.commissionAmount || 0).toFixed(2)} ({Number(it.commissionPercent || 0)}%)
                                       </span>
                                     </div>
                                     {/* Post-commission expenses */}
                                     {Array.isArray(it.postCommissionExpenses) && it.postCommissionExpenses.length > 0 && (
-                                      <div className="mt-2">
-                                        <div className="text-[11px] text-gray-600 font-semibold mb-1">Post-billing expenses (deducted after commission):</div>
-                                        <div className="flex flex-wrap gap-1.5">
+                                      <div className="mt-1">
+                                        <div className="text-[9px] text-gray-600 font-semibold mb-0.5">Post-commission expenses:</div>
+                                        <div className="flex flex-wrap gap-1">
                                           {it.postCommissionExpenses.map((pce, iPce) => (
-                                            <span key={`pce-${iPce}`} className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-violet-100 text-violet-800 border border-violet-200">
+                                            <span key={`pce-${iPce}`} className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[8px] bg-violet-100 text-violet-800 border border-violet-200">
                                               {pce.name}: {getCurrencySymbol(currency)}{Number(pce.price || 0).toFixed(2)}
                                             </span>
                                           ))}
-                                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-violet-200 text-violet-900 font-semibold">
-                                            Post-expense total: {getCurrencySymbol(currency)}{it.postCommissionExpenses.reduce((s, e) => s + Number(e.price || 0), 0).toFixed(2)}
+                                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[8px] bg-violet-200 text-violet-900 font-semibold">
+                                            Post-exp total: {getCurrencySymbol(currency)}{it.postCommissionExpenses.reduce((s, e) => s + Number(e.price || 0), 0).toFixed(2)}
                                           </span>
                                         </div>
                                       </div>
                                     )}
                                     {/* Add Expense button / inline form */}
-                                    <div className="mt-2">
+                                    <div className="mt-1">
                                       {addExpenseRow !== it.commissionId ? (
                                         <button
                                           onClick={() => { setAddExpenseRow(it.commissionId); setNewExpenses([{ name: "", price: "" }]); }}
-                                          className="px-3 py-1 text-[11px] rounded-md bg-violet-600 hover:bg-violet-700 text-white font-medium transition-all"
+                                          className="px-2 py-1 text-[9px] rounded-md bg-violet-600 hover:bg-violet-700 text-white font-medium transition-all"
                                         >
                                           + Add Expense
                                         </button>
                                       ) : (
-                                        <div className="rounded-md border border-violet-200 bg-violet-50/40 p-3 mt-1">
-                                          <div className="text-[11px] font-semibold text-violet-800 mb-2">Add Post-Commission Expenses</div>
+                                        <div className="rounded-md border border-violet-200 bg-violet-50/40 p-2 mt-1">
+                                          <div className="text-[9px] font-semibold text-violet-800 mb-1.5">Add Expenses</div>
                                           {newExpenses.map((exp, idx) => (
-                                            <div key={idx} className="flex items-center gap-2 mb-1.5">
+                                            <div key={idx} className="flex items-center gap-1.5 mb-1">
                                               <input
                                                 type="text"
                                                 placeholder="Expense name"
                                                 value={exp.name}
                                                 onChange={(e) => setNewExpenses((prev) => prev.map((x, i) => i === idx ? { ...x, name: e.target.value } : x))}
-                                                className="flex-1 px-2 py-1 text-[11px] border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-violet-400"
+                                                className="flex-1 px-1.5 py-1 text-[9px] border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-violet-400"
                                               />
                                               <input
                                                 type="number"
@@ -772,35 +770,35 @@ function ClinicCommissionPage() {
                                                 min="0"
                                                 value={exp.price}
                                                 onChange={(e) => setNewExpenses((prev) => prev.map((x, i) => i === idx ? { ...x, price: e.target.value } : x))}
-                                                className="w-24 px-2 py-1 text-[11px] border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-violet-400"
+                                                className="w-20 px-1.5 py-1 text-[9px] border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-violet-400"
                                               />
                                               {newExpenses.length > 1 && (
                                                 <button
                                                   onClick={() => setNewExpenses((prev) => prev.filter((_, i) => i !== idx))}
-                                                  className="text-[11px] text-red-500 hover:text-red-700 px-1"
+                                                  className="text-[9px] text-red-500 hover:text-red-700 px-1"
                                                 >
                                                   ✕
                                                 </button>
                                               )}
                                             </div>
                                           ))}
-                                          <div className="flex items-center gap-2 mt-2">
+                                          <div className="flex items-center gap-1.5 mt-1">
                                             <button
                                               onClick={() => setNewExpenses((prev) => [...prev, { name: "", price: "" }])}
-                                              className="px-2 py-1 text-[11px] rounded-md border border-violet-300 text-violet-700 hover:bg-violet-100"
+                                              className="px-2 py-1 text-[9px] rounded-md border border-violet-300 text-violet-700 hover:bg-violet-100"
                                             >
                                               + Add Row
                                             </button>
                                             <button
                                               disabled={addExpenseLoading}
                                               onClick={() => handleAddExpense(it.commissionId)}
-                                              className="px-3 py-1 text-[11px] rounded-md bg-violet-600 hover:bg-violet-700 text-white font-medium disabled:opacity-50"
+                                              className="px-2 py-1 text-[9px] rounded-md bg-violet-600 hover:bg-violet-700 text-white font-medium disabled:opacity-50"
                                             >
                                               {addExpenseLoading ? "Saving..." : "Save"}
                                             </button>
                                             <button
                                               onClick={() => { setAddExpenseRow(null); setNewExpenses([{ name: "", price: "" }]); }}
-                                              className="px-2 py-1 text-[11px] rounded-md border border-gray-300 text-gray-600 hover:bg-gray-100"
+                                              className="px-2 py-1 text-[9px] rounded-md border border-gray-300 text-gray-600 hover:bg-gray-100"
                                             >
                                               Cancel
                                             </button>
@@ -808,7 +806,7 @@ function ClinicCommissionPage() {
                                         </div>
                                       )}
                                     </div>
-                                    <div className="border-t border-gray-100 my-2" />
+                                    <div className="border-t border-gray-100 my-1" />
                                     {it.patientId && patientInfoMap[it.patientId]?.full && (() => {
                                       const full = patientInfoMap[it.patientId].full;
                                       const outMemIds = new Set((full.membershipTransfers || []).filter(t => t.type === 'out').map(t => String(t.membershipId)));
@@ -817,14 +815,14 @@ function ClinicCommissionPage() {
                                       const showPackage = full.package === "Yes" && full.packageId && !outPkgIds.has(String(full.packageId));
                                       if (!showMembership && !showPackage) return null;
                                       return (
-                                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                                        <div className="mt-1 flex flex-wrap items-center gap-1">
                                           {showMembership && (
-                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-purple-100 text-purple-700">
+                                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[8px] bg-purple-100 text-purple-700">
                                               Membership active
                                             </span>
                                           )}
                                           {showPackage && (
-                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-blue-100 text-blue-700">
+                                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[8px] bg-blue-100 text-blue-700">
                                               Package assigned
                                             </span>
                                           )}
@@ -833,7 +831,7 @@ function ClinicCommissionPage() {
                                     })()}
                                     {/* Detailed Membership Info */}
                                     {it.patientId && patientInfoMap[it.patientId]?.full && (
-                                      <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
+                                      <div className="mt-1.5 grid grid-cols-1 md:grid-cols-2 gap-1.5">
                                         {(() => {
                                           const full = patientInfoMap[it.patientId].full;
                                           const outIds = new Set((full.membershipTransfers || []).filter(t => t.type === 'out').map(t => String(t.membershipId)));
@@ -858,17 +856,17 @@ function ClinicCommissionPage() {
                                             const memKey = `${mId}|${start}|${end}`;
                                             const isOpen = !!expandedMemberships[memKey];
                                             return (
-                                              <div key={idx} className="rounded-md border border-purple-200 bg-purple-50/40 p-2">
-                                                <div className="text-[11px] font-semibold text-purple-800 mb-1">Membership</div>
-                                                <div className="flex flex-wrap items-center gap-2">
-                                                  <span className="inline-flex px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[11px]">{name}</span>
-                                                  <span className="text-[11px] text-gray-600">From {start} to {end}</span>
+                                              <div key={idx} className="rounded-md border border-purple-200 bg-purple-50/40 p-1.5">
+                                                <div className="text-[9px] font-semibold text-purple-800 mb-0.5">Membership</div>
+                                                <div className="flex flex-wrap items-center gap-1">
+                                                  <span className="inline-flex px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[8px]">{name}</span>
+                                                  <span className="text-[8px] text-gray-600">From {start} to {end}</span>
                                                   {inTransferred && (
-                                                    <span className="inline-flex px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[11px]">Transferred in</span>
+                                                    <span className="inline-flex px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[8px]">Transferred in</span>
                                                   )}
                                                   <button
                                                     onClick={() => setExpandedMemberships(prev => ({ ...prev, [memKey]: !prev[memKey] }))}
-                                                    className="ml-auto inline-flex px-2 py-0.5 rounded-md bg-white border border-purple-200 text-[11px] text-purple-700 hover:bg-purple-100"
+                                                    className="ml-auto inline-flex px-1.5 py-0.5 rounded-md bg-white border border-purple-200 text-[8px] text-purple-700 hover:bg-purple-100"
                                                   >
                                                     {isOpen ? "Hide details" : "Included"}
                                                   </button>

@@ -565,7 +565,7 @@ const PatientProfileDashboard = ({ patientData, onClose, onPatientUpdated }: { p
   const statusTabsConfig = [
     { key: 'all',          label: 'All' },
     { key: 'booked',       label: 'Booked' },
-    { key: 'upcoming',     label: 'Follow-Up' },
+    { key: 'upcoming',     label: 'Upcoming' },
     { key: 'enquiry',      label: 'Enquiry' },
     { key: 'Arrived',      label: 'Arrived' },
     { key: 'Waiting',      label: 'Waiting' },

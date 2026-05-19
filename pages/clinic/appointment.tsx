@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useRef, useState, useCallback } from "react";
+import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { ChromePicker } from "react-color";
 import { ModalPortal } from "../../lib/modalPortal";
 import { useRouter } from "next/router";
@@ -2209,6 +2209,79 @@ function AppointmentPage({
   const lastBookableMinutes =
     closingMinutes !== null ? closingMinutes - SLOT_INTERVAL_MINUTES : null;
 
+  // --- Overlap layout computation for side-by-side appointment rendering ---
+  const overlapLayoutMap = useMemo(() => {
+    const layoutMap = new Map<string, { column: number; totalColumns: number }>();
+
+    const computeForGroup = (aptGroup: Appointment[]) => {
+      const valid = aptGroup.filter((a) => a.status !== "Cancelled");
+      if (valid.length === 0) return;
+
+      const items = valid.map((a) => ({
+        id: a._id,
+        start: timeStringToMinutes(a.fromTime),
+        end: timeStringToMinutes(a.toTime),
+      }));
+
+      // Sort by start then by longer duration first
+      items.sort((a, b) => a.start - b.start || (b.end - b.start) - (a.end - a.start));
+
+      // Greedy column assignment
+      const columnEnds: number[] = [];
+      const assignments: { id: string; column: number }[] = [];
+
+      for (const item of items) {
+        let placed = -1;
+        for (let col = 0; col < columnEnds.length; col++) {
+          if (columnEnds[col] <= item.start) {
+            placed = col;
+            break;
+          }
+        }
+        if (placed === -1) {
+          placed = columnEnds.length;
+          columnEnds.push(item.end);
+        } else {
+          columnEnds[placed] = item.end;
+        }
+        assignments.push({ id: item.id, column: placed });
+      }
+
+      const totalCols = columnEnds.length;
+      for (const a of assignments) {
+        layoutMap.set(a.id, { column: a.column, totalColumns: totalCols });
+      }
+    };
+
+    // Compute for each doctor
+    const doctorGroups = new Map<string, Appointment[]>();
+    const roomGroups = new Map<string, Appointment[]>();
+
+    for (const apt of appointments) {
+      const aptDate = typeof apt.startDate === "string"
+        ? apt.startDate.split("T")[0]
+        : new Date(apt.startDate).toISOString().split("T")[0];
+      if (aptDate !== selectedDate) continue;
+
+      if (apt.bookedFrom === "room") {
+        if (apt.roomId) {
+          if (!roomGroups.has(apt.roomId)) roomGroups.set(apt.roomId, []);
+          roomGroups.get(apt.roomId)!.push(apt);
+        }
+      } else {
+        if (apt.doctorId) {
+          if (!doctorGroups.has(apt.doctorId)) doctorGroups.set(apt.doctorId, []);
+          doctorGroups.get(apt.doctorId)!.push(apt);
+        }
+      }
+    }
+
+    for (const group of doctorGroups.values()) computeForGroup(group);
+    for (const group of roomGroups.values()) computeForGroup(group);
+
+    return layoutMap;
+  }, [appointments, selectedDate]);
+
   // Column widths are fixed - do not expand based on patients
   // All columns maintain consistent width regardless of number of patients
 
@@ -3746,9 +3819,9 @@ function AppointmentPage({
                     }}
                   >
                     {/* Header row - sticky top */}
-                    {/* Time header cell */}
+                    {/* Time header cell - sticky to both top AND left so it stays in the corner during horizontal/vertical scroll */}
                     <div
-                      className="sticky top-0 z-[50] bg-gray-50 dark:bg-gray-200 border-b border-r border-gray-200 dark:border-gray-300 p-1.5 flex items-center"
+                      className="sticky top-0 left-0 z-[60] bg-gray-50 dark:bg-gray-200 border-b border-r border-gray-200 dark:border-gray-300 p-1.5 flex items-center"
                       style={{ height: "36px", gridColumn: "1", gridRow: "1" }}
                     >
                       <div className="flex items-center gap-0.5 text-[8px] sm:text-[9px] font-semibold text-gray-900 dark:text-gray-900">
@@ -4029,18 +4102,6 @@ function AppointmentPage({
                                         const subEndMinutes =
                                           subStartMinutes +
                                           SLOT_INTERVAL_MINUTES;
-                                        const isSubSlotOccupied =
-                                          rowAppointments.some((apt) => {
-                                            const aptStart =
-                                              timeStringToMinutes(apt.fromTime);
-                                            const aptEnd = timeStringToMinutes(
-                                              apt.toTime,
-                                            );
-                                            return (
-                                              aptStart < subEndMinutes &&
-                                              aptEnd > subStartMinutes
-                                            );
-                                          });
                                         const slotWithinClosing =
                                           lastBookableMinutes === null ||
                                           subStartMinutes <=
@@ -4050,8 +4111,7 @@ function AppointmentPage({
                                           (!isToday ||
                                             subStartMinutes >=
                                               currentMinutes) &&
-                                          slotWithinClosing &&
-                                          !isSubSlotOccupied;
+                                          slotWithinClosing;
 
                                         const isSelected =
                                           isInSelection &&
@@ -4076,9 +4136,7 @@ function AppointmentPage({
                                                   ? "bg-blue-200 dark:bg-blue-200 border-l-2 border-blue-500 dark:border-blue-600 cursor-crosshair"
                                                   : canBookSlot
                                                     ? "cursor-crosshair hover:bg-blue-50 dark:hover:bg-blue-100 border-l-2 border-transparent hover:border-blue-400 dark:hover:border-blue-500"
-                                                    : isSubSlotOccupied
-                                                      ? "bg-gray-50 dark:bg-gray-100 cursor-not-allowed"
-                                                      : "bg-gray-50 dark:bg-gray-100 cursor-not-allowed"
+                                                    : "bg-gray-50 dark:bg-gray-100 cursor-not-allowed"
                                             }`}
                                             style={{
                                               height: SUB_SLOT_HEIGHT_PX,
@@ -4214,274 +4272,105 @@ function AppointmentPage({
                                         if (startingAppointments.length === 0)
                                           return null;
 
-                                        const appointmentsBySlot =
-                                          startingAppointments.map((apt) => {
-                                            const aptStart =
-                                              timeStringToMinutes(apt.fromTime);
-                                            const aptEnd = timeStringToMinutes(
-                                              apt.toTime,
-                                            );
-                                            const slotOffset =
-                                              aptStart - rowStartMinutes;
-                                            const topOffset =
-                                              (slotOffset /
-                                                ROW_INTERVAL_MINUTES) *
-                                              ROW_HEIGHT_PX;
-                                            const duration = aptEnd - aptStart;
-                                            const height =
-                                              (duration /
-                                                ROW_INTERVAL_MINUTES) *
-                                              ROW_HEIGHT_PX;
-
-                                            return {
-                                              apt,
-                                              topOffset,
-                                              height: Math.max(
-                                                height,
-                                                ROW_HEIGHT_PX / 2,
-                                              ),
-                                            };
-                                          });
-
-                                        const groupedBySlot: {
-                                          [
-                                            key: string
-                                          ]: typeof appointmentsBySlot;
-                                        } = {};
-                                        appointmentsBySlot.forEach((item) => {
-                                          const slotKey = Math.round(
-                                            item.topOffset,
-                                          ).toString();
-                                          if (!groupedBySlot[slotKey]) {
-                                            groupedBySlot[slotKey] = [];
-                                          }
-                                          groupedBySlot[slotKey].push(item);
-                                        });
-
                                         return (
                                           <>
-                                            {Object.values(groupedBySlot).map(
-                                              (
-                                                slotAppointments,
-                                                groupIndex,
-                                              ) => {
-                                                const firstAppt =
-                                                  slotAppointments[0];
-                                                const maxHeight = Math.max(
-                                                  ...slotAppointments.map(
-                                                    (item) => item.height,
-                                                  ),
-                                                );
+                                            {startingAppointments.map((apt) => {
+                                              const aptStart = timeStringToMinutes(apt.fromTime);
+                                              const aptEnd = timeStringToMinutes(apt.toTime);
+                                              const slotOffset = aptStart - rowStartMinutes;
+                                              const topOffset = (slotOffset / ROW_INTERVAL_MINUTES) * ROW_HEIGHT_PX;
+                                              const duration = aptEnd - aptStart;
+                                              const height = Math.max((duration / ROW_INTERVAL_MINUTES) * ROW_HEIGHT_PX, ROW_HEIGHT_PX / 2);
+                                              const layout = overlapLayoutMap.get(apt._id) || { column: 0, totalColumns: 1 };
+                                              const leftPercent = (layout.column / layout.totalColumns) * 100;
+                                              const widthPercent = (1 / layout.totalColumns) * 100;
+                                              const statusColor = getStatusColor(apt.status);
 
-                                                return (
-                                                  <div
-                                                    key={`slot-${groupIndex}`}
-                                                    className="absolute left-[2px] right-[2px] flex flex-row items-center"
-                                                    style={{
-                                                      top: `${Math.max(0, firstAppt.topOffset + 1)}px`,
-                                                      height: `${maxHeight - 2}px`,
-                                                      zIndex: 10,
-                                                    }}
-                                                  >
-                                                    {slotAppointments.map(
-                                                      (item) => {
-                                                        const statusColor =
-                                                          getStatusColor(
-                                                            item.apt.status,
-                                                          );
-                                                        const patientCount =
-                                                          slotAppointments.length;
-                                                        const cardWidthPercent =
-                                                          patientCount > 1
-                                                            ? `${Math.floor(100 / patientCount)}%`
-                                                            : "100%";
-
-                                                        return (
-                                                          <div
-                                                            key={item.apt._id}
-                                                            className={`flex flex-col justify-center flex-1 min-w-0 px-2 py-1 border transition-all hover:shadow-sm ${permissions.canUpdate ? "cursor-pointer" : "cursor-default"} ${draggedAppointmentId === item.apt._id ? "opacity-50" : ""}`}
-                                                            style={{
-                                                              backgroundColor:
-                                                                statusColor.bg,
-                                                              color:
-                                                                statusColor.text,
-                                                              borderColor:
-                                                                statusColor.border,
-                                                              height: `${item.height - 2}px`,
-                                                              width:
-                                                                cardWidthPercent,
-                                                              flexBasis:
-                                                                cardWidthPercent,
-                                                            }}
-                                                            draggable={
-                                                              permissions.canUpdate
-                                                            }
-                                                            onDragStart={(e) =>
-                                                              handleAppointmentDragStart(
-                                                                e,
-                                                                item.apt._id,
-                                                              )
-                                                            }
-                                                            onDragEnd={
-                                                              handleAppointmentDragEnd
-                                                            }
-                                                            onMouseEnter={(
-                                                              e,
-                                                            ) => {
-                                                              const rect =
-                                                                e.currentTarget.getBoundingClientRect();
-                                                              const tooltipWidth = 200;
-                                                              const tooltipHeight = 300;
-                                                              const spacing = 8;
-
-                                                              let left =
-                                                                rect.right +
-                                                                spacing;
-                                                              let top =
-                                                                rect.top;
-
-                                                              if (
-                                                                left +
-                                                                  tooltipWidth >
-                                                                window.innerWidth
-                                                              ) {
-                                                                left =
-                                                                  rect.left -
-                                                                  tooltipWidth -
-                                                                  spacing;
-                                                              }
-
-                                                              if (
-                                                                top +
-                                                                  tooltipHeight >
-                                                                window.innerHeight
-                                                              ) {
-                                                                top =
-                                                                  window.innerHeight -
-                                                                  tooltipHeight -
-                                                                  10;
-                                                              }
-
-                                                              if (top < 10) {
-                                                                top = 10;
-                                                              }
-
-                                                              if (left < 10) {
-                                                                left = 10;
-                                                              }
-
-                                                              setHoveredAppointment(
-                                                                {
-                                                                  appointment:
-                                                                    item.apt,
-                                                                  position: {
-                                                                    top,
-                                                                    left,
-                                                                  },
-                                                                },
-                                                              );
-                                                            }}
-                                                            onMouseLeave={() => {
-                                                              setHoveredAppointment(
-                                                                null,
-                                                              );
-                                                            }}
-                                                            onClick={(e) => {
-                                                              e.stopPropagation();
-                                                              if (
-                                                                permissions.canUpdate
-                                                              ) {
-                                                                appointmentRef.current =
-                                                                  item.apt;
-                                                                setSelectedAppointment(
-                                                                  item.apt,
-                                                                );
-                                                                setEditModalOpen(
-                                                                  true,
-                                                                );
-                                                              } else {
-                                                                showErrorToast(
-                                                                  "You do not have permission to edit appointments",
-                                                                );
-                                                              }
-                                                            }}
-                                                            title={`${item.apt.patientName} - ${formatTime(item.apt.fromTime)} - ${formatTime(item.apt.toTime)}`}
-                                                          >
-                                                            <div className="flex flex-col justify-center h-full">
-                                                              {item.height <
-                                                              60 ? (
-                                                                <div className="flex items-center h-full px-2">
-                                                                  <span className="text-[13px] font-[600] leading-[1.2] tracking-tight text-black truncate">
-                                                                    {
-                                                                      item.apt
-                                                                        .patientName
-                                                                    }
-                                                                  </span>
-                                                                </div>
-                                                              ) : (
-                                                                <div className="px-2 py-1.5 leading-[1.2] space-y-[2px]">
-                                                                  <span className="text-[11px] font-[400] opacity-[0.75] mb-[2px] block">
-                                                                    {formatTime(
-                                                                      item.apt
-                                                                        .fromTime,
-                                                                    )}{" "}
-                                                                    -{" "}
-                                                                    {formatTime(
-                                                                      item.apt
-                                                                        .toTime,
-                                                                    )}
-                                                                  </span>
-                                                                  <span className="text-[13px] font-[600] text-black mb-[2px] block">
-                                                                    {slotAppointments.length >
-                                                                    1
-                                                                      ? item.apt.patientName
-                                                                          .split(
-                                                                            " ",
-                                                                          )
-                                                                          .slice(
-                                                                            0,
-                                                                            2,
-                                                                          )
-                                                                          .join(
-                                                                            " ",
-                                                                          )
-                                                                      : item.apt
-                                                                          .patientName}
-                                                                  </span>
-                                                                  {item.apt
-                                                                    .serviceNames &&
-                                                                  item.apt
-                                                                    .serviceNames
-                                                                    .length >
-                                                                    0 ? (
-                                                                    <span className="text-[12px] font-[400] text-black opacity-[0.8] block truncate">
-                                                                      {item.apt.serviceNames.join(
-                                                                        ", ",
-                                                                      )}
-                                                                    </span>
-                                                                  ) : (
-                                                                    item.apt
-                                                                      .serviceName && (
-                                                                      <span className="text-[12px] font-[400] text-black opacity-[0.8] block truncate">
-                                                                        {
-                                                                          item
-                                                                            .apt
-                                                                            .serviceName
-                                                                        }
-                                                                      </span>
-                                                                    )
-                                                                  )}
-                                                                </div>
-                                                              )}
-                                                            </div>
-                                                          </div>
-                                                        );
-                                                      },
+                                              return (
+                                                <div
+                                                  key={apt._id}
+                                                  className={`absolute flex flex-col justify-center min-w-0 px-1 py-0.5 border rounded-sm transition-all hover:shadow-md hover:z-20 ${permissions.canUpdate ? "cursor-pointer" : "cursor-default"} ${draggedAppointmentId === apt._id ? "opacity-50" : ""}`}
+                                                  style={{
+                                                    top: `${Math.max(0, topOffset + 1)}px`,
+                                                    height: `${height - 2}px`,
+                                                    left: `calc(${leftPercent}% + 2px)`,
+                                                    width: `calc(${widthPercent}% - 4px)`,
+                                                    backgroundColor: statusColor.bg,
+                                                    color: statusColor.text,
+                                                    borderColor: statusColor.border,
+                                                    zIndex: 10,
+                                                    overflow: "hidden",
+                                                  }}
+                                                  draggable={permissions.canUpdate}
+                                                  onDragStart={(e) => handleAppointmentDragStart(e, apt._id)}
+                                                  onDragEnd={handleAppointmentDragEnd}
+                                                  onMouseEnter={(e) => {
+                                                    const rect = e.currentTarget.getBoundingClientRect();
+                                                    const tooltipWidth = 200;
+                                                    const tooltipHeight = 300;
+                                                    const spacing = 8;
+                                                    let left = rect.right + spacing;
+                                                    let top = rect.top;
+                                                    if (left + tooltipWidth > window.innerWidth) {
+                                                      left = rect.left - tooltipWidth - spacing;
+                                                    }
+                                                    if (top + tooltipHeight > window.innerHeight) {
+                                                      top = window.innerHeight - tooltipHeight - 10;
+                                                    }
+                                                    if (top < 10) top = 10;
+                                                    if (left < 10) left = 10;
+                                                    setHoveredAppointment({
+                                                      appointment: apt,
+                                                      position: { top, left },
+                                                    });
+                                                  }}
+                                                  onMouseLeave={() => setHoveredAppointment(null)}
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (permissions.canUpdate) {
+                                                      appointmentRef.current = apt;
+                                                      setSelectedAppointment(apt);
+                                                      setEditModalOpen(true);
+                                                    } else {
+                                                      showErrorToast("You do not have permission to edit appointments");
+                                                    }
+                                                  }}
+                                                  title={`${apt.patientName} - ${formatTime(apt.fromTime)} - ${formatTime(apt.toTime)}`}
+                                                >
+                                                  <div className="flex flex-col justify-center h-full">
+                                                    {height < 60 ? (
+                                                      <div className="flex items-center h-full px-1">
+                                                        <span className="text-[11px] font-[600] leading-[1.2] tracking-tight text-black truncate">
+                                                          {apt.patientName}
+                                                        </span>
+                                                      </div>
+                                                    ) : (
+                                                      <div className="px-1 py-0.5 leading-[1.2] space-y-[1px]">
+                                                        <span className="text-[10px] font-[400] opacity-[0.75] block truncate">
+                                                          {formatTime(apt.fromTime)} - {formatTime(apt.toTime)}
+                                                        </span>
+                                                        <span className="text-[11px] font-[600] text-black block truncate">
+                                                          {layout.totalColumns > 1
+                                                            ? apt.patientName.split(" ").slice(0, 2).join(" ")
+                                                            : apt.patientName}
+                                                        </span>
+                                                        {apt.serviceNames && apt.serviceNames.length > 0 ? (
+                                                          <span className="text-[10px] font-[400] text-black opacity-[0.8] block truncate">
+                                                            {apt.serviceNames.join(", ")}
+                                                          </span>
+                                                        ) : (
+                                                          apt.serviceName && (
+                                                            <span className="text-[10px] font-[400] text-black opacity-[0.8] block truncate">
+                                                              {apt.serviceName}
+                                                            </span>
+                                                          )
+                                                        )}
+                                                      </div>
                                                     )}
                                                   </div>
-                                                );
-                                              },
-                                            )}
+                                                </div>
+                                              );
+                                            })}
                                           </>
                                         );
                                       })()
@@ -4544,18 +4433,6 @@ function AppointmentPage({
                                         const subEndMinutes =
                                           subStartMinutes +
                                           SLOT_INTERVAL_MINUTES;
-                                        const isSubSlotOccupied =
-                                          roomAppointments.some((apt) => {
-                                            const aptStart =
-                                              timeStringToMinutes(apt.fromTime);
-                                            const aptEnd = timeStringToMinutes(
-                                              apt.toTime,
-                                            );
-                                            return (
-                                              aptStart < subEndMinutes &&
-                                              aptEnd > subStartMinutes
-                                            );
-                                          });
                                         const slotWithinClosing =
                                           lastBookableMinutes === null ||
                                           subStartMinutes <=
@@ -4566,8 +4443,7 @@ function AppointmentPage({
                                           (!isToday ||
                                             subStartMinutes >=
                                               currentMinutes) &&
-                                          slotWithinClosing &&
-                                          !isSubSlotOccupied;
+                                          slotWithinClosing;
 
                                         const isSelected =
                                           isInRoomSelection &&
@@ -4585,9 +4461,7 @@ function AppointmentPage({
                                                 ? "bg-emerald-200 dark:bg-emerald-200 border-l-2 border-emerald-500 dark:border-emerald-600 cursor-crosshair"
                                                 : canBookSlot
                                                   ? "cursor-crosshair hover:bg-emerald-50 dark:hover:bg-emerald-100 border-l-2 border-transparent hover:border-emerald-400 dark:hover:border-emerald-500"
-                                                  : isSubSlotOccupied
-                                                    ? "bg-gray-50 dark:bg-gray-100 cursor-not-allowed"
-                                                    : "bg-gray-50 dark:bg-gray-100 cursor-not-allowed"
+                                                  : "bg-gray-50 dark:bg-gray-100 cursor-not-allowed"
                                             }`}
                                             style={{
                                               height: SUB_SLOT_HEIGHT_PX,
@@ -4726,290 +4600,105 @@ function AppointmentPage({
                                         if (startingAppointments.length === 0)
                                           return null;
 
-                                        const appointmentsBySlot =
-                                          startingAppointments.map((apt) => {
-                                            const aptStart =
-                                              timeStringToMinutes(apt.fromTime);
-                                            const aptEnd = timeStringToMinutes(
-                                              apt.toTime,
-                                            );
-                                            const slotOffset =
-                                              aptStart - rowStartMinutes;
-                                            const topOffset =
-                                              (slotOffset /
-                                                ROW_INTERVAL_MINUTES) *
-                                              ROW_HEIGHT_PX;
-                                            const duration = aptEnd - aptStart;
-                                            const height =
-                                              (duration /
-                                                ROW_INTERVAL_MINUTES) *
-                                              ROW_HEIGHT_PX;
-
-                                            return {
-                                              apt,
-                                              topOffset,
-                                              height: Math.max(
-                                                height,
-                                                ROW_HEIGHT_PX / 2,
-                                              ),
-                                            };
-                                          });
-
-                                        const groupedBySlot: {
-                                          [
-                                            key: string
-                                          ]: typeof appointmentsBySlot;
-                                        } = {};
-                                        appointmentsBySlot.forEach((item) => {
-                                          const slotKey = Math.round(
-                                            item.topOffset,
-                                          ).toString();
-                                          if (!groupedBySlot[slotKey]) {
-                                            groupedBySlot[slotKey] = [];
-                                          }
-                                          groupedBySlot[slotKey].push(item);
-                                        });
-
                                         return (
                                           <>
-                                            {Object.values(groupedBySlot).map(
-                                              (
-                                                slotAppointments,
-                                                groupIndex,
-                                              ) => {
-                                                const firstAppt =
-                                                  slotAppointments[0];
-                                                const maxHeight = Math.max(
-                                                  ...slotAppointments.map(
-                                                    (item) => item.height,
-                                                  ),
-                                                );
+                                            {startingAppointments.map((apt) => {
+                                              const aptStart = timeStringToMinutes(apt.fromTime);
+                                              const aptEnd = timeStringToMinutes(apt.toTime);
+                                              const slotOffset = aptStart - rowStartMinutes;
+                                              const topOffset = (slotOffset / ROW_INTERVAL_MINUTES) * ROW_HEIGHT_PX;
+                                              const duration = aptEnd - aptStart;
+                                              const height = Math.max((duration / ROW_INTERVAL_MINUTES) * ROW_HEIGHT_PX, ROW_HEIGHT_PX / 2);
+                                              const layout = overlapLayoutMap.get(apt._id) || { column: 0, totalColumns: 1 };
+                                              const leftPercent = (layout.column / layout.totalColumns) * 100;
+                                              const widthPercent = (1 / layout.totalColumns) * 100;
+                                              const statusColor = getStatusColor(apt.status);
 
-                                                return (
-                                                  <div
-                                                    key={`slot-${groupIndex}`}
-                                                    className="absolute left-0.5 right-0.5 flex flex-row items-center"
-                                                    style={{
-                                                      top: `${Math.max(0, firstAppt.topOffset + 1)}px`,
-                                                      height: `${maxHeight - 2}px`,
-                                                      zIndex: 10,
-                                                      gap: "2px",
-                                                    }}
-                                                  >
-                                                    {slotAppointments.map(
-                                                      (item, index) => {
-                                                        const statusColor =
-                                                          getStatusColor(
-                                                            item.apt.status,
-                                                          );
-                                                        const patientCount =
-                                                          slotAppointments.length;
-                                                        const cardWidthPercent =
-                                                          patientCount > 1
-                                                            ? `${Math.floor(100 / patientCount)}%`
-                                                            : "100%";
-                                                        const maxCardWidth =
-                                                          patientCount > 3
-                                                            ? "80px"
-                                                            : patientCount > 2
-                                                              ? "90px"
-                                                              : "none";
-
-                                                        return (
-                                                          <div
-                                                            key={item.apt._id}
-                                                            className={`flex flex-col justify-center flex-1 min-w-0 px-2 py-1 border transition-all hover:shadow-sm ${permissions.canUpdate ? "cursor-pointer" : "cursor-default"} ${draggedAppointmentId === item.apt._id ? "opacity-50" : ""}`}
-                                                            style={{
-                                                              backgroundColor:
-                                                                statusColor.bg,
-                                                              color:
-                                                                statusColor.text,
-                                                              borderColor:
-                                                                statusColor.border,
-                                                              height: `${item.height - 2}px`,
-                                                              borderWidth:
-                                                                "1px",
-                                                              width:
-                                                                cardWidthPercent,
-                                                              maxWidth:
-                                                                maxCardWidth,
-                                                              flexBasis:
-                                                                cardWidthPercent,
-                                                            }}
-                                                            draggable={
-                                                              permissions.canUpdate
-                                                            }
-                                                            onDragStart={(e) =>
-                                                              handleAppointmentDragStart(
-                                                                e,
-                                                                item.apt._id,
-                                                              )
-                                                            }
-                                                            onDragEnd={
-                                                              handleAppointmentDragEnd
-                                                            }
-                                                            onMouseEnter={(
-                                                              e,
-                                                            ) => {
-                                                              const rect =
-                                                                e.currentTarget.getBoundingClientRect();
-                                                              const tooltipWidth = 200;
-                                                              const tooltipHeight = 300;
-                                                              const spacing = 8;
-
-                                                              let left =
-                                                                rect.right +
-                                                                spacing;
-                                                              let top =
-                                                                rect.top;
-
-                                                              if (
-                                                                left +
-                                                                  tooltipWidth >
-                                                                window.innerWidth
-                                                              ) {
-                                                                left =
-                                                                  rect.left -
-                                                                  tooltipWidth -
-                                                                  spacing;
-                                                              }
-
-                                                              if (
-                                                                top +
-                                                                  tooltipHeight >
-                                                                window.innerHeight
-                                                              ) {
-                                                                top =
-                                                                  window.innerHeight -
-                                                                  tooltipHeight -
-                                                                  10;
-                                                              }
-
-                                                              if (top < 10) {
-                                                                top = 10;
-                                                              }
-
-                                                              if (left < 10) {
-                                                                left = 10;
-                                                              }
-
-                                                              setHoveredAppointment(
-                                                                {
-                                                                  appointment:
-                                                                    item.apt,
-                                                                  position: {
-                                                                    top,
-                                                                    left,
-                                                                  },
-                                                                },
-                                                              );
-                                                            }}
-                                                            onMouseLeave={() => {
-                                                              setHoveredAppointment(
-                                                                null,
-                                                              );
-                                                            }}
-                                                            onClick={(e) => {
-                                                              e.stopPropagation();
-                                                              if (
-                                                                permissions.canUpdate
-                                                              ) {
-                                                                appointmentRef.current =
-                                                                  item.apt;
-                                                                setSelectedAppointment(
-                                                                  item.apt,
-                                                                );
-                                                                setEditModalOpen(
-                                                                  true,
-                                                                );
-                                                              } else {
-                                                                showErrorToast(
-                                                                  "You do not have permission to edit appointments",
-                                                                );
-                                                              }
-                                                            }}
-                                                            title={`${item.apt.patientName} - ${formatTime(item.apt.fromTime)} - ${formatTime(item.apt.toTime)}`}
-                                                          >
-                                                            <div className="flex flex-col justify-center h-full">
-                                                              {item.height <
-                                                              60 ? (
-                                                                <div className="flex items-center h-full px-2">
-                                                                  <span className="text-[13px] font-[600] leading-[1.2] tracking-tight text-black truncate">
-                                                                    {
-                                                                      item.apt
-                                                                        .patientName
-                                                                    }
-                                                                  </span>
-                                                                </div>
-                                                              ) : (
-                                                                <div className="px-2 py-1.5 leading-[1.2] space-y-[2px]">
-                                                                  <span className="text-[11px] font-[400] opacity-[0.75] mb-[2px] block">
-                                                                    {formatTime(
-                                                                      item.apt
-                                                                        .fromTime,
-                                                                    )}{" "}
-                                                                    -{" "}
-                                                                    {formatTime(
-                                                                      item.apt
-                                                                        .toTime,
-                                                                    )}
-                                                                  </span>
-                                                                  <span className="text-[13px] font-[600] text-black mb-[2px] block">
-                                                                    {slotAppointments.length >
-                                                                    1
-                                                                      ? item.apt.patientName
-                                                                          .split(
-                                                                            " ",
-                                                                          )
-                                                                          .slice(
-                                                                            0,
-                                                                            2,
-                                                                          )
-                                                                          .join(
-                                                                            " ",
-                                                                          )
-                                                                      : item.apt
-                                                                          .patientName}
-                                                                  </span>
-                                                                  {item.apt
-                                                                    .serviceNames &&
-                                                                  item.apt
-                                                                    .serviceNames
-                                                                    .length >
-                                                                    0 ? (
-                                                                    <span className="text-[12px] font-[400] text-black opacity-[0.8] block truncate">
-                                                                      {item.apt.serviceNames.join(
-                                                                        ", ",
-                                                                      )}
-                                                                    </span>
-                                                                  ) : (
-                                                                    item.apt
-                                                                      .serviceName && (
-                                                                      <span className="text-[12px] font-[400] text-black opacity-[0.8] block truncate">
-                                                                        {
-                                                                          item
-                                                                            .apt
-                                                                            .serviceName
-                                                                        }
-                                                                      </span>
-                                                                    )
-                                                                  )}
-                                                                </div>
-                                                              )}
-                                                            </div>
-                                                            {index <
-                                                              slotAppointments.length -
-                                                                1 && (
-                                                              <div className="w-px h-2 bg-gray-300 dark:bg-gray-400 mx-0.5 flex-shrink-0" />
-                                                            )}
-                                                          </div>
-                                                        );
-                                                      },
+                                              return (
+                                                <div
+                                                  key={apt._id}
+                                                  className={`absolute flex flex-col justify-center min-w-0 px-1 py-0.5 border rounded-sm transition-all hover:shadow-md hover:z-20 ${permissions.canUpdate ? "cursor-pointer" : "cursor-default"} ${draggedAppointmentId === apt._id ? "opacity-50" : ""}`}
+                                                  style={{
+                                                    top: `${Math.max(0, topOffset + 1)}px`,
+                                                    height: `${height - 2}px`,
+                                                    left: `calc(${leftPercent}% + 2px)`,
+                                                    width: `calc(${widthPercent}% - 4px)`,
+                                                    backgroundColor: statusColor.bg,
+                                                    color: statusColor.text,
+                                                    borderColor: statusColor.border,
+                                                    zIndex: 10,
+                                                    overflow: "hidden",
+                                                  }}
+                                                  draggable={permissions.canUpdate}
+                                                  onDragStart={(e) => handleAppointmentDragStart(e, apt._id)}
+                                                  onDragEnd={handleAppointmentDragEnd}
+                                                  onMouseEnter={(e) => {
+                                                    const rect = e.currentTarget.getBoundingClientRect();
+                                                    const tooltipWidth = 200;
+                                                    const tooltipHeight = 300;
+                                                    const spacing = 8;
+                                                    let left = rect.right + spacing;
+                                                    let top = rect.top;
+                                                    if (left + tooltipWidth > window.innerWidth) {
+                                                      left = rect.left - tooltipWidth - spacing;
+                                                    }
+                                                    if (top + tooltipHeight > window.innerHeight) {
+                                                      top = window.innerHeight - tooltipHeight - 10;
+                                                    }
+                                                    if (top < 10) top = 10;
+                                                    if (left < 10) left = 10;
+                                                    setHoveredAppointment({
+                                                      appointment: apt,
+                                                      position: { top, left },
+                                                    });
+                                                  }}
+                                                  onMouseLeave={() => setHoveredAppointment(null)}
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (permissions.canUpdate) {
+                                                      appointmentRef.current = apt;
+                                                      setSelectedAppointment(apt);
+                                                      setEditModalOpen(true);
+                                                    } else {
+                                                      showErrorToast("You do not have permission to edit appointments");
+                                                    }
+                                                  }}
+                                                  title={`${apt.patientName} - ${formatTime(apt.fromTime)} - ${formatTime(apt.toTime)}`}
+                                                >
+                                                  <div className="flex flex-col justify-center h-full">
+                                                    {height < 60 ? (
+                                                      <div className="flex items-center h-full px-1">
+                                                        <span className="text-[11px] font-[600] leading-[1.2] tracking-tight text-black truncate">
+                                                          {apt.patientName}
+                                                        </span>
+                                                      </div>
+                                                    ) : (
+                                                      <div className="px-1 py-0.5 leading-[1.2] space-y-[1px]">
+                                                        <span className="text-[10px] font-[400] opacity-[0.75] block truncate">
+                                                          {formatTime(apt.fromTime)} - {formatTime(apt.toTime)}
+                                                        </span>
+                                                        <span className="text-[11px] font-[600] text-black block truncate">
+                                                          {layout.totalColumns > 1
+                                                            ? apt.patientName.split(" ").slice(0, 2).join(" ")
+                                                            : apt.patientName}
+                                                        </span>
+                                                        {apt.serviceNames && apt.serviceNames.length > 0 ? (
+                                                          <span className="text-[10px] font-[400] text-black opacity-[0.8] block truncate">
+                                                            {apt.serviceNames.join(", ")}
+                                                          </span>
+                                                        ) : (
+                                                          apt.serviceName && (
+                                                            <span className="text-[10px] font-[400] text-black opacity-[0.8] block truncate">
+                                                              {apt.serviceName}
+                                                            </span>
+                                                          )
+                                                        )}
+                                                      </div>
                                                     )}
                                                   </div>
-                                                );
-                                              },
-                                            )}
+                                                </div>
+                                              );
+                                            })}
                                           </>
                                         );
                                       })()

@@ -32,7 +32,7 @@ const DoctorTreatmentModal = ({ isOpen, onClose, doctorStaffId, doctorStaffName,
   const [fetching, setFetching] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState({ type: "info", text: "" });
-  const [activeTab, setActiveTab] = useState("existing"); // "existing", "custom", or "department"
+  const [activeTab, setActiveTab] = useState("department"); // "existing", "custom", or "department"
   const [customTreatmentName, setCustomTreatmentName] = useState("");
   const [customSubTreatments, setCustomSubTreatments] = useState([
     { id: Date.now(), name: "", price: "" },
@@ -456,28 +456,8 @@ const DoctorTreatmentModal = ({ isOpen, onClose, doctorStaffId, doctorStaffName,
           <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
             <MessageBanner type={message.type} text={message.text} />
 
-            {/* Clean Tabs */}
+            {/* Clean Tabs - Only Department */}
             <div className="flex gap-1 border-b border-gray-200 overflow-x-auto">
-              <button
-                onClick={() => setActiveTab("existing")}
-                className={`px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap ${
-                  activeTab === "existing"
-                    ? "text-gray-900 border-b-2 border-gray-900"
-                    : "text-gray-600 hover:text-gray-900"
-                }`}
-              >
-                Assign Existing Treatment
-              </button>
-              <button
-                onClick={() => setActiveTab("custom")}
-                className={`px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap ${
-                  activeTab === "custom"
-                    ? "text-gray-900 border-b-2 border-gray-900"
-                    : "text-gray-600 hover:text-gray-900"
-                }`}
-              >
-                Create Custom Treatment
-              </button>
               <button
                 onClick={() => setActiveTab("department")}
                 className={`px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap ${
