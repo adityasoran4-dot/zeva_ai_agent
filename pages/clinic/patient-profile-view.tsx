@@ -8,7 +8,7 @@ import {
   ExternalLink,
   AlertTriangle, Plus, FileImage, Wallet, ClipboardList, Send, Pill, ClipboardCheck,
   ChevronDown, Search, Loader2, Check,  Camera, Image as ImageIcon, Eye, Edit2, Trash2, Paperclip,
-  Filter
+  Filter, AlertCircle as AlertCircleIcon, UserPlus
 } from 'lucide-react';
 import ClinicLayout from '../../components/ClinicLayout';
 import withClinicAuth from '../../components/withClinicAuth';
@@ -16,6 +16,7 @@ import AddPatientAdvancePaymentModal from '@/components/patient/AddPatientAdvanc
 import AddPatientPastAdvancePaymentModal from '@/components/patient/AddPatientPastAdvancePaymentModal';
 import PayPendingBalanceModal from '@/components/patient/PayPendingBalanceModal';
 import { getCurrencySymbol } from '@/lib/currencyHelper';
+import { useAgentPermissions } from "@/hooks/useAgentPermissions";
 
 const TOKEN_PRIORITY = [
   "clinicToken",
@@ -35,23 +36,69 @@ const getStoredToken = () => {
   return null;
 };
 
-const getAuthHeaders = () => {
-  const token = getStoredToken();
+const getAuthHeaders = (routeContext: "clinic" | "agent" = "clinic") => {
+  let token = null;
+
+  if (routeContext === "agent") {
+    token =
+      localStorage.getItem("agentToken") ||
+      sessionStorage.getItem("agentToken") ||
+      localStorage.getItem("staffToken") ||
+      sessionStorage.getItem("staffToken") ||
+      localStorage.getItem("userToken") ||
+      sessionStorage.getItem("userToken");
+  } else {
+    token =
+      localStorage.getItem("clinicToken") ||
+      sessionStorage.getItem("clinicToken");
+  }
+
+  if (!token) {
+    token =
+      localStorage.getItem("userToken") ||
+      sessionStorage.getItem("userToken");
+  }
+
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
-const getUserRole = () => {
+const getUserInfo = () => {
+  if (typeof window === "undefined") return { role: null, id: null };
   try {
-    const token = getStoredToken();
-    if (!token) return null;
-    const parts = token.split('.');
-    if (parts.length < 2) return null;
-    const payload = JSON.parse(atob(parts[1]));
-    return payload.role || payload.userRole || null;
+    for (const key of TOKEN_PRIORITY) {
+      const token =
+        window.localStorage.getItem(key) ||
+        window.sessionStorage.getItem(key);
+      if (token) {
+        try {
+          const base64Url = token.split(".")[1];
+          const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+          const jsonPayload = decodeURIComponent(
+            atob(base64)
+              .split("")
+              .map(
+                (c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2),
+              )
+              .join(""),
+          );
+          const decoded = JSON.parse(jsonPayload);
+          return {
+            role: decoded.role || decoded.userRole || null,
+            id: decoded.userId || decoded.id || null,
+          };
+        } catch (e) {
+          continue;
+        }
+      }
+    }
   } catch (error) {
-    console.error('Error getting user role:', error);
-    return null;
+    console.error("Error getting user info:", error);
   }
+  return { role: null, id: null };
+};
+
+const getUserRole = () => {
+  return getUserInfo().role;
 };
 
 const getCurrentUserName = () => {
@@ -532,7 +579,7 @@ const formatPmDate = (d: Date) => {
 };
 
 // Modern Patient Profile Dashboard Component
-const PatientProfileDashboard = ({ patientData, onClose, onPatientUpdated }: { patientData: any; onClose: () => void; onPatientUpdated?: (updatedData: any) => void }) => {
+const PatientProfileDashboard = ({ patientData, onClose, onPatientUpdated, permissions }: { patientData: any; onClose: () => void; onPatientUpdated?: (updatedData: any) => void; permissions: any }) => {
   const [activeTab, setActiveTab] = useState('overview');
   const [showBeforeAfterModal, setShowBeforeAfterModal] = useState(false);
   const [currency, setCurrency] = useState('INR');
@@ -4130,8 +4177,8 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                           </div>
                         </div>
 
-                        {/* Add Membership - only when membership is Yes */}
-                        {editFormData.membership === 'Yes' && (!showAddMembershipDropdown ? (
+                        {/* Add Membership - only when membership is Yes and create permission is true */}
+                        {editFormData.membership === 'Yes' && permissions.canCreate && (!showAddMembershipDropdown ? (
                           <button
                             type="button"
                             onClick={() => setShowAddMembershipDropdown(true)}
@@ -4307,8 +4354,8 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                           </div>
                         </div>
 
-                        {/* Add Package - only when package is Yes */}
-                        {editFormData.package === 'Yes' && (!showAddPackageDropdown ? (
+                        {/* Add Package - only when package is Yes and create permission is true */}
+                        {editFormData.package === 'Yes' && permissions.canCreate && (!showAddPackageDropdown ? (
                           <div className="flex items-center gap-2">
                             <button
                               type="button"
@@ -7197,6 +7244,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                     ) : (
                       <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">Not Enrolled</span>
                     )}
+                    {permissions.canCreate && (
                     <button
                       onClick={() => {
                         const opening = !showNewClaimForm;
@@ -7233,6 +7281,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                       <Plus className="w-3.5 h-3.5" />
                       New Claim
                     </button>
+                    )}
                   </div>
 
                   {/* New Claim Form */}
@@ -7731,7 +7780,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                         >
                                           <Activity className="w-4 h-4" />
                                         </button>
-                                        {['Under Review', 'Rejected'].includes(claim.status) && (
+                                        {permissions.canUpdate && ['Under Review', 'Rejected'].includes(claim.status) && (
                                           <button
                                             onClick={() => openClaimEditModal(claim)}
                                             className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
@@ -7740,7 +7789,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                             <Edit2 className="w-4 h-4" />
                                           </button>
                                         )}
-                                        {['Under Review', 'Rejected'].includes(claim.status) && (
+                                        {permissions.canDelete && ['Under Review', 'Rejected'].includes(claim.status) && (
                                           <button
                                             onClick={() => deleteClaim(claim._id)}
                                             className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
@@ -9258,7 +9307,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                                     </div>
                                   )}
                                   {/* Pay Button for Pending Treatments */}
-                                  {isPending && hasPendingAmount && (
+                                  {permissions.canCreate && isPending && hasPendingAmount && (
                                     <div className="pt-2 border-t border-gray-100">
                                       <button
                                         onClick={() => {
@@ -9779,6 +9828,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                     Add Payment
                   </h3>
                   <div className="flex flex-wrap gap-3">
+                    {permissions.canCreate && (
                     <button
                       onClick={() => setShowAddAdvancePaymentModal(true)}
                       className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md transition-all duration-200 hover:bg-green-700 hover:shadow-lg active:scale-95"
@@ -9786,6 +9836,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                       <Plus className="w-4 h-4" />
                       Add Advance Balance
                     </button>
+                    )}
                   </div>
                 </div>
 
@@ -9866,12 +9917,14 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                               <div className="text-lg font-bold text-orange-700">{formatAED(balance.pendingClaim)}</div>
                             </div>
                           </div>
+                          {permissions.canCreate && (
                           <button
                             onClick={() => setShowPayPendingClaimModal(true)}
                             className="px-3 py-1 bg-orange-600 hover:bg-orange-700 text-white text-[10px] font-bold rounded shadow-sm transition-all active:scale-95 flex items-center gap-1"
                           >
                             Pay
                           </button>
+                          )}
                         </div>
                       )}
 
@@ -9952,7 +10005,7 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
                             <div className="text-lg font-bold text-red-600">{formatAED(balance.pendingBalance)}</div>
                           </div>
                         </div>
-                        {balance.pendingBalance > 0 && (
+                        {balance.pendingBalance > 0 && permissions.canCreate && (
                           <div className="flex items-center gap-1.5">
                             <button
                               onClick={() => setShowUploadImageModal(true)}
@@ -11290,11 +11343,342 @@ if (typeof document !== 'undefined') {
 }
 
 // Main Page Component
-function PatientProfileView() {
+function PatientProfileView({
+  contextOverride = null,
+}: {
+  contextOverride?: "clinic" | "agent" | null;
+}) {
   const router = useRouter();
   const { id } = router.query;
   const [patient, setPatient] = useState(null);
   const [loading, setLoading] = useState(true);
+  
+  const [routeContext, setRouteContext] = useState<"clinic" | "agent">(
+    contextOverride || "clinic",
+  );
+  const [permissions, setPermissions] = useState({
+    canRead: false,
+    canCreate: false,
+    canUpdate: false,
+    canDelete: false,
+  });
+  const [permissionsLoaded, setPermissionsLoaded] = useState(false);
+  const [hasAgentToken, setHasAgentToken] = useState(false);
+  const [isAgentRoute, setIsAgentRoute] = useState(false);
+
+  useEffect(() => {
+    if (contextOverride) {
+      setRouteContext(contextOverride);
+      return;
+    }
+    if (typeof window === "undefined") return;
+    const currentPath = window.location.pathname || "";
+    if (currentPath.startsWith("/agent/")) {
+      setRouteContext("agent");
+    } else {
+      setRouteContext("clinic");
+    }
+  }, [contextOverride]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const syncTokens = () => {
+      const hasAgent =
+        Boolean(
+          localStorage.getItem("agentToken") ||
+          sessionStorage.getItem("agentToken"),
+        ) ||
+        Boolean(
+          localStorage.getItem("staffToken") ||
+          sessionStorage.getItem("staffToken"),
+        ) ||
+        Boolean(
+          localStorage.getItem("userToken") ||
+          sessionStorage.getItem("userToken"),
+        );
+      setHasAgentToken(hasAgent);
+    };
+    syncTokens();
+    window.addEventListener("storage", syncTokens);
+    return () => window.removeEventListener("storage", syncTokens);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const agentPath =
+      router?.pathname?.startsWith("/agent/") ||
+      window.location.pathname?.startsWith("/agent/");
+    setIsAgentRoute(agentPath && hasAgentToken);
+  }, [router.pathname, hasAgentToken]);
+
+  const agentPermissionsHook: any = useAgentPermissions(
+    isAgentRoute ? "clinic_patient_registration" : null,
+  );
+  const agentPermissions = agentPermissionsHook?.permissions || {
+    canRead: false,
+    canCreate: false,
+    canUpdate: false,
+    canDelete: false,
+    canAll: false,
+  };
+  const agentPermissionsLoading = agentPermissionsHook?.loading || false;
+
+  useEffect(() => {
+    if (!isAgentRoute) return;
+    if (agentPermissionsLoading) return;
+
+    const newPermissions = {
+      canRead: Boolean(agentPermissions.canAll || agentPermissions.canRead),
+      canCreate: Boolean(agentPermissions.canAll || agentPermissions.canCreate),
+      canUpdate: Boolean(agentPermissions.canAll || agentPermissions.canUpdate),
+      canDelete: Boolean(agentPermissions.canAll || agentPermissions.canDelete),
+    };
+
+    setPermissions(newPermissions);
+    setPermissionsLoaded(true);
+  }, [isAgentRoute, agentPermissions, agentPermissionsLoading]);
+
+  useEffect(() => {
+    if (isAgentRoute) return;
+    let isMounted = true;
+
+    const clinicToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("clinicToken") ||
+          sessionStorage.getItem("clinicToken")
+        : null;
+    const doctorToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("doctorToken") ||
+          sessionStorage.getItem("doctorToken")
+        : null;
+    const agentToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("agentToken") ||
+          sessionStorage.getItem("agentToken")
+        : null;
+    const staffToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("staffToken") ||
+          sessionStorage.getItem("staffToken")
+        : null;
+    const userToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("userToken") ||
+          sessionStorage.getItem("userToken")
+        : null;
+
+    const userRole = getUserRole();
+    const authToken =
+      clinicToken || doctorToken || agentToken || staffToken || userToken;
+
+    if (userRole === "admin") {
+      if (!isMounted) return;
+      setPermissions({
+        canRead: true,
+        canCreate: true,
+        canUpdate: true,
+        canDelete: true,
+      });
+      setPermissionsLoaded(true);
+      return;
+    }
+
+    if (userRole === "clinic" || userRole === "doctor") {
+      const fetchClinicPermissions = async () => {
+        try {
+          if (!authToken) {
+            if (!isMounted) return;
+            setPermissions({
+              canRead: false,
+              canCreate: false,
+              canUpdate: false,
+              canDelete: false,
+            });
+            setPermissionsLoaded(true);
+            return;
+          }
+
+          const res = await axios.get("/api/clinic/sidebar-permissions", {
+            headers: { Authorization: `Bearer ${authToken}` },
+          });
+
+          if (!isMounted) return;
+
+          if (res.data.success) {
+            if (
+              res.data.permissions === null ||
+              !Array.isArray(res.data.permissions) ||
+              res.data.permissions.length === 0
+            ) {
+              setPermissions({
+                canRead: true,
+                canCreate: true,
+                canUpdate: true,
+                canDelete: true,
+              });
+            } else {
+              const modulePermission = res.data.permissions.find((p: any) => {
+                if (!p?.module) return false;
+                if (p.module === "clinic_patient_registration") return true;
+                if (p.module === "patient_registration") return true;
+                return false;
+              });
+
+              if (modulePermission) {
+                const actions = modulePermission.actions || {};
+
+                const moduleAll =
+                  actions.all === true ||
+                  actions.all === "true" ||
+                  String(actions.all).toLowerCase() === "true";
+                const moduleCreate =
+                  actions.create === true ||
+                  actions.create === "true" ||
+                  String(actions.create).toLowerCase() === "true";
+                const moduleRead =
+                  actions.read === true ||
+                  actions.read === "true" ||
+                  String(actions.read).toLowerCase() === "true";
+                const moduleUpdate =
+                  actions.update === true ||
+                  actions.update === "true" ||
+                  String(actions.update).toLowerCase() === "true";
+                const moduleDelete =
+                  actions.delete === true ||
+                  actions.delete === "true" ||
+                  String(actions.delete).toLowerCase() === "true";
+
+                setPermissions({
+                  canRead: moduleAll || moduleRead,
+                  canCreate: moduleAll || moduleCreate,
+                  canUpdate: moduleAll || moduleUpdate,
+                  canDelete: moduleAll || moduleDelete,
+                });
+              } else {
+                setPermissions({
+                  canRead: true,
+                  canCreate: false,
+                  canUpdate: false,
+                  canDelete: false,
+                });
+              }
+            }
+          } else {
+            setPermissions({
+              canRead: true,
+              canUpdate: true,
+              canDelete: true,
+              canCreate: true,
+            });
+          }
+        } catch (err: any) {
+          console.error("Error fetching clinic sidebar permissions:", err);
+          if (isMounted) {
+            setPermissions({
+              canRead: true,
+              canCreate: true,
+              canUpdate: true,
+              canDelete: true,
+            });
+          }
+        } finally {
+          if (isMounted) {
+            setPermissionsLoaded(true);
+          }
+        }
+      };
+
+      fetchClinicPermissions();
+      return;
+    }
+
+    const agentStaffToken = getStoredToken();
+    if (!agentStaffToken) {
+      setPermissions({
+        canRead: false,
+        canCreate: false,
+        canUpdate: false,
+        canDelete: false,
+      });
+      setPermissionsLoaded(true);
+      return;
+    }
+
+    if (agentToken || staffToken || userToken) {
+      const fetchPermissions = async () => {
+        try {
+          console.log(
+            "Fetching Agent/Staff Permissions for clinic_patient_registration...",
+          );
+          setPermissionsLoaded(false);
+          const res = await axios.get("/api/agent/get-module-permissions", {
+            params: { moduleKey: "clinic_patient_registration" },
+            headers: { Authorization: `Bearer ${agentStaffToken}` },
+          });
+          const data = res.data;
+          console.log("Agent Permissions API Response:", data);
+
+          if (!isMounted) return;
+
+          if (
+            !data?.permissions &&
+            data?.error?.includes("not found in agent permissions")
+          ) {
+            console.log(
+              "Module not found in permissions, granting full access by default",
+            );
+            setPermissions({
+              canRead: true,
+              canCreate: true,
+              canUpdate: true,
+              canDelete: true,
+            });
+            setPermissionsLoaded(true);
+            return;
+          }
+
+          const actions =
+            data?.permissions?.actions || data?.data?.moduleActions || {};
+          const isTrue = (val: any) =>
+            val === true ||
+            val === "true" ||
+            String(val || "").toLowerCase() === "true";
+
+          const canAll = isTrue(actions.all);
+
+          const newPerms = {
+            canRead: canAll || isTrue(actions.read),
+            canCreate: canAll || isTrue(actions.create),
+            canUpdate: canAll || isTrue(actions.update),
+            canDelete: canAll || isTrue(actions.delete),
+          };
+          setPermissions(newPerms);
+        } catch (err) {
+          console.error("Error fetching agent permissions:", err);
+          setPermissions({
+            canCreate: false,
+            canUpdate: false,
+            canDelete: false,
+            canRead: false,
+          });
+        } finally {
+          setPermissionsLoaded(true);
+        }
+      };
+
+      fetchPermissions();
+      return;
+    }
+
+    setPermissions({
+      canRead: false,
+      canUpdate: false,
+      canDelete: false,
+      canCreate: false,
+    });
+    setPermissionsLoaded(true);
+  }, [isAgentRoute, routeContext]);
 
   useEffect(() => {
     if (id) {
@@ -11305,7 +11689,7 @@ function PatientProfileView() {
   const fetchPatientData = async () => {
     try {
       setLoading(true);
-      const headers = getAuthHeaders();
+      const headers = getAuthHeaders(routeContext);
       if (!headers) {
         router.push('/clinic/login-clinic');
         return;
@@ -11336,10 +11720,29 @@ function PatientProfileView() {
     router.back();
   };
 
-  if (loading) {
+  if (loading || !permissionsLoaded) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-teal-600"></div>
+      </div>
+    );
+  }
+
+  if (!permissions.canRead && !permissions.canCreate) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg shadow-lg border border-red-200 p-8 text-center max-w-md">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <UserPlus className="w-8 h-8 text-red-600" />
+          </div>
+          <h2 className="text-xl font-bold text-teal-900 mb-2">Access Denied</h2>
+          <p className="text-sm text-teal-700 mb-4">
+            You do not have permission to view or manage this patient's profile.
+          </p>
+          <p className="text-xs text-teal-600">
+            Please contact your administrator to request access to the Patient Registration module.
+          </p>
+        </div>
       </div>
     );
   }
@@ -11351,6 +11754,7 @@ function PatientProfileView() {
       onPatientUpdated={(updatedData) => {
         setPatient(updatedData);
       }}
+      permissions={permissions}
     />
   );
 }
