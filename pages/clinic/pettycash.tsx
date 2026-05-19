@@ -24,8 +24,71 @@ import {
   CheckCircle,
   Trash2,
   Image as ImageIcon,
+  Shield,
 } from "lucide-react";
 import AddSupplierModal from "./stocks/suppliers/_components/AddSupplierModal";
+
+// Permission Types
+interface Permissions {
+  canRead: boolean;
+  canCreate: boolean;
+  canUpdate: boolean;
+  canDelete: boolean;
+}
+
+// Token priority for auth
+const TOKEN_PRIORITY = [
+  "clinicToken",
+  "doctorToken",
+  "agentToken",
+  "staffToken",
+  "userToken",
+  "adminToken",
+];
+
+const getStoredToken = () => {
+  if (typeof window === "undefined") return null;
+  for (const key of TOKEN_PRIORITY) {
+    const value = window.localStorage.getItem(key) || window.sessionStorage.getItem(key);
+    if (value) return value;
+  }
+  return null;
+};
+
+const getAuthToken = () => {
+  if (typeof window === "undefined") return null;
+  for (const k of ["clinicToken", "doctorToken", "agentToken", "staffToken", "userToken", "adminToken"]) {
+    const v = localStorage.getItem(k) || sessionStorage.getItem(k);
+    if (v) return v;
+  }
+  return null;
+};
+
+const authHeaders = () => { const t = getAuthToken(); return t ? { Authorization: `Bearer ${t}` } : {}; };
+
+// Helper function to get user info from token
+const getUserInfo = (): { role: string | null; id: string | null } => {
+  if (typeof window === "undefined") return { role: null, id: null };
+  try {
+    for (const key of TOKEN_PRIORITY) {
+      const token = window.localStorage.getItem(key) || window.sessionStorage.getItem(key);
+      if (token) {
+        try {
+          const base64Url = token.split(".")[1];
+          const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+          const jsonPayload = decodeURIComponent(
+            atob(base64).split("").map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2)).join(""),
+          );
+          const decoded = JSON.parse(jsonPayload);
+          return { role: decoded.role || decoded.userRole || null, id: decoded.userId || decoded.id || null };
+        } catch (e) { continue; }
+      }
+    }
+  } catch (error) { console.error("Error getting user info:", error); }
+  return { role: null, id: null };
+};
+
+const getUserRole = (): string | null => getUserInfo().role;
 
 // Types
 interface MultiPayment { paymentMethod: string; amount: number; }
@@ -72,16 +135,6 @@ interface Summary { totalCashIn: number; totalRecords: number; }
 interface Pagination { total: number; page: number; limit: number; totalPages: number; }
 
 // Helpers
-const TOKEN_KEYS = ["clinicToken", "doctorToken", "agentToken", "staffToken", "userToken", "adminToken"];
-const getToken = () => {
-  if (typeof window === "undefined") return null;
-  for (const k of TOKEN_KEYS) {
-    const v = localStorage.getItem(k) || sessionStorage.getItem(k);
-    if (v) return v;
-  }
-  return null;
-};
-const authHeaders = () => { const t = getToken(); return t ? { Authorization: `Bearer ${t}` } : {}; };
 
 const fmtDate = (d: string) =>
   new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
@@ -133,6 +186,15 @@ function PettyCashPage() {
   const [error, setError] = useState("");
   const [currency, setCurrency] = useState('INR');
 
+  // ── Permissions ──────────────────────────────────────────────
+  const [permissions, setPermissions] = useState<Permissions>({
+    canRead: false,
+    canCreate: false,
+    canUpdate: false,
+    canDelete: false,
+  });
+  const [permissionsLoaded, setPermissionsLoaded] = useState(false);
+
   // Manual petty cash entries
   const [manualEntries, setManualEntries] = useState<ManualEntry[]>([]);
   const [expenseEntries, setExpenseEntries] = useState<any[]>([]);
@@ -172,7 +234,111 @@ function PettyCashPage() {
   const [token, setToken] = useState("");
 
   useEffect(() => {
-    setToken(getToken() || "");
+    setToken(getAuthToken() || "");
+  }, []);
+
+  // ── Fetch Permissions ─────────────────────────────────────────────────────────
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchPermissions = async () => {
+      try {
+        const userRole = getUserRole();
+        const authToken = getStoredToken();
+
+        if (!authToken) {
+          if (isMounted) {
+            setPermissions({ canRead: false, canCreate: false, canUpdate: false, canDelete: false });
+            setPermissionsLoaded(true);
+          }
+          return;
+        }
+
+        // Admin role gets full access
+        if (userRole === "admin") {
+          if (isMounted) {
+            setPermissions({ canRead: true, canCreate: true, canUpdate: true, canDelete: true });
+            setPermissionsLoaded(true);
+          }
+          return;
+        }
+
+        // Clinic and Doctor roles use /api/clinic/sidebar-permissions
+        if (userRole === "clinic" || userRole === "doctor") {
+          const res = await axios.get("/api/clinic/sidebar-permissions", {
+            headers: { Authorization: `Bearer ${authToken}` },
+          });
+
+          if (!isMounted) return;
+
+          if (res.data.success) {
+            if (!res.data.permissions || res.data.permissions === null || res.data.permissions.length === 0) {
+              // No restrictions set - full access (backward compatibility)
+              setPermissions({ canRead: true, canCreate: true, canUpdate: true, canDelete: true });
+            } else {
+              // Check clinic_PettyCash module permission
+              const modulePermission = res.data.permissions.find((p: any) => {
+                if (!p?.module) return false;
+                return p.module === "clinic_PettyCash" || p.module === "clinic_pettycash" || p.module === "pettycash" || p.module === "petty_cash";
+              });
+
+              if (modulePermission) {
+                const actions = modulePermission.actions || {};
+                const isTrue = (val: any) => val === true || val === "true" || String(val || "").toLowerCase() === "true";
+                const moduleAll = isTrue(actions.all);
+                setPermissions({
+                  canRead: moduleAll || isTrue(actions.read),
+                  canCreate: moduleAll || isTrue(actions.create),
+                  canUpdate: moduleAll || isTrue(actions.update),
+                  canDelete: moduleAll || isTrue(actions.delete),
+                });
+              } else {
+                // Module not found - default to read-only for clinic/doctor
+                setPermissions({ canRead: true, canCreate: false, canUpdate: false, canDelete: false });
+              }
+            }
+          } else {
+            setPermissions({ canRead: true, canCreate: true, canUpdate: true, canDelete: true });
+          }
+        } else {
+          // Agent/Staff roles use /api/agent/get-module-permissions
+          const res = await axios.get("/api/agent/get-module-permissions", {
+            params: { moduleKey: "clinic_pettycash" },
+            headers: { Authorization: `Bearer ${authToken}` },
+          });
+
+          if (!isMounted) return;
+
+          const data = res.data;
+          // Module not found = full access (matches backend)
+          if (!data?.permissions && data?.error?.includes("not found")) {
+            setPermissions({ canRead: true, canCreate: true, canUpdate: true, canDelete: true });
+          } else {
+            const actions = data?.permissions?.actions || data?.data?.moduleActions || {};
+            const isTrue = (val: any) => val === true || val === "true" || String(val || "").toLowerCase() === "true";
+            const canAll = isTrue(actions.all);
+            setPermissions({
+              canRead: canAll || isTrue(actions.read),
+              canCreate: canAll || isTrue(actions.create),
+              canUpdate: canAll || isTrue(actions.update),
+              canDelete: canAll || isTrue(actions.delete),
+            });
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching permissions:", err);
+        if (isMounted) {
+          setPermissions({ canRead: false, canCreate: false, canUpdate: false, canDelete: false });
+        }
+      } finally {
+        if (isMounted) {
+          setPermissionsLoaded(true);
+        }
+      }
+    };
+
+    fetchPermissions();
+    return () => { isMounted = false; };
   }, []);
 
   // Fetch suppliers
@@ -393,17 +559,21 @@ function PettyCashPage() {
 
   useEffect(() => {
     fetchData(page);
-  }, [page]);
+  }, [page, permissionsLoaded, permissions.canRead]);
 
   // Fetch global totals once on mount (no date filter — for Total Cash In card)
   useEffect(() => {
+    if (!permissionsLoaded) return;
+    if (!permissions.canRead) return;
     fetchGlobalTotals();
-  }, []);
+  }, [permissionsLoaded, permissions.canRead]);
 
 
   useEffect(() => {
+    if (!permissionsLoaded) return;
+    if (!permissions.canRead) return;
     fetchManual();
-  }, [startDate, endDate]);
+  }, [startDate, endDate, permissionsLoaded, permissions.canRead]);
 
   const handleSearch = () => { setPage(1); fetchData(1); };
   const handleReset = () => {
@@ -495,6 +665,19 @@ function PettyCashPage() {
   // Render
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
+      {/* ── Access Denied Screen (only if both read and create are false) ───────────────────────────────────────────────── */}
+      {!permissionsLoaded ? null : (!permissions.canRead && !permissions.canCreate) ? (
+        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+          <div className="p-4 bg-red-100 rounded-full">
+            <Shield size={48} className="text-red-600" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Access Denied</h2>
+          <p className="text-gray-500 dark:text-gray-400 text-center max-w-md">
+            You do not have permission to view or manage Petty Cash data. Please contact your administrator for access.
+          </p>
+        </div>
+      ) : (
+        <>
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
@@ -506,6 +689,7 @@ function PettyCashPage() {
             <p className="text-xs text-gray-500 dark:text-gray-400">Cash payments received from patients + manual entries</p>
           </div>
         </div>
+        {permissions.canCreate && (
         <div className="flex items-center gap-2">
           {/* Add Expense button */}
           <button
@@ -524,7 +708,11 @@ function PettyCashPage() {
             Add Petty Cash
           </button>
         </div>
+      )}
       </div>
+
+      {permissions.canRead && (
+      <>
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
@@ -792,10 +980,12 @@ function PettyCashPage() {
             <div className="flex flex-col items-center justify-center py-12 text-gray-400">
               <ListOrdered size={36} className="mb-2 opacity-40" />
               <p className="text-sm">No manual entries yet</p>
+              {permissions.canCreate && (
               <button
                 onClick={() => { setManualDrawerOpen(false); setAddDrawerOpen(true); }}
                 className="mt-3 text-xs text-green-600 underline"
               >Add one now</button>
+              )}
             </div>
           ) : (
             <div className="flex flex-col gap-3">
@@ -853,6 +1043,7 @@ function PettyCashPage() {
           </div>
 
           <div className="flex justify-center">
+            {permissions.canCreate && (
             <button
               onClick={() => { setAllExpenseDrawerOpen(false); setExpenseDrawerOpen(true); }}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg shadow transition-colors w-full justify-center"
@@ -860,6 +1051,7 @@ function PettyCashPage() {
               <Plus size={15} />
               Add Expense
             </button>
+            )}
           </div>
 
           {manualLoading ? (
@@ -870,10 +1062,12 @@ function PettyCashPage() {
             <div className="flex flex-col items-center justify-center py-12 text-gray-400">
               <RefreshCw size={36} className="mb-2 opacity-40" />
               <p className="text-sm">No expenses yet</p>
+              {permissions.canCreate && (
               <button
                 onClick={() => { setAllExpenseDrawerOpen(false); setExpenseDrawerOpen(true); }}
                 className="mt-3 text-xs text-blue-600 underline font-medium"
               >Add one now</button>
+              )}
             </div>
           ) : (
             <div className="flex flex-col gap-3">
@@ -1186,7 +1380,10 @@ function PettyCashPage() {
           setIsAddSupplierOpen(false);
         }}
       />
-
+        </>
+      )}
+      </>
+      )}
     </div>
   );
 }

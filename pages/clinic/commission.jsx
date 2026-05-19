@@ -3,7 +3,8 @@ import axios from "axios";
 import { getCurrencySymbol } from "@/lib/currencyHelper";
 import ClinicLayout from "../../components/ClinicLayout";
 import withClinicAuth from "../../components/withClinicAuth";
-import { Eye, CheckCircle, AlertCircle, X, Check } from "lucide-react";
+import Loader from "../../components/Loader";
+import { Eye, CheckCircle, AlertCircle, X, Check, CircleDollarSign } from "lucide-react";
 
 const TOKEN_PRIORITY = ["clinicToken", "doctorToken", "agentToken", "staffToken", "userToken", "adminToken"];
 const getStoredToken = () => {
@@ -19,7 +20,71 @@ const getAuthHeaders = () => {
   return token ? { Authorization: `Bearer ${token}` } : null;
 };
 
+const getUserInfo = () => {
+  if (typeof window === "undefined") return { role: null, id: null };
+  try {
+    for (const key of TOKEN_PRIORITY) {
+      const token =
+        localStorage.getItem(key) || sessionStorage.getItem(key);
+      if (!token) continue;
+      try {
+        const base64Url = token.split(".")[1];
+        const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+        const jsonPayload = decodeURIComponent(
+          atob(base64)
+            .split("")
+            .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+            .join("")
+        );
+        const decoded = JSON.parse(jsonPayload);
+        return {
+          role: decoded.role || decoded.userRole || null,
+          id: decoded.userId || decoded.id || null,
+        };
+      } catch {
+        continue;
+      }
+    }
+  } catch (error) {
+    console.error("Error getting user info:", error);
+  }
+  return { role: null, id: null };
+};
+
+const getUserRole = () => getUserInfo().role;
+
+const isTruthy = (val) =>
+  val === true || val === "true" || String(val || "").toLowerCase() === "true";
+
+const findCommissionModule = (permissionsList) =>
+  permissionsList.find((p) => {
+    if (!p?.module) return false;
+    const mod = String(p.module).toLowerCase();
+    return (
+      mod === "clinic_commission" ||
+      mod === "clinic_commissions" ||
+      mod === "commission"
+    );
+  });
+
+const parsePermissionActions = (actions = {}) => {
+  const moduleAll = isTruthy(actions.all);
+  return {
+    canRead: moduleAll || isTruthy(actions.read),
+    canCreate: moduleAll || isTruthy(actions.create),
+    canUpdate: moduleAll || isTruthy(actions.update),
+    canDelete: moduleAll || isTruthy(actions.delete),
+  };
+};
+
 function ClinicCommissionPage() {
+  const [permissions, setPermissions] = useState({
+    canRead: false,
+    canCreate: false,
+    canUpdate: false,
+    canDelete: false,
+  });
+  const [permissionsLoaded, setPermissionsLoaded] = useState(false);
   const [source, setSource] = useState("referral");
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -62,6 +127,229 @@ function ClinicCommissionPage() {
     setTimeout(() => setToast(null), 2500);
   }, []);
 
+  // Clinic-level (sidebar-permissions) + agent/doctorStaff-level (get-module-permissions)
+  useEffect(() => {
+    let isMounted = true;
+
+    const userRole = getUserRole();
+    const authToken = getStoredToken();
+    const clinicToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("clinicToken") || sessionStorage.getItem("clinicToken")
+        : null;
+    const doctorToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("doctorToken") || sessionStorage.getItem("doctorToken")
+        : null;
+
+    const agentToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("agentToken") || sessionStorage.getItem("agentToken")
+        : null;
+    const staffToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("staffToken") || sessionStorage.getItem("staffToken")
+        : null;
+    const userToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("userToken") || sessionStorage.getItem("userToken")
+        : null;
+
+    if (userRole === "admin") {
+      if (!isMounted) return;
+      setPermissions({
+        canRead: true,
+        canCreate: true,
+        canUpdate: true,
+        canDelete: true,
+      });
+      setPermissionsLoaded(true);
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    if (userRole === "clinic" || userRole === "doctor") {
+      const fetchClinicPermissions = async () => {
+        try {
+          const clinicAuthToken = clinicToken || doctorToken || authToken;
+          if (!clinicAuthToken) {
+            if (!isMounted) return;
+            setPermissions({
+              canRead: false,
+              canCreate: false,
+              canUpdate: false,
+              canDelete: false,
+            });
+            return;
+          }
+
+          const res = await axios.get("/api/clinic/sidebar-permissions", {
+            headers: { Authorization: `Bearer ${clinicAuthToken}` },
+          });
+
+          if (!isMounted) return;
+
+          if (res.data.success) {
+            if (
+              res.data.permissions === null ||
+              !Array.isArray(res.data.permissions) ||
+              res.data.permissions.length === 0
+            ) {
+              setPermissions({
+                canRead: true,
+                canCreate: true,
+                canUpdate: true,
+                canDelete: true,
+              });
+            } else {
+              const modulePermission = findCommissionModule(res.data.permissions);
+
+              if (modulePermission) {
+                setPermissions(parsePermissionActions(modulePermission.actions || {}));
+              } else {
+                setPermissions({
+                  canRead: true,
+                  canCreate: false,
+                  canUpdate: false,
+                  canDelete: false,
+                });
+              }
+            }
+          } else {
+            setPermissions({
+              canRead: true,
+              canCreate: true,
+              canUpdate: true,
+              canDelete: true,
+            });
+          }
+        } catch (err) {
+          console.error("Error fetching clinic sidebar permissions:", err);
+          if (isMounted) {
+            setPermissions({
+              canRead: true,
+              canCreate: true,
+              canUpdate: true,
+              canDelete: true,
+            });
+          }
+        } finally {
+          if (isMounted) setPermissionsLoaded(true);
+        }
+      };
+
+      fetchClinicPermissions();
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    const agentStaffToken = getStoredToken();
+    if (!agentStaffToken) {
+      setPermissions({
+        canRead: false,
+        canCreate: false,
+        canUpdate: false,
+        canDelete: false,
+      });
+      setPermissionsLoaded(true);
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    if (
+      agentToken ||
+      staffToken ||
+      userToken ||
+      userRole === "agent" ||
+      userRole === "doctorStaff" ||
+      userRole === "staff"
+    ) {
+      const fetchAgentPermissions = async () => {
+        try {
+          setPermissionsLoaded(false);
+          let permissionToken = agentStaffToken;
+          if (userRole === "agent") {
+            permissionToken = agentToken || agentStaffToken;
+          } else if (userRole === "doctorStaff" || userRole === "staff") {
+            permissionToken = userToken || staffToken || agentStaffToken;
+          }
+          const res = await axios.get("/api/agent/get-module-permissions", {
+            params: { moduleKey: "clinic_commission" },
+            headers: { Authorization: `Bearer ${permissionToken}` },
+          });
+
+          if (!isMounted) return;
+
+          if (
+            !res.data?.permissions &&
+            res.data?.error?.includes("not found in agent permissions")
+          ) {
+            setPermissions({
+              canRead: true,
+              canCreate: true,
+              canUpdate: true,
+              canDelete: true,
+            });
+            return;
+          }
+
+          if (res.data?.success && res.data?.permissions) {
+            setPermissions(parsePermissionActions(res.data.permissions.actions || {}));
+          } else {
+            setPermissions({
+              canRead: false,
+              canCreate: false,
+              canUpdate: false,
+              canDelete: false,
+            });
+          }
+        } catch (err) {
+          console.error("Error fetching agent permissions:", err);
+          if (isMounted) {
+            setPermissions({
+              canRead: false,
+              canCreate: false,
+              canUpdate: false,
+              canDelete: false,
+            });
+          }
+        } finally {
+          if (isMounted) setPermissionsLoaded(true);
+        }
+      };
+
+      fetchAgentPermissions();
+    } else {
+      setPermissions({
+        canRead: true,
+        canCreate: true,
+        canUpdate: true,
+        canDelete: true,
+      });
+      setPermissionsLoaded(true);
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Clear commission data when read access is denied
+  useEffect(() => {
+    if (!permissionsLoaded) return;
+    if (!permissions.canRead) {
+      setItems([]);
+      setModalItems([]);
+      setShowModal(false);
+      setLoading(false);
+      setExpandedRow(null);
+      setAddExpenseRow(null);
+    }
+  }, [permissionsLoaded, permissions.canRead]);
+
   // Fetch clinic currency preference
   useEffect(() => {
     const fetchClinicCurrency = async () => {
@@ -86,6 +374,7 @@ function ClinicCommissionPage() {
   }, []);
 
   const load = useCallback(async () => {
+    if (!permissionsLoaded || !permissions.canRead) return;
     const headers = getAuthHeaders();
     if (!headers) return;
     setLoading(true);
@@ -104,9 +393,10 @@ function ClinicCommissionPage() {
     } finally {
       setLoading(false);
     }
-  }, [source, showToast]);
+  }, [source, showToast, permissionsLoaded, permissions.canRead]);
 
   useEffect(() => {
+    if (!permissionsLoaded || !permissions.canRead) return;
     load();
     // Clear modal when source changes
     if (source !== lastSource) {
@@ -115,9 +405,10 @@ function ClinicCommissionPage() {
       setSelectedPerson(null);
       setLastSource(source);
     }
-  }, [load, source, lastSource]);
+  }, [load, source, lastSource, permissionsLoaded, permissions.canRead]);
 
   useEffect(() => {
+    if (!permissionsLoaded || !permissions.canRead) return;
     const headers = getAuthHeaders();
     if (!headers) return;
     (async () => {
@@ -130,7 +421,7 @@ function ClinicCommissionPage() {
         setPackageList(Array.isArray(pRes.data?.packages) ? pRes.data.packages : []);
       } catch {}
     })();
-  }, []);
+  }, [permissionsLoaded, permissions.canRead]);
 
   const openDetails = async (row) => {
     const headers = getAuthHeaders();
@@ -268,6 +559,10 @@ function ClinicCommissionPage() {
   };
 
   const handleAddExpense = async (commissionId) => {
+    if (!permissions.canUpdate) {
+      showToast("You do not have permission to add expenses", "error");
+      return;
+    }
     const headers = getAuthHeaders();
     if (!headers) {
       showToast("Authentication required", "error");
@@ -305,6 +600,10 @@ function ClinicCommissionPage() {
   };
 
   const handleToggleSubmit = async (commissionId) => {
+    if (!permissions.canUpdate) {
+      showToast("You do not have permission to update commissions", "error");
+      return;
+    }
     const headers = getAuthHeaders();
     if (!headers) return;
     try {
@@ -328,6 +627,10 @@ function ClinicCommissionPage() {
   };
 
   const handleApprove = async (personId, src) => {
+    if (!permissions.canUpdate) {
+      showToast("You do not have permission to approve commissions", "error");
+      return;
+    }
     const headers = getAuthHeaders();
     if (!headers) return;
     try {
@@ -353,6 +656,29 @@ function ClinicCommissionPage() {
       showToast("Failed to approve", "error");
     }
   };
+
+  if (!permissionsLoaded) {
+    return <Loader />;
+  }
+
+  if (!permissions.canRead) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-8 text-center max-w-md">
+          <div className="w-16 h-16 bg-yellow-100 dark:bg-yellow-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+            <CircleDollarSign className="w-8 h-8 text-yellow-600 dark:text-yellow-400" />
+          </div>
+          <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-2">
+            Access Denied
+          </h3>
+          <p className="text-sm text-gray-700 dark:text-gray-400">
+            You do not have permission to view commissions. Please contact your
+            administrator.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 p-3 sm:p-4 md:p-6">
@@ -462,23 +788,25 @@ function ClinicCommissionPage() {
                             <Eye className="w-3 h-3" />
                             View
                           </button>
-                          <button
-                            className={`w-full sm:w-auto px-2 sm:px-3 py-1.5 text-xs rounded-md flex items-center justify-center gap-1 font-medium transition-all shadow-sm ${
-                              Number(row.pendingApprovalCount || 0) > 0
-                                ? "bg-emerald-600 hover:bg-emerald-700 text-white"
-                                : "bg-gray-100 text-gray-400 cursor-not-allowed"
-                            }`}
-                            disabled={Number(row.pendingApprovalCount || 0) === 0}
-                            onClick={() => handleApprove(row.personId, row.source)}
-                            title={
-                              Number(row.pendingApprovalCount || 0) > 0
-                                ? `Approve ${row.pendingApprovalCount} submitted commission(s)`
-                                : "No submitted commissions to approve"
-                            }
-                          >
-                            <Check className="w-3 h-3" />
-                            <span className="whitespace-nowrap">Approve{Number(row.pendingApprovalCount || 0) > 0 ? ` (${row.pendingApprovalCount})` : ""}</span>
-                          </button>
+                          {permissions.canUpdate && (
+                            <button
+                              className={`w-full sm:w-auto px-2 sm:px-3 py-1.5 text-xs rounded-md flex items-center justify-center gap-1 font-medium transition-all shadow-sm ${
+                                Number(row.pendingApprovalCount || 0) > 0
+                                  ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                                  : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                              }`}
+                              disabled={Number(row.pendingApprovalCount || 0) === 0}
+                              onClick={() => handleApprove(row.personId, row.source)}
+                              title={
+                                Number(row.pendingApprovalCount || 0) > 0
+                                  ? `Approve ${row.pendingApprovalCount} submitted commission(s)`
+                                  : "No submitted commissions to approve"
+                              }
+                            >
+                              <Check className="w-3 h-3" />
+                              <span className="whitespace-nowrap">Approve{Number(row.pendingApprovalCount || 0) > 0 ? ` (${row.pendingApprovalCount})` : ""}</span>
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -600,17 +928,19 @@ function ClinicCommissionPage() {
                                     {expandedRow === it.commissionId ? "Hide" : "View"}
                                   </button>
                                   {/* Tick button: mark/unmark this commission as submitted */}
-                                  <button
-                                    onClick={() => handleToggleSubmit(it.commissionId)}
-                                    title={it.isSubmitted ? "Unmark submission" : "Mark as submitted"}
-                                    className={`p-1 sm:p-1.5 rounded-md transition-all ${
-                                      it.isSubmitted
-                                        ? "bg-emerald-600 text-white hover:bg-emerald-700"
-                                        : "bg-gray-100 text-gray-400 hover:bg-emerald-50 hover:text-emerald-600 border border-gray-200"
-                                    }`}
-                                  >
-                                    <Check className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                                  </button>
+                                  {permissions.canUpdate && (
+                                    <button
+                                      onClick={() => handleToggleSubmit(it.commissionId)}
+                                      title={it.isSubmitted ? "Unmark submission" : "Mark as submitted"}
+                                      className={`p-1 sm:p-1.5 rounded-md transition-all ${
+                                        it.isSubmitted
+                                          ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                                          : "bg-gray-100 text-gray-400 hover:bg-emerald-50 hover:text-emerald-600 border border-gray-200"
+                                      }`}
+                                    >
+                                      <Check className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                                    </button>
+                                  )}
                                   {it.isApproved && (
                                     <span className="inline-flex items-center px-1 sm:px-1.5 py-0.5 rounded-full text-[8px] sm:text-[10px] bg-emerald-100 text-emerald-700 font-semibold whitespace-nowrap">
                                       Approved
@@ -746,6 +1076,7 @@ function ClinicCommissionPage() {
                                       </div>
                                     )}
                                     {/* Add Expense button / inline form */}
+                                    {permissions.canUpdate && (
                                     <div className="mt-2">
                                       {addExpenseRow !== it.commissionId ? (
                                         <button
@@ -808,6 +1139,7 @@ function ClinicCommissionPage() {
                                         </div>
                                       )}
                                     </div>
+                                    )}
                                     <div className="border-t border-gray-100 my-2" />
                                     {it.patientId && patientInfoMap[it.patientId]?.full && (() => {
                                       const full = patientInfoMap[it.patientId].full;

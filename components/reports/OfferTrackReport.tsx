@@ -86,6 +86,7 @@ interface Props {
   startDate: string;
   endDate: string;
   headers: HeadersRecord;
+  canUpdate?: boolean;
 }
 
 const OFFER_TYPE_COLORS: Record<string, string> = {
@@ -100,7 +101,7 @@ const OFFER_TYPE_LABELS: Record<string, string> = {
   bundle: "Bundle",
 };
 
-export default function OfferTrackReport({ startDate, endDate, headers }: Props) {
+export default function OfferTrackReport({ startDate, endDate, headers, canUpdate = false }: Props) {
   const [data, setData] = useState<OfferTrackItem[]>([]);
   const [summary, setSummary] = useState<Summary>({
     totalBillings: 0,
@@ -457,22 +458,28 @@ export default function OfferTrackReport({ startDate, endDate, headers }: Props)
                     <td className="px-4 py-2 text-sm text-gray-500">{currency(item.originalAmount)}</td>
                     <td className="px-4 py-2 text-sm font-medium">{currency(item.finalAmount)}</td>
                     <td className="px-4 py-2 text-sm">
-                      {item.isOfferRefunded ? (
-                        <span className="px-2 py-1 bg-red-100 text-red-700 text-xs rounded font-medium">
-                          Refunded
-                        </span>
+                      {canUpdate ? (
+                        item.isOfferRefunded ? (
+                          <span className="px-2 py-1 bg-red-100 text-red-700 text-xs rounded font-medium">
+                            Refunded
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              setSelectedBilling(item);
+                              setShowRefundModal(true);
+                              setRefundError(null);
+                              setRefundSuccess(null);
+                            }}
+                            className="px-2 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 transition-colors"
+                          >
+                            Refund
+                          </button>
+                        )
                       ) : (
-                        <button
-                          onClick={() => {
-                            setSelectedBilling(item);
-                            setShowRefundModal(true);
-                            setRefundError(null);
-                            setRefundSuccess(null);
-                          }}
-                          className="px-2 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 transition-colors"
-                        >
-                          Refund
-                        </button>
+                        <span className="px-2 py-1 bg-gray-100 text-gray-500 text-xs rounded font-medium">
+                          No Permission
+                        </span>
                       )}
                     </td>
                   </tr>
