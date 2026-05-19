@@ -1787,6 +1787,13 @@ function AppointmentPage({
           newToTime = `${String(Math.floor(newToMinutes / 60)).padStart(2, "0")}:${String(newToMinutes % 60).padStart(2, "0")}`;
         }
 
+        // Resolve serviceId to a plain string (it may be a populated object)
+        const resolvedServiceId = appointment.serviceId
+          ? (typeof appointment.serviceId === "string"
+              ? appointment.serviceId
+              : (appointment.serviceId as { _id: string })._id)
+          : undefined;
+
         const updateData = {
           patientId: appointment.patientId,
           doctorId: updates.doctorId || appointment.doctorId,
@@ -1799,6 +1806,9 @@ function AppointmentPage({
           referral: appointment.referral,
           emergency: appointment.emergency,
           notes: appointment.notes,
+          // Preserve existing service data so drag-drop does not wipe services
+          serviceId: resolvedServiceId,
+          serviceIds: Array.isArray(appointment.serviceIds) ? appointment.serviceIds : [],
         };
 
         const res = await axios.put(

@@ -405,7 +405,7 @@ const ClinicSidebar: FC<ClinicSidebarProps> = ({
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
   const [items, setItems] = useState<NavItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [permissions, setPermissions] = useState<any[] | null>(null);
+  const [, setPermissions] = useState<any[] | null>(null);
 
   // Trial countdown timer state
   const [trialInfo, setTrialInfo] = useState<{
@@ -686,7 +686,7 @@ const ClinicSidebar: FC<ClinicSidebarProps> = ({
               
               const permissionData = {
                 moduleActions: perm.actions,
-                subModules: {}
+                subModules: {} as Record<string, any>
               };
               
               permissionMap[moduleKey] = permissionData;

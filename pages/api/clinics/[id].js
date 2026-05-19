@@ -6,25 +6,8 @@ import path from "path";
 import fs from "fs";
 import { getUserFromReq, requireRole } from "../lead-ms/auth";
 
-// Configure multer for file upload (photos + documents)
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    let uploadPath = path.join(process.cwd(), "public/uploads/clinic");
-    if (file.fieldname === "documents") {
-      uploadPath = path.join(process.cwd(), "public/uploads/clinic/documents");
-    }
-    if (!fs.existsSync(uploadPath)) {
-      fs.mkdirSync(uploadPath, { recursive: true });
-    }
-    cb(null, uploadPath);
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    const base =
-      file.fieldname === "documents" ? "doc-" : "clinic-";
-    cb(null, base + uniqueSuffix + path.extname(file.originalname));
-  },
-});
+// Configure multer for file upload (photos + documents) using memory storage for Cloudinary
+const storage = multer.memoryStorage();
 
 const upload = multer({
   storage: storage,
@@ -363,15 +346,53 @@ export default async function handler(req, res) {
           const files = req.files || {};
           const photoFiles = Array.isArray(files.photos) ? files.photos : [];
           const documentFiles = Array.isArray(files.documents) ? files.documents : [];
+          
+          // Upload photos to Cloudinary
           if (photoFiles.length > 0) {
-            uploadedPhotoPaths = photoFiles.map((file) => `/uploads/clinic/${file.filename}`);
-            console.log("📸 Files uploaded:", uploadedPhotoPaths);
+            const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || 'dxwuxbpir';
+            const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || 'sms_upload';
+            
+            for (const file of photoFiles) {
+              const formData = new FormData();
+              formData.append("file", `data:${file.mimetype};base64,${file.buffer.toString('base64')}`);
+              formData.append("upload_preset", uploadPreset);
+              
+              const cloudUrl = `https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`;
+              const uploadResp = await fetch(cloudUrl, {
+                method: "POST",
+                body: formData,
+              });
+              const uploadData = await uploadResp.json();
+              
+              if (uploadResp.ok && uploadData.secure_url) {
+                uploadedPhotoPaths.push(uploadData.secure_url);
+              }
+            }
+            console.log("📸 Photos uploaded to Cloudinary:", uploadedPhotoPaths);
           }
+          
+          // Upload documents to Cloudinary
           if (documentFiles.length > 0) {
-            uploadedDocumentPaths = documentFiles.map(
-              (file) => `/uploads/clinic/documents/${file.filename}`
-            );
-            console.log("📄 Documents uploaded:", uploadedDocumentPaths);
+            const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || 'dxwuxbpir';
+            const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || 'sms_upload';
+            
+            for (const file of documentFiles) {
+              const formData = new FormData();
+              formData.append("file", `data:${file.mimetype};base64,${file.buffer.toString('base64')}`);
+              formData.append("upload_preset", uploadPreset);
+              
+              const cloudUrl = `https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`;
+              const uploadResp = await fetch(cloudUrl, {
+                method: "POST",
+                body: formData,
+              });
+              const uploadData = await uploadResp.json();
+              
+              if (uploadResp.ok && uploadData.secure_url) {
+                uploadedDocumentPaths.push(uploadData.secure_url);
+              }
+            }
+            console.log("📄 Documents uploaded to Cloudinary:", uploadedDocumentPaths);
           }
         } catch (uploadError) {
           console.error("File upload error:", uploadError);
@@ -580,13 +601,17 @@ export default async function handler(req, res) {
 
       if (uploadedPhotoPaths.length > 0) {
         const basePhotos = Array.isArray(updateData.photos) ? updateData.photos : (existingClinic.photos || []);
-        const allPhotos = [...basePhotos];
-        uploadedPhotoPaths.forEach((newPhoto) => {
-          if (!allPhotos.includes(newPhoto)) {
-            allPhotos.push(newPhoto);
-          }
-        });
-        updateData.photos = allPhotos;
+        if (updateData.isMediaUpload === "true") {
+          // Split uploaded paths into media paths (logo/cover, first two) and other paths
+          const mediaPaths = uploadedPhotoPaths.slice(0, 2); // logo (index0), cover (index1)
+          const otherPaths = uploadedPhotoPaths.slice(2);
+          // Final array: [mediaPaths (logo/cover), basePhotos, otherPaths (other clinic images)]
+          const allPhotos = [...mediaPaths, ...basePhotos, ...otherPaths];
+          updateData.photos = allPhotos;
+        } else {
+          const allPhotos = [...uploadedPhotoPaths, ...basePhotos];
+          updateData.photos = allPhotos;
+        }
       }
 
       // Documents merging and cleanup
@@ -643,6 +668,8 @@ export default async function handler(req, res) {
 
       console.log("🔄 Updating clinic with data:", updateData);
       console.log("📦 Update data keys:", Object.keys(updateData));
+      console.log("📄 Document names:", documentNames);
+      console.log("📄 Uploaded document paths:", uploadedDocumentPaths);
 
       // Validate required fields
       const requiredFields = ['name', 'address'];
