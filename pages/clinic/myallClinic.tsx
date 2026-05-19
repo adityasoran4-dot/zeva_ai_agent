@@ -64,7 +64,7 @@ const getStoredToken = () => {
 const isTruthy = (val: unknown) =>
   val === true || val === "true" || String(val ?? "").toLowerCase() === "true";
 
-const findHealthCenterModule = (permissionsList: { module?: string }[]) =>
+const findHealthCenterModule = (permissionsList: { module?: string; actions?: any }[]) =>
   permissionsList.find((p) => {
     if (!p?.module) return false;
     const mod = String(p.module).toLowerCase();
@@ -384,6 +384,8 @@ function ClinicManagementDashboard(): ReactElement {
   });
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>({
     lat: 28.474389,
     lng: 77.50399,
@@ -472,7 +474,7 @@ function ClinicManagementDashboard(): ReactElement {
   // Clinic-level (sidebar-permissions) + agent/doctorStaff-level (get-module-permissions)
   useEffect(() => {
     let isMounted = true;
-    const userRole = getUserRole();
+    const userRole = getUserRole() as "clinic" | "staff" | "agent" | "doctor" | "user" | "admin" | "doctorStaff" | null;
     const authToken = getStoredToken();
     const clinicToken =
       typeof window !== "undefined"
@@ -839,6 +841,16 @@ function ClinicManagementDashboard(): ReactElement {
           applyOn: "earned",
         },
       });
+    }
+    // Load logo and cover preview from clinic's photos array
+    const photos = (c as any).photos || [];
+    if (photos.length > 0) {
+      const logoPath = photos[0];
+      setLogoPreview(getImagePath(logoPath));
+    }
+    if (photos.length > 1) {
+      const coverPath = photos[1];
+      setCoverPreview(getImagePath(coverPath));
     }
     if (!stateSnapshot) {
       setStateSnapshot({
@@ -1220,6 +1232,8 @@ function ClinicManagementDashboard(): ReactElement {
       );
       setLogoPreview(stateSnapshot.logoPreview || null);
       setCoverPreview(stateSnapshot.coverPreview || null);
+      setLogoFile(null);
+      setCoverFile(null);
       setIntegrations(stateSnapshot.integrations || integrations);
       setBrandPrimary(stateSnapshot.brandPrimary || brandPrimary);
       setBrandSecondary(stateSnapshot.brandSecondary || brandSecondary);
@@ -1252,7 +1266,6 @@ function ClinicManagementDashboard(): ReactElement {
     }));
     setNewDocName("");
     setNewDocFile(null);
-    toast.success("Document added");
   };
 
   const handleRemoveExistingDocument = (index: number) => {
@@ -1288,6 +1301,11 @@ function ClinicManagementDashboard(): ReactElement {
         return;
       }
       const toRelativeUploadPath = (s: string) => {
+        if (!s) return s;
+        // If it's already a Cloudinary URL or absolute URL, return as is
+        if (s.startsWith("http://") || s.startsWith("https://")) {
+          return s;
+        }
         let out = s.trim().replace(/^['"`]+|['"`]+$/g, "");
         try {
           if (out.startsWith("http://") || out.startsWith("https://")) {
@@ -1302,11 +1320,24 @@ function ClinicManagementDashboard(): ReactElement {
         if (out.startsWith("/")) return out;
         return `/uploads/clinic/${out}`;
       };
-      const existingPhotos = (editForm.photos || [])
+      
+      let existingPhotos = (editForm.photos || [])
         .filter(
           (p: any) => typeof p === "string" && String(p).trim().length > 0,
         )
         .map((p: any) => toRelativeUploadPath(String(p)));
+      
+      if (logoFile) {
+        existingPhotos = existingPhotos.slice(1);
+      }
+      if (coverFile) {
+        if (logoFile) {
+          existingPhotos = existingPhotos.slice(1);
+        } else {
+          existingPhotos = [existingPhotos[0], ...existingPhotos.slice(2)];
+        }
+      }
+      
       const existingDocuments = (editForm.documents || [])
         .filter((d: any) => d && typeof d.url === "string" && d.url.length > 0)
         .map((d: any) => ({
@@ -1319,16 +1350,33 @@ function ClinicManagementDashboard(): ReactElement {
       const filesFromEdit = (editForm.photos || []).filter(
         (p: any) => p instanceof File,
       ) as File[];
-      const filesToUploadMap = new Map<string, File>();
+      
+      const mediaFilesToUploadMap = new Map<string, File>();
+      
+      if (logoFile) {
+        const key = `${logoFile.name}-${logoFile.size}-${logoFile.type}`;
+        mediaFilesToUploadMap.set(key, logoFile);
+      }
+      if (coverFile) {
+        const key = `${coverFile.name}-${coverFile.size}-${coverFile.type}`;
+        mediaFilesToUploadMap.set(key, coverFile);
+      }
+      
+      const otherFilesToUploadMap = new Map<string, File>();
+      
       [...(selectedFiles || []), ...filesFromEdit].forEach((f) => {
         const key = `${f.name}-${f.size}-${f.type}`;
-        if (!filesToUploadMap.has(key)) filesToUploadMap.set(key, f);
+        if (!mediaFilesToUploadMap.has(key) && !otherFilesToUploadMap.has(key)) {
+          otherFilesToUploadMap.set(key, f);
+        }
       });
-      const filesToUpload = Array.from(filesToUploadMap.values());
+      
+      const mediaFilesToUpload = Array.from(mediaFilesToUploadMap.values());
+      const otherFilesToUpload = Array.from(otherFilesToUploadMap.values());
       const documentFilesToUpload = (editForm.documents || [])
         .filter((d: any) => d && d.file instanceof File)
         .map((d: any) => d.file as File);
-      const hasFiles = filesToUpload.length > 0;
+      const hasFiles = mediaFilesToUpload.length > 0 || otherFilesToUpload.length > 0;
       const hasDocFiles = documentFilesToUpload.length > 0;
       if (hasFiles || hasDocFiles) {
         const form = new FormData();
@@ -1355,14 +1403,24 @@ function ClinicManagementDashboard(): ReactElement {
         if (existingDocuments && existingDocuments.length > 0) {
           form.append("existingDocuments", JSON.stringify(existingDocuments));
         }
-        filesToUpload.forEach((file) => form.append("photos", file));
+        // Append media files (logo, cover) with a specific flag to tell API to prepend them
+        form.append("isMediaUpload", "true");
+        mediaFilesToUpload.forEach((file) => {
+          form.append("photos", file);
+        });
+        otherFilesToUpload.forEach((file) => {
+          form.append("photos", file);
+        });
         // Append new documents with names
-        (editForm.documents || [])
-          .filter((d: any) => d && d.file instanceof File)
-          .forEach((d: any) => {
-            form.append("documents", d.file);
-            form.append("documentNames", d.name || d.file?.name || "Document");
-          });
+        const newDocuments = (editForm.documents || [])
+          .filter((d: any) => d && d.file instanceof File);
+        console.log("📄 New documents to upload:", newDocuments);
+        newDocuments.forEach((d: any) => {
+          form.append("documents", d.file);
+          form.append("documentNames", d.name || d.file?.name || "Document");
+        });
+        console.log("📄 Form document entries:", form.getAll("documents"));
+        console.log("📄 Form document names:", form.getAll("documentNames"));
         try {
           const response = await axios.put(
             `/api/clinics/${editingClinicId}`,
@@ -1413,7 +1471,14 @@ function ClinicManagementDashboard(): ReactElement {
                 JSON.stringify(existingDocuments),
               );
             }
-            filesToUpload.forEach((file) => retryForm.append("photos", file));
+            if (logoFile) retryForm.append("photos", logoFile);
+            if (coverFile) retryForm.append("photos", coverFile);
+            mediaFilesToUpload.forEach((file) => {
+              retryForm.append("photos", file);
+            });
+            otherFilesToUpload.forEach((file) => {
+              retryForm.append("photos", file);
+            });
             (editForm.documents || [])
               .filter((d: any) => d && d.file instanceof File)
               .forEach((d: any) => {
@@ -1522,9 +1587,14 @@ function ClinicManagementDashboard(): ReactElement {
           }
         }
       }
+      console.log("🔔 About to show success toast");
       toast.success("Clinic updated successfully");
+      console.log("🔔 Success toast shown");
       // Sync currency to global context after successful save
       setGlobalCurrency(clinicCurrency);
+      // Reset logo and cover file states
+      setLogoFile(null);
+      setCoverFile(null);
       console.log("✅ Update successful, refreshing data...");
       const refreshResponse = await axios.get("/api/clinics/myallClinic", {
         headers: authHeaders,
@@ -1540,6 +1610,8 @@ function ClinicManagementDashboard(): ReactElement {
                 )
                 .filter((p: any) => typeof p === "string" && p.length > 0)
             : [];
+        console.log("🔄 Refresh response clinic:", refreshResponse.data.clinic);
+        console.log("📄 Refresh response documents:", refreshResponse.data.clinic.documents);
         const clinicObj = refreshResponse.data.clinic
           ? {
               ...refreshResponse.data.clinic,
@@ -2054,6 +2126,7 @@ function ClinicManagementDashboard(): ReactElement {
                             if (!f) return;
                             const url = URL.createObjectURL(f);
                             setLogoPreview(url);
+                            setLogoFile(f);
                           }}
                         />
                         {logoPreview ? (
@@ -2091,6 +2164,7 @@ function ClinicManagementDashboard(): ReactElement {
                             if (!f) return;
                             const url = URL.createObjectURL(f);
                             setCoverPreview(url);
+                            setCoverFile(f);
                           }}
                         />
                         {coverPreview ? (
@@ -2827,13 +2901,14 @@ function ClinicManagementDashboard(): ReactElement {
                         value={contactForm.phone}
                         disabled={fieldDisabled}
                         readOnly={fieldDisabled}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 10);
                           setContactForm({
                             ...contactForm,
-                            phone: e.target.value,
-                          })
-                        }
-                        placeholder="+91 1234569870"
+                            phone: value,
+                          });
+                        }}
+                        placeholder="1234567890"
                       />
                     </div>
                     <div>
@@ -2845,13 +2920,14 @@ function ClinicManagementDashboard(): ReactElement {
                         value={contactForm.whatsapp}
                         disabled={fieldDisabled}
                         readOnly={fieldDisabled}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 10);
                           setContactForm({
                             ...contactForm,
-                            whatsapp: e.target.value,
-                          })
-                        }
-                        placeholder="+91 1234567890"
+                            whatsapp: value,
+                          });
+                        }}
+                        placeholder="1234567890"
                       />
                     </div>
                     <div>
@@ -2965,9 +3041,6 @@ function ClinicManagementDashboard(): ReactElement {
                         if (f) {
                           setNewDocFile(f);
                           setNewDocName(f.name.split(".")[0]);
-                          toast.success(
-                            "File selected. Click Add Document to upload.",
-                          );
                         }
                       }}
                     />
@@ -2978,7 +3051,9 @@ function ClinicManagementDashboard(): ReactElement {
                 {/* Document Grid */}
                 {editForm.documents && editForm.documents.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
-                    {(editForm.documents || []).map((doc: any, idx: number) => {
+                    {(() => {
+                      console.log("📋 Rendering documents:", editForm.documents);
+                      return (editForm.documents || []).map((doc: any, idx: number) => {
                       const url = String(doc?.url || "");
                       const hasUrl = url && url.length > 0;
                       const isImage = /\.(jpg|jpeg|png)$/i.test(url);
@@ -2993,13 +3068,6 @@ function ClinicManagementDashboard(): ReactElement {
                             doc.type ||
                             "PDF"
                           ).toUpperCase();
-                      const uploadDate = doc.createdAt
-                        ? new Date(doc.createdAt).toLocaleDateString("en-US", {
-                            year: "numeric",
-                            month: "short",
-                            day: "numeric",
-                          })
-                        : "Recently";
                       const isPending = !hasUrl && doc.file; // New document not yet saved
 
                       return (
@@ -3043,9 +3111,6 @@ function ClinicManagementDashboard(): ReactElement {
                                 <span>{fileType}</span>
                                 <span>•</span>
                                 <span>{fileSize}</span>
-                              </div>
-                              <div className="mt-1 text-xs text-gray-400">
-                                Uploaded {uploadDate}
                               </div>
                             </div>
                           </div>
@@ -3128,7 +3193,8 @@ function ClinicManagementDashboard(): ReactElement {
                           )}
                         </div>
                       );
-                    })}
+                    });
+                  })()}
                   </div>
                 ) : (
                   <div className="bg-gray-50 border border-gray-200 rounded-xl p-8 text-center">
@@ -3200,7 +3266,6 @@ function ClinicManagementDashboard(): ReactElement {
 
                     setNewDocFile(file);
                     setNewDocName(file.name.split(".")[0]);
-                    toast.success(`File "${file.name}" ready to upload`);
                   }}
                 >
                   <div className="max-w-md mx-auto">
@@ -3239,11 +3304,24 @@ function ClinicManagementDashboard(): ReactElement {
                             }
                           }}
                         />
-                        <div className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm text-gray-700 text-center hover:bg-gray-50 transition-all">
+                        <div className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm text-gray-700 text-center hover:bg-gray-50 transition-all flex items-center justify-between">
                           {newDocFile ? (
-                            <span className="text-teal-700 font-medium">
-                              ✓ {newDocFile.name}
-                            </span>
+                            <>
+                              <span className="text-teal-700 font-medium truncate">
+                                ✓ {newDocFile.name}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setNewDocFile(null);
+                                }}
+                                className="ml-2 text-gray-500 hover:text-red-500 transition-colors"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </>
                           ) : (
                             "Choose File"
                           )}
@@ -5253,7 +5331,7 @@ function ClinicManagementDashboard(): ReactElement {
           <div className="w-full">
             {/* Show permission denied message if no read permission (only for agent/doctorStaff, not clinic/doctor) */}
             {(() => {
-              const userRole = getUserRole();
+              const userRole = getUserRole() as "clinic" | "staff" | "agent" | "doctor" | "user" | "admin" | "doctorStaff" | null;
               // Clinic and doctor roles always have access - don't show access denied
               if (userRole === "clinic" || userRole === "doctor") {
                 return null;
@@ -5283,7 +5361,7 @@ function ClinicManagementDashboard(): ReactElement {
               return null;
             })()}
             {(() => {
-              const userRole = getUserRole();
+              const userRole = getUserRole() as "clinic" | "staff" | "agent" | "doctor" | "user" | "admin" | "doctorStaff" | null;
               // If clinic/doctor role, always show content (they have full access)
               if (userRole === "clinic" || userRole === "doctor") {
                 // Show clinics or empty state
