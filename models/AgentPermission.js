@@ -11,6 +11,7 @@ const ModulePermissionSchema = new mongoose.Schema({
     path: { type: String, default: '' },
     icon: { type: String, default: '📄' },
     order: { type: Number, default: 0 },
+    moduleKey: { type: String }, // Added moduleKey field
     actions: {
       all: { type: Boolean, default: false },
       create: { type: Boolean, default: false },

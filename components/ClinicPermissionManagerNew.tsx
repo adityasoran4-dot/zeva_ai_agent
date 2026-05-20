@@ -5,6 +5,7 @@ interface SubModule {
   path?: string;
   icon: string;
   order: number;
+  moduleKey?: string;
   actions: Record<ActionKey, boolean>;
 }
 
@@ -97,6 +98,7 @@ const sanitizeModulePermission = (permission: ModulePermission): ModulePermissio
   }, {} as Record<ActionKey, boolean>),
   subModules: (permission.subModules || []).map((sub) => ({
     ...sub,
+    moduleKey: sub.moduleKey,
     actions: ACTION_KEYS.reduce((acc, key) => {
       acc[key] = Boolean(sub.actions?.[key]);
       return acc;
@@ -149,6 +151,7 @@ const ClinicPermissionManagerNew: React.FC<ClinicPermissionManagerProps> = ({
           path: subModule.path || '',
           icon: subModule.icon,
           order: subModule.order,
+          moduleKey: (subModule as any).moduleKey,
           actions: createBlankActions(),
         })) || [],
       actions: createBlankActions(),
@@ -197,6 +200,7 @@ const ClinicPermissionManagerNew: React.FC<ClinicPermissionManagerProps> = ({
             path: sub.path || '',
             icon: sub.icon,
             order: sub.order,
+            moduleKey: (sub as any).moduleKey,
             actions: createBlankActions(),
           })) || [],
       };
@@ -262,6 +266,7 @@ const ClinicPermissionManagerNew: React.FC<ClinicPermissionManagerProps> = ({
             path: sub.path || '',
             icon: sub.icon,
             order: sub.order,
+            moduleKey: (sub as any).moduleKey,
             actions: createBlankActions(),
           })) || [],
       };
@@ -283,6 +288,7 @@ const ClinicPermissionManagerNew: React.FC<ClinicPermissionManagerProps> = ({
         path: navSub?.path || '',
         icon: navSub?.icon || '📄',
         order: navSub?.order || 0,
+        moduleKey: (navSub as any)?.moduleKey,
         actions: createBlankActions(),
       };
       modulePermission.subModules.push(subModule);

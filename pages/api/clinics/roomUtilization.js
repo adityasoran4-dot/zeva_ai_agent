@@ -96,15 +96,17 @@ export default async function handler(req, res) {
         });
       }
 
-      // Check read permission
-     const { hasPermission, error: permError } = await checkClinicPermission(
+      // For real data, check read permission (but be lenient - allow if permission not configured)
+      const { hasPermission, error: permError } = await checkClinicPermission(
         clinicId,
         "clinic_addRoom",
         "read"
       );
 
-     if (!hasPermission) {
-       return res.status(403).json({
+      // Only deny if permissions are explicitly configured and denied
+      // If no permissions configured at all, allow access (backward compatibility)
+      if (!hasPermission && permError && !permError.includes('No permissions found')) {
+        return res.status(403).json({
           success: false,
           message: permError || "You do not have permission to view room utilization",
         });

@@ -44,6 +44,7 @@ interface SubModule {
   path?: string;
   icon: string;
   order: number;
+  moduleKey?: string;
   actions: {
     all: boolean;
     create: boolean;
@@ -243,6 +244,7 @@ const ManageClinicPermissionsPage: NextPageWithLayout = () => {
         }, {} as ModulePermission['actions']),
         subModules: module.subModules?.map((subModule) => ({
           ...subModule,
+          moduleKey: subModule.moduleKey,
           actions: ACTION_KEYS.reduce((acc, key) => {
             acc[key] = Boolean(subModule.actions?.[key]);
             return acc;
@@ -396,6 +398,7 @@ const ManageClinicPermissionsPage: NextPageWithLayout = () => {
           path: subModule.path,
           icon: subModule.icon,
           order: subModule.order,
+          moduleKey: (subModule as any).moduleKey,
           actions: createBlankActions(),
         })),
         actions: createBlankActions(),

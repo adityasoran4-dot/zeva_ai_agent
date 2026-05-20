@@ -7,6 +7,7 @@ interface SubModule {
   path?: string;
   icon: string;
   order: number;
+  moduleKey?: string;
   actions: {
     all: boolean;
     create: boolean;
@@ -44,6 +45,7 @@ interface NavigationItem {
     path?: string;
     icon: string;
     order: number;
+    moduleKey?: string;
   }>;
 }
 
@@ -280,6 +282,7 @@ const AgentPermissionModal: React.FC<AgentPermissionModalProps> = ({
 
         return {
           ...subMod,
+          moduleKey: subMod.moduleKey,
           actions: sanitizedSubActions
         };
       });
@@ -324,6 +327,7 @@ const AgentPermissionModal: React.FC<AgentPermissionModalProps> = ({
           path: subModule.path || '',
           icon: subModule.icon,
           order: subModule.order,
+          moduleKey: subModule.moduleKey,
           actions: {
             all: false,
             create: false,
@@ -355,6 +359,7 @@ const AgentPermissionModal: React.FC<AgentPermissionModalProps> = ({
             path: subModule.path || '',
             icon: subModule.icon,
             order: subModule.order,
+            moduleKey: subModule.moduleKey,
             actions: {
               all: false,
               create: false,
@@ -539,6 +544,7 @@ const AgentPermissionModal: React.FC<AgentPermissionModalProps> = ({
           path: subModule.path || '',
           icon: subModule.icon,
           order: subModule.order,
+          moduleKey: subModule.moduleKey,
           actions: {
             all: false,
             create: false,
@@ -584,6 +590,7 @@ const AgentPermissionModal: React.FC<AgentPermissionModalProps> = ({
               path: navSubModule.path || '',
               icon: navSubModule.icon || '📄',
               order: navSubModule.order || 0,
+              moduleKey: navSubModule.moduleKey,
               actions: {
                 all: false,
                 create: false,
@@ -642,6 +649,7 @@ const AgentPermissionModal: React.FC<AgentPermissionModalProps> = ({
           path: subModule.path || '',
           icon: subModule.icon,
           order: subModule.order,
+          moduleKey: subModule.moduleKey,
           actions: {
             all: false,
             create: false,
@@ -671,6 +679,7 @@ const AgentPermissionModal: React.FC<AgentPermissionModalProps> = ({
         path: navSubModule?.path || '',
         icon: navSubModule?.icon || '📄',
         order: navSubModule?.order || 0,
+        moduleKey: navSubModule?.moduleKey,
         actions: {
           all: false,
           create: false,
