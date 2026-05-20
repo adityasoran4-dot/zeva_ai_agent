@@ -95,7 +95,14 @@ const UserPackagesPage: NextPageWithLayout = () => {
   const [currency, setCurrency] = useState('INR');
 
   useEffect(() => {
-    fetchPackages();
+    fetchAllPackages();
+  }, []);
+
+  useEffect(() => {
+    // Only fetch active tab packages if we need to refresh (like search query changes after initial load)
+    if (searchQuery) {
+      fetchPackages();
+    }
   }, [activeTab, searchQuery]);
 
   // Fetch clinic currency preference
@@ -115,9 +122,41 @@ const UserPackagesPage: NextPageWithLayout = () => {
     fetchClinicCurrency();
   }, []);
 
-  const fetchPackages = async () => {
+  const fetchAllPackages = async () => {
     try {
       setLoading(true);
+      const authHeaders = getAuthHeaders();
+      
+      // Fetch both pending AND approved packages in parallel!
+      const [pendingRes, approvedRes] = await Promise.all([
+        axios.get('/api/clinic/user-packages', {
+          headers: authHeaders,
+          params: { status: 'pending' }
+        }),
+        axios.get('/api/clinic/user-packages', {
+          headers: authHeaders,
+          params: { status: 'approved' }
+        })
+      ]);
+      
+      if (pendingRes.data.success) {
+        setPendingPackages(pendingRes.data.packages);
+      }
+      
+      if (approvedRes.data.success) {
+        setApprovedPackages(approvedRes.data.packages);
+      }
+      
+    } catch (err: any) {
+      console.error('Error fetching all packages:', err);
+      setError(err.response?.data?.message || 'Failed to fetch packages');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchPackages = async () => {
+    try {
       const status = activeTab === 'pending' ? 'pending' : 'approved';
       const params = new URLSearchParams({ status });
       
@@ -149,8 +188,6 @@ const UserPackagesPage: NextPageWithLayout = () => {
       console.error('Error fetching packages:', err);
       console.error('Error details:', err.response);
       setError(err.response?.data?.message || 'Failed to fetch packages');
-    } finally {
-      setLoading(false);
     }
   };
 

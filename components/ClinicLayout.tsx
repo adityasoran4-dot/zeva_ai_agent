@@ -27,9 +27,18 @@ const ClinicLayout = ({ children, hideSidebar = false, hideHeader = false }: Cli
 
   return (
     <div className="flex min-h-screen bg-gray-50" role="application">
+      {/* Mobile Overlay - Shows when mobile sidebar is open */}
+      {!hideSidebar && isMobileOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[99] lg:hidden"
+          onClick={handleToggleMobile}
+          aria-hidden="true"
+        />
+      )}
+
       {/* Sidebar - ClinicSidebar with external state */}
       {!hideSidebar && (
-        <div className={`h-screen ${isMobileOpen ? 'fixed lg:sticky' : 'sticky'} top-0 z-50`}>
+        <div className={`h-screen ${isMobileOpen ? 'fixed lg:sticky' : 'sticky'} top-0 z-[100]`}>
           <ClinicSidebar 
             externalIsDesktopHidden={isDesktopHidden}
             externalIsMobileOpen={isMobileOpen}
@@ -40,10 +49,10 @@ const ClinicLayout = ({ children, hideSidebar = false, hideHeader = false }: Cli
       )}
 
       {/* Main Content Area */}
-      <div className="flex flex-col flex-1 min-h-screen max-h-screen relative" style={{ overflowX: 'visible', minWidth: 0 }}>
+      <div className="flex flex-col flex-1 min-h-screen max-h-screen relative" style={{ overflowX: 'hidden', minWidth: 0 }}>
         {/* Header - Visible on both mobile and desktop */}
         {!hideHeader && (
-          <div className={`${isMobileOpen ? 'w-1/2 ml-auto' : 'w-full'} transition-all duration-300`}>
+          <div className="w-full transition-all duration-300">
             <ClinicHeader 
               handleToggleDesktop={handleToggleDesktop}
               handleToggleMobile={handleToggleMobile}
@@ -55,25 +64,16 @@ const ClinicLayout = ({ children, hideSidebar = false, hideHeader = false }: Cli
 
         {/* Page Content */}
         <main 
-          className={`flex-1 ${isMobileOpen ? 'w-1/2 ml-auto' : 'w-full'} transition-all duration-300`} 
+          className="flex-1 w-full transition-all duration-300" 
           role="main" 
           style={{ 
             overflowY: 'auto', 
-            overflowX: 'visible',
+            overflowX: 'hidden',
             minWidth: 0
           }}
         >
           {children}
         </main>
-
-        {/* Mobile Overlay - Shows when mobile sidebar is open */}
-        {!hideSidebar && isMobileOpen && (
-          <div
-            className="fixed inset-y-0 right-0 w-1/2 bg-black/20 backdrop-blur-sm z-40 lg:hidden"
-            onClick={handleToggleMobile}
-            aria-hidden="true"
-          />
-        )}
       </div>
     </div>
   );

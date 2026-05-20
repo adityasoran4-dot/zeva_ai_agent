@@ -1595,6 +1595,10 @@ function ClinicManagementDashboard(): ReactElement {
       // Reset logo and cover file states
       setLogoFile(null);
       setCoverFile(null);
+      // Clear temporary treatment selection states
+      setSelectedAvailableTreatmentId("");
+      setSelectedTreatmentIndex(null);
+      setCustomSubTreatmentPrices({});
       console.log("✅ Update successful, refreshing data...");
       const refreshResponse = await axios.get("/api/clinics/myallClinic", {
         headers: authHeaders,
@@ -2510,6 +2514,9 @@ function ClinicManagementDashboard(): ReactElement {
                               </div>
                             );
                           })}
+                        </div>
+                         <div className="mt-1.5 text-[10px] sm:text-xs text-red-500">
+                          Please click "Save Changes" to save added treatments.
                         </div>
                       </div>
                     )}

@@ -1226,14 +1226,14 @@ const ClinicSidebar: FC<ClinicSidebarProps> = ({
       {/* Mobile Sidebar */}
       <aside
         className={clsx(
-          "fixed inset-y-0 left-0 z-50 w-72 bg-[#F3F4F6] border-r border-gray-200 transform transition-transform duration-300 ease-in-out lg:hidden",
+          "fixed inset-y-0 left-0 z-[100] w-[80%] sm:w-[75%] bg-[#F3F4F6] border-r border-gray-200 transform transition-transform duration-300 ease-in-out lg:hidden",
           {
             "translate-x-0": isMobileOpen,
             "-translate-x-full": !isMobileOpen,
           },
           className,
         )}
-        style={{ height: "100vh" }}
+        style={{ height: "100vh", maxWidth: "320px" }}
       >
         <div className="flex flex-col h-full">
           {/* Mobile Header Section */}
@@ -1297,8 +1297,7 @@ const ClinicSidebar: FC<ClinicSidebarProps> = ({
                   Loading menu…
                 </div>
               ) : (
-                items.map((item) => {
-                  const isDropdownOpen = openDropdown === item.label;
+                items.map((item, parentIdx) => {
                   const isSection = !!item.children && !item.path;
                   const isActive = selectedItem
                     ? selectedItem === item.label
@@ -1315,113 +1314,42 @@ const ClinicSidebar: FC<ClinicSidebarProps> = ({
                     }
                   };
 
-                  if (isSection && item.children && item.children.length > 0) {
-                    const itemIndex = items.findIndex(
-                      (i) => i.label === item.label,
-                    );
-                    return (
-                      <div key={item.label} className="mt-4">
-                        <div className="px-2 text-xs font-medium uppercase tracking-wider text-[#64748B] inter-font flex items-center">
-                          <span className="flex-1">{item.label}</span>
-                        </div>
-                        <div className="mt-2 space-y-1">
-                          {item.children.map((child, childIdx) => {
-                            const isChildActive =
-                              router.pathname === child.path;
-                            return child.path ? (
-                              <Link
-                                key={childIdx}
-                                href={child.path}
-                                onClick={handleItemClick}
-                              >
-                                <div
-                                  draggable
-                                  onDragStart={onDragStartChild(
-                                    itemIndex,
-                                    childIdx,
-                                  )}
-                                  onDragOver={onDragOver}
-                                  onDrop={onDropChild(itemIndex, childIdx)}
-                                  onDragEnd={onDragEnd}
-                                  className={clsx(
-                                    "px-3 py-2 rounded-lg transition-all duration-200 text-sm flex items-center gap-2 inter-font",
-                                    {
-                                      "bg-[#2D9AA5] text-white": isChildActive,
-                                      "text-[#374151] hover:bg-gray-100":
-                                        !isChildActive,
-                                    },
-                                  )}
-                                >
-                                  <span className="text-[#374151]">
-                                    {child.label}
-                                  </span>
-                                  {child.badge && (
-                                    <span className="ml-auto bg-red-600 text-white text-[10px] rounded-full min-w-4 h-4 px-1 flex items-center justify-center font-medium inter-font">
-                                      {child.badge}
-                                    </span>
-                                  )}
-                                </div>
-                              </Link>
-                            ) : (
-                              <div
-                                key={childIdx}
-                                className="px-3 py-2 text-sm text-[#374151]"
-                              >
-                                {child.label}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  if (item.children && item.children.length > 0) {
-                    const itemIndex = items.findIndex(
-                      (i) => i.label === item.label,
-                    );
+                  // Section header - collapsible on mobile
+                  if (isSection && item.children) {
+                    const isDropdownOpen = openDropdown === item.label;
                     return (
                       <div
                         key={item.label}
-                        className="space-y-1"
                         draggable
-                        onDragStart={onDragStartParent(itemIndex)}
+                        onDragStart={onDragStartParent(parentIdx)}
                         onDragOver={onDragOver}
-                        onDrop={onDropParent(itemIndex)}
+                        onDrop={onDropParent(parentIdx)}
                         onDragEnd={onDragEnd}
                       >
                         <button
                           onClick={() => {
                             setSelectedItem(item.label);
-                            setOpenDropdown(
-                              openDropdown === item.label ? null : item.label,
-                            );
+                            setOpenDropdown(isDropdownOpen ? null : item.label);
                           }}
                           className={clsx(
-                            "w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all duration-200 text-left group cursor-move",
+                            "w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all duration-200 text-left group cursor-move mt-3 mb-1",
                             {
                               "bg-[#2D9AA5] text-white": isActive,
                               "text-[#374151] hover:bg-gray-100": !isActive,
                             },
                           )}
                         >
-                          <div className="flex items-center gap-1">
-                            <div
+                          <span className="flex items-center gap-2">
+                            {renderIcon(item.icon, isActive)}
+                            <span
                               className={clsx(
-                                "p-1.5 rounded-md transition-all duration-200 flex-shrink-0",
-                                {
-                                  "bg-[#2D9AA5] text-white": isActive,
-                                  "text-[#6B7280] group-hover:text-[#374151]":
-                                    !isActive,
-                                },
+                                "inter-font text-xs font-medium uppercase tracking-wider",
+                                { "text-white": isActive },
                               )}
                             >
-                              {renderIcon(item.icon, isActive)}
-                            </div>
-                            <span className="inter-font text-sm font-medium text-[#374151]">
                               {item.label}
                             </span>
-                          </div>
+                          </span>
                           <ChevronDown
                             className={clsx(
                               "w-4 h-4 transition-transform duration-200",
@@ -1434,62 +1362,59 @@ const ClinicSidebar: FC<ClinicSidebarProps> = ({
                           />
                         </button>
                         {isDropdownOpen && (
-                          <div className="ml-9 space-y-0.5">
+                          <div className="mt-1 ml-9 space-y-0.5">
                             {item.children.map((child, childIdx) => {
-                              const isChildActive =
-                                router.pathname === child.path;
-                              return child.path ? (
-                                <Link
-                                  key={childIdx}
-                                  href={child.path}
-                                  onClick={handleItemClick}
-                                >
+                              const childActive = selectedItem
+                                ? selectedItem === child.label
+                                : router.pathname === child.path;
+                              return (
+                                <Link key={child.path} href={child.path!}>
                                   <div
                                     draggable
                                     onDragStart={onDragStartChild(
-                                      itemIndex,
+                                      parentIdx,
                                       childIdx,
                                     )}
                                     onDragOver={onDragOver}
-                                    onDrop={onDropChild(itemIndex, childIdx)}
+                                    onDrop={onDropChild(parentIdx, childIdx)}
                                     onDragEnd={onDragEnd}
                                     className={clsx(
                                       "px-3 py-2 rounded-lg transition-all duration-200 text-sm cursor-move flex items-start gap-2.5 inter-font min-w-0",
                                       {
-                                        "bg-[#2D9AA5] text-white":
-                                          isChildActive,
+                                        "bg-[#2D9AA5] text-white": childActive,
                                         "text-[#374151] hover:bg-gray-100":
-                                          !isChildActive,
+                                          !childActive,
                                       },
                                     )}
+                                    onClick={safeClick(() => {
+                                      setSelectedItem(child.label);
+                                      if (onExternalToggleMobile && externalIsMobileOpen) {
+                                        onExternalToggleMobile();
+                                      } else {
+                                        setInternalIsMobileOpen(false);
+                                      }
+                                    })}
                                   >
                                     <span
                                       className={clsx(
                                         "flex-shrink-0 mt-0.5",
-                                        isChildActive
+                                        childActive
                                           ? "text-white"
                                           : "text-[#6B7280] group-hover:text-[#374151]",
                                       )}
                                     >
-                                      {renderIcon(child.icon, isChildActive)}
+                                      {renderIcon(child.icon, childActive)}
                                     </span>
                                     <span
                                       className={clsx(
                                         "inter-font font-medium text-sm leading-tight",
-                                        { "text-white": isChildActive },
+                                        { "text-white": childActive },
                                       )}
                                     >
                                       {child.label}
                                     </span>
                                   </div>
                                 </Link>
-                              ) : (
-                                <div
-                                  key={childIdx}
-                                  className="px-3 py-2 text-sm text-[#374151]"
-                                >
-                                  {child.label}
-                                </div>
                               );
                             })}
                           </div>
@@ -1498,56 +1423,68 @@ const ClinicSidebar: FC<ClinicSidebarProps> = ({
                     );
                   }
 
+                  // Regular (non-dropdown) item
                   const MenuItemContent = (
                     <div
                       draggable
-                      onDragStart={onDragStartParent(
-                        items.findIndex((i) => i.label === item.label),
-                      )}
+                      onDragStart={onDragStartParent(parentIdx)}
                       onDragOver={onDragOver}
-                      onDrop={onDropParent(
-                        items.findIndex((i) => i.label === item.label),
-                      )}
+                      onDrop={onDropParent(parentIdx)}
                       onDragEnd={onDragEnd}
-                      onClick={safeClick(handleItemClick)}
                       className={clsx(
-                        "w-full flex items-center px-3 py-2.5 rounded-lg transition-all duration-200 group cursor-move inter-font",
+                        "group relative block rounded-lg transition-all duration-200 cursor-move p-2.5 touch-manipulation",
                         {
                           "bg-[#2D9AA5] text-white": isActive,
-                          "text-[#374151] hover:bg-gray-100": !isActive,
+                          "hover:bg-gray-100 text-[#374151]": !isActive,
                         },
                       )}
+                      onClick={safeClick(() => {
+                        setOpenDropdown(null);
+                        setSelectedItem(item.label);
+                        if (onExternalToggleMobile && externalIsMobileOpen) {
+                          onExternalToggleMobile();
+                        } else {
+                          setInternalIsMobileOpen(false);
+                        }
+                      })}
                     >
-                      <div
-                        className={clsx(
-                          "p-1.5 rounded-md transition-all duration-200 flex-shrink-0",
-                          {
-                            "text-white": isActive,
-                            "text-[#6B7280] group-hover:text-gray-700":
-                              !isActive,
-                          },
-                        )}
-                      >
-                        {renderIcon(item.icon, isActive)}
-                      </div>
-
-                      <div className="flex-1 min-w-0 ">
+                      <div className="flex items-center gap-1">
                         <div
                           className={clsx(
-                            "inter-font font-medium text-sm transition-colors duration-200",
+                            "p-1.5 rounded-md transition-all duration-200 flex-shrink-0",
                             {
                               "text-white": isActive,
-                              "text-[#374151]": !isActive,
-                              uppercase:
-                                (item.label || "").toUpperCase() ===
-                                "DASHBOARD",
-                              "text-xs":
-                                (item.label || "").toUpperCase() ===
-                                "DASHBOARD",
+                              "text-[#6B7280] group-hover:text-[#374151]":
+                                !isActive,
                             },
                           )}
                         >
-                          {item.label}
+                          {renderIcon(item.icon, isActive)}
+                          {item.badge && (
+                            <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-medium inter-font text-[10px]">
+                              {item.badge}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex-1 min-w-0">
+                          <div
+                            className={clsx(
+                              "inter-font font-medium text-sm transition-colors duration-200",
+                              {
+                                "text-white": isActive,
+                                "text-[#374151]": !isActive,
+                                uppercase:
+                                  (item.label || "").toUpperCase() ===
+                                  "DASHBOARD",
+                                "text-xs":
+                                  (item.label || "").toUpperCase() ===
+                                  "DASHBOARD",
+                              },
+                            )}
+                          >
+                            {item.label}
+                          </div>
                         </div>
                       </div>
                     </div>
