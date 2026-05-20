@@ -1,15 +1,18 @@
+"use client";
 import ClinicLayout from "@/components/ClinicLayout";
 import withClinicAuth from "@/components/withClinicAuth";
 import { NextPageWithLayout } from "@/pages/_app";
-import React, { ReactElement, useState, useEffect, useCallback } from "react";
+import React, { ReactElement, useState, useEffect, useCallback, useRef } from "react";
 import axios from "axios";
 import { getTokenByPath } from "@/lib/helper";
 import { PlusIcon, PencilIcon, TrashIcon } from "@heroicons/react/24/outline";
+import { Loader2, Building2 } from "lucide-react";
 import AddLocationModal from "./_components/AddLocationModal";
 import DeleteLocationModal from "./_components/DeleteLocationModal";
 import EditLocationModal from "./_components/EditLocationModal";
 import { StockLocation } from "@/types/stocks";
-
+import { useRouter } from "next/router";
+import { useAgentPermissions } from "@/hooks/useAgentPermissions";
 
 interface ApiResponse {
   success: boolean;
@@ -24,7 +27,45 @@ interface ApiResponse {
   };
 }
 
-const StockLocationPage: NextPageWithLayout = () => {
+const MODULE_KEY = "clinic_stock_locations";
+
+const TOKEN_PRIORITY = [
+  "clinicToken",
+  "doctorToken",
+  "agentToken",
+  "staffToken",
+  "userToken",
+  "adminToken",
+];
+
+const getStoredToken = () => {
+  if (typeof window === "undefined") return null;
+  for (const key of TOKEN_PRIORITY) {
+    const value =
+      window.localStorage.getItem(key) || window.sessionStorage.getItem(key);
+    if (value) return value;
+  }
+  return null;
+};
+
+const StockLocationPage: NextPageWithLayout = ({
+  contextOverride = null,
+}: {
+  contextOverride?: "clinic" | "agent" | null;
+}) => {
+  const router = useRouter();
+  const [routeContext, setRouteContext] = useState<"clinic" | "agent">(
+    contextOverride || "clinic",
+  );
+  const [permissions, setPermissions] = useState({
+    canRead: false,
+    canCreate: false,
+    canUpdate: false,
+    canDelete: false,
+  });
+  const [permissionsLoaded, setPermissionsLoaded] = useState(false);
+  const [hasAgentToken, setHasAgentToken] = useState(false);
+  const [isAgentRoute, setIsAgentRoute] = useState(false);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({
     totalResults: 0,
@@ -44,6 +85,419 @@ const StockLocationPage: NextPageWithLayout = () => {
   const [locationToEdit, setLocationToEdit] = useState<StockLocation | null>(
     null,
   );
+
+  // Detect agent route and token
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const syncTokens = () => {
+      const hasAgent =
+        Boolean(
+          localStorage.getItem("agentToken") ||
+            sessionStorage.getItem("agentToken"),
+        ) ||
+        Boolean(
+          localStorage.getItem("staffToken") ||
+            sessionStorage.getItem("staffToken"),
+        ) ||
+        Boolean(
+          localStorage.getItem("userToken") ||
+            sessionStorage.getItem("userToken"),
+        );
+      setHasAgentToken(hasAgent);
+    };
+    syncTokens();
+    window.addEventListener("storage", syncTokens);
+    return () => window.removeEventListener("storage", syncTokens);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const agentPath =
+      router?.pathname?.startsWith("/agent/") ||
+      window.location.pathname?.startsWith("/agent/");
+    setIsAgentRoute(agentPath && hasAgentToken);
+  }, [router.pathname, hasAgentToken]);
+
+  useEffect(() => {
+    if (contextOverride) {
+      setRouteContext(contextOverride);
+      return;
+    }
+    if (typeof window === "undefined") return;
+    const currentPath = window.location.pathname || "";
+    if (currentPath.startsWith("/agent/")) {
+      setRouteContext("agent");
+    } else {
+      setRouteContext("clinic");
+    }
+  }, [contextOverride]);
+
+  // Use agent permissions hook for agent routes
+  const agentPermissionsHook: any = useAgentPermissions(
+    isAgentRoute ? MODULE_KEY : null,
+  );
+  const agentPermissions = agentPermissionsHook?.permissions || {
+    canRead: false,
+    canCreate: false,
+    canUpdate: false,
+    canDelete: false,
+    canAll: false,
+  };
+  const agentPermissionsLoading = agentPermissionsHook?.loading || false;
+
+  // Handle agent permissions
+  useEffect(() => {
+    if (!isAgentRoute) return;
+    if (agentPermissionsLoading) return;
+
+    const newPermissions = {
+      canRead: Boolean(agentPermissions.canAll || agentPermissions.canRead),
+      canCreate: Boolean(
+        agentPermissions.canAll || agentPermissions.canCreate,
+      ),
+      canUpdate: Boolean(
+        agentPermissions.canAll || agentPermissions.canUpdate,
+      ),
+      canDelete: Boolean(
+        agentPermissions.canAll || agentPermissions.canDelete,
+      ),
+    };
+
+    setPermissions(newPermissions);
+    setPermissionsLoaded(true);
+  }, [isAgentRoute, agentPermissions, agentPermissionsLoading]);
+
+  // Helper function to get user info from token
+  const getUserInfo = (): { role: string | null; id: string | null } => {
+    if (typeof window === "undefined") return { role: null, id: null };
+    try {
+      for (const key of TOKEN_PRIORITY) {
+        const token =
+          window.localStorage.getItem(key) ||
+          window.sessionStorage.getItem(key);
+        if (token) {
+          try {
+            const base64Url = token.split(".")[1];
+            const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+            const jsonPayload = decodeURIComponent(
+              atob(base64)
+                .split("")
+                .map(
+                  (c) =>
+                    "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2),
+                )
+                .join(""),
+            );
+            const decoded = JSON.parse(jsonPayload);
+            return {
+              role: decoded.role || decoded.userRole || null,
+              id: decoded.userId || decoded.id || null,
+            };
+          } catch (e) {
+            continue;
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error getting user info:", error);
+    }
+    return { role: null, id: null };
+  };
+
+  // Helper function to get user role from token
+  const getUserRole = (): string | null => {
+    return getUserInfo().role;
+  };
+
+  // Handle clinic permissions - clinic, doctor have admin-level permissions; agent/doctorStaff need checks
+  useEffect(() => {
+    if (isAgentRoute) return;
+    let isMounted = true;
+
+    // Check which token type is being used
+    const clinicToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("clinicToken") ||
+          sessionStorage.getItem("clinicToken")
+        : null;
+    const doctorToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("doctorToken") ||
+          sessionStorage.getItem("doctorToken")
+        : null;
+    const agentToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("agentToken") ||
+          sessionStorage.getItem("agentToken")
+        : null;
+    const staffToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("staffToken") ||
+          sessionStorage.getItem("staffToken")
+        : null;
+    const userToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("userToken") ||
+          sessionStorage.getItem("userToken")
+        : null;
+
+    const userRole = getUserRole();
+    const authToken =
+      clinicToken || doctorToken || agentToken || staffToken || userToken;
+
+    // ✅ For admin role, grant full access (bypass permission checks)
+    if (userRole === "admin") {
+      if (!isMounted) return;
+      setPermissions({
+        canRead: true,
+        canCreate: true,
+        canUpdate: true,
+        canDelete: true,
+      });
+      setPermissionsLoaded(true);
+      return;
+    }
+
+    // ✅ For clinic and doctor roles, fetch admin-level permissions from /api/clinic/sidebar-permissions
+    if (userRole === "clinic" || userRole === "doctor") {
+      const fetchClinicPermissions = async () => {
+        try {
+          if (!authToken) {
+            if (!isMounted) return;
+            setPermissions({
+              canRead: false,
+              canCreate: false,
+              canUpdate: false,
+              canDelete: false,
+            });
+            setPermissionsLoaded(true);
+            return;
+          }
+
+          const res = await axios.get("/api/clinic/sidebar-permissions", {
+            headers: { Authorization: `Bearer ${authToken}` },
+          });
+
+          if (!isMounted) return;
+
+          if (res.data.success) {
+            console.log("Clinic Sidebar Permissions Response:", res.data);
+            // Check if permissions array exists and is not null
+            // If permissions is null, admin hasn't set any restrictions yet - allow full access (backward compatibility)
+            if (
+              res.data.permissions === null ||
+              !Array.isArray(res.data.permissions) ||
+              res.data.permissions.length === 0
+            ) {
+              console.log("No permissions set, granting full access");
+              // No admin restrictions set yet - default to full access for backward compatibility
+              setPermissions({
+                canRead: true,
+                canCreate: true,
+                canUpdate: true,
+                canDelete: true,
+              });
+            } else {
+              // Admin has set permissions - check the clinic_stock_locations module OR parent clinic_stock module's subModules
+              let modulePermission = res.data.permissions.find((p: any) => {
+                if (!p?.module) return false;
+                // Check for clinic_stock_locations module variations
+                if (p.module === "clinic_stock_locations") return true;
+                if (p.module === "clinic_stock_locations") return true;
+                if (p.module === "stock_locations") return true;
+                return false;
+              });
+
+              console.log("Direct module permission found:", modulePermission);
+
+              // If not found as direct module, check parent clinic_stock module's subModules
+              if (!modulePermission) {
+                const parentStockModule = res.data.permissions.find((p: any) => 
+                  p?.module === "clinic_stock" && Array.isArray(p.subModules)
+                );
+                
+                console.log("Parent stock module found:", parentStockModule);
+                
+                if (parentStockModule) {
+                  modulePermission = parentStockModule.subModules.find((sm: any) => 
+                    sm?.moduleKey === "clinic_stock_locations"
+                  );
+                  console.log("Submodule permission found:", modulePermission);
+                }
+              }
+
+              if (modulePermission) {
+                const actions = modulePermission.actions || {};
+                console.log("Module permission actions:", actions);
+
+                // Check if "all" is true, which grants all permissions
+                const moduleAll =
+                  actions.all === true ||
+                  actions.all === "true" ||
+                  String(actions.all).toLowerCase() === "true";
+                const moduleCreate =
+                  actions.create === true ||
+                  actions.create === "true" ||
+                  String(actions.create).toLowerCase() === "true";
+                const moduleRead =
+                  actions.read === true ||
+                  actions.read === "true" ||
+                  String(actions.read).toLowerCase() === "true";
+                const moduleUpdate =
+                  actions.update === true ||
+                  actions.update === "true" ||
+                  String(actions.update).toLowerCase() === "true";
+                const moduleDelete =
+                  actions.delete === true ||
+                  actions.delete === "true" ||
+                  String(actions.delete).toLowerCase() === "true";
+
+                const newPermissions = {
+                  canRead: moduleAll || moduleRead,
+                  canCreate: moduleAll || moduleCreate,
+                  canUpdate: moduleAll || moduleUpdate,
+                  canDelete: moduleAll || moduleDelete,
+                };
+                console.log("Setting permissions:", newPermissions);
+                setPermissions(newPermissions);
+              } else {
+                // Module permission not found in the permissions array - default to read-only
+                setPermissions({
+                  canRead: true, // Clinic/doctor can always read their own data
+                  canCreate: false,
+                  canUpdate: false,
+                  canDelete: false,
+                });
+              }
+            }
+          } else {
+            // API response doesn't have permissions, default to full access (backward compatibility)
+            setPermissions({
+              canRead: true,
+              canCreate: true,
+              canUpdate: true,
+              canDelete: true,
+            });
+          }
+        } catch (err: any) {
+          console.error("Error fetching clinic sidebar permissions:", err);
+          // On error, default to full access (backward compatibility)
+          if (isMounted) {
+            setPermissions({
+              canRead: true,
+              canCreate: true,
+              canUpdate: true,
+              canDelete: true,
+            });
+          }
+        } finally {
+          if (isMounted) {
+            setPermissionsLoaded(true);
+          }
+        }
+      };
+
+      fetchClinicPermissions();
+      return;
+    }
+
+    // For agent/doctorStaff tokens (when not on agent route), check permissions
+    const agentStaffToken = getStoredToken();
+    if (!agentStaffToken) {
+      setPermissions({
+        canRead: false,
+        canCreate: false,
+        canUpdate: false,
+        canDelete: false,
+      });
+      setPermissionsLoaded(true);
+      return;
+    }
+
+    // Only check permissions for agent/doctorStaff roles when not on agent route
+    if (agentToken || staffToken || userToken) {
+      const fetchPermissions = async () => {
+        try {
+          console.log(
+            "Fetching Agent/Staff Permissions for clinic_stock_locations...",
+          );
+          setPermissionsLoaded(false);
+          // Use agent permissions API for agent/doctorStaff
+          const res = await axios.get("/api/agent/get-module-permissions", {
+            params: { moduleKey: MODULE_KEY },
+            headers: { Authorization: `Bearer ${agentStaffToken}` },
+          });
+          const data = res.data;
+          console.log("Agent Permissions API Response:", data);
+
+          if (!isMounted) return;
+
+          // Default to true if module not found in permissions (matches backend logic)
+          if (
+            !data?.permissions &&
+            data?.error?.includes("not found in agent permissions")
+          ) {
+            console.log(
+              "Module not found in permissions, granting full access by default",
+            );
+            setPermissions({
+              canRead: true,
+              canCreate: true,
+              canUpdate: true,
+              canDelete: true,
+            });
+            return;
+          }
+
+          const actions =
+            data?.permissions?.actions || data?.data?.moduleActions || {};
+          const isTrue = (val: any) =>
+            val === true ||
+            val === "true" ||
+            String(val || "").toLowerCase() === "true";
+
+          const canAll = isTrue(actions.all);
+
+          const newPerms = {
+            canRead: canAll || isTrue(actions.read),
+            canCreate: canAll || isTrue(actions.create),
+            canUpdate: canAll || isTrue(actions.update),
+            canDelete: canAll || isTrue(actions.delete),
+          };
+
+          setPermissions(newPerms);
+          console.log("Setting permissions:", newPerms);
+        } catch (err: any) {
+          console.error("Error fetching agent permissions:", err);
+          if (isMounted) {
+            // Default to full access on error (backward compatibility)
+            setPermissions({
+              canRead: true,
+              canCreate: true,
+              canUpdate: true,
+              canDelete: true,
+            });
+          }
+        } finally {
+          if (isMounted) {
+            setPermissionsLoaded(true);
+          }
+        }
+      };
+
+      fetchPermissions();
+      return;
+    }
+
+    // Default to full access for other cases
+    setPermissions({
+      canRead: true,
+      canCreate: true,
+      canUpdate: true,
+      canDelete: true,
+    });
+    setPermissionsLoaded(true);
+  }, [isAgentRoute]);
 
   // Fetch stock locations
   const fetchLocations = useCallback(
@@ -86,9 +540,14 @@ const StockLocationPage: NextPageWithLayout = () => {
   );
 
   useEffect(() => {
-    // Initial fetch with empty data to show loading state
-    fetchLocations();
-  }, []);
+    // Only fetch locations if permissions are loaded and canRead is true
+    if (permissionsLoaded && permissions.canRead) {
+      fetchLocations();
+    } else if (permissionsLoaded) {
+      // If canRead is false, don't fetch anything
+      setLoading(false);
+    }
+  }, [permissionsLoaded, permissions.canRead, fetchLocations]);
 
   const handlePageChange = useCallback(
     (page: number) => {
@@ -106,11 +565,13 @@ const StockLocationPage: NextPageWithLayout = () => {
 
   // Action handlers
   const handleAddLocation = useCallback(() => {
+    if (!permissions.canCreate) return;
     setIsAddModalOpen(true);
-  }, []);
+  }, [permissions.canCreate]);
 
   const handleAddLocationSubmit = useCallback(
     async (locationData: { location: string; status: string }) => {
+      if (!permissions.canCreate) return;
       try {
         const token = getTokenByPath();
         const response = await axios.post<ApiResponse>(
@@ -136,16 +597,17 @@ const StockLocationPage: NextPageWithLayout = () => {
         alert("Failed to add location");
       }
     },
-    [fetchLocations, pagination.currentPage],
+    [fetchLocations, pagination.currentPage, permissions.canCreate],
   );
 
   const handleDeleteClick = useCallback((location: StockLocation) => {
+    if (!permissions.canDelete) return;
     setLocationToDelete(location);
     setIsDeleteModalOpen(true);
-  }, []);
+  }, [permissions.canDelete]);
 
   const handleDeleteConfirm = useCallback(async () => {
-    if (!locationToDelete) return;
+    if (!locationToDelete || !permissions.canDelete) return;
 
     try {
       const token = getTokenByPath();
@@ -168,7 +630,7 @@ const StockLocationPage: NextPageWithLayout = () => {
       console.error("Error deleting location:", error);
       alert("Failed to delete location");
     }
-  }, [locationToDelete, fetchLocations, pagination.currentPage]);
+  }, [locationToDelete, fetchLocations, pagination.currentPage, permissions.canDelete]);
 
   const handleDeleteCancel = useCallback(() => {
     setIsDeleteModalOpen(false);
@@ -176,13 +638,14 @@ const StockLocationPage: NextPageWithLayout = () => {
   }, []);
 
   const handleEditClick = useCallback((location: StockLocation) => {
+    if (!permissions.canUpdate) return;
     setLocationToEdit(location);
     setIsEditModalOpen(true);
-  }, []);
+  }, [permissions.canUpdate]);
 
   const handleEditSubmit = useCallback(
     async (locationData: { location: string; status: string }) => {
-      if (!locationToEdit) return;
+      if (!locationToEdit || !permissions.canUpdate) return;
 
       try {
         const token = getTokenByPath();
@@ -210,13 +673,82 @@ const StockLocationPage: NextPageWithLayout = () => {
         alert("Failed to update location");
       }
     },
-    [locationToEdit, fetchLocations, pagination.currentPage],
+    [locationToEdit, fetchLocations, pagination.currentPage, permissions.canUpdate],
   );
 
   const handleEditCancel = useCallback(() => {
     setIsEditModalOpen(false);
     setLocationToEdit(null);
   }, []);
+
+  // If permissions are not loaded yet, show loading spinner
+  if (!permissionsLoaded) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-6 flex items-center justify-center">
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6 text-center text-gray-700">
+          <Loader2 className="w-5 h-5 mx-auto mb-2 animate-spin" />
+          <p className="text-xs sm:text-sm">Checking your permissions...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If canRead is false, show access denied
+  if (!permissions.canRead && !permissions.canCreate) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-6 flex items-center justify-center">
+        <div className="bg-white rounded-lg shadow-lg border border-red-200 p-8 text-center max-w-md">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Building2 className="w-8 h-8 text-red-600" />
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Access Denied</h2>
+          <p className="text-sm text-gray-700 mb-4">
+            You do not have permission to view stock locations.
+          </p>
+          <p className="text-xs text-gray-600">
+            Please contact your administrator to request access to the Stock Locations module.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // If canRead is false but canCreate is true, show only add button
+  if (!permissions.canRead && permissions.canCreate) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-6">
+        {/* Header Section */}
+        <div className="mb-8">
+          <div className="max-w-9xl mx-auto">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">
+                  Stock Locations
+                </h1>
+                <p className="mt-1 sm:mt-2 text-xs sm:text-sm text-gray-600">
+                  Manage storage locations for your clinic inventory
+                </p>
+              </div>
+              <button
+                className="cursor-pointer inline-flex items-center justify-center gap-1.5 bg-gray-800 hover:bg-gray-900 text-white px-3 py-2 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 text-xs sm:text-sm font-medium"
+                onClick={handleAddLocation}
+              >
+                <PlusIcon className="h-5 w-5 mr-2" />
+                Add Location
+              </button>
+
+              {/* Add Location Modal */}
+              <AddLocationModal
+                isOpen={isAddModalOpen}
+                onClose={() => setIsAddModalOpen(false)}
+                onAddLocation={handleAddLocationSubmit}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-6">
@@ -232,36 +764,44 @@ const StockLocationPage: NextPageWithLayout = () => {
                 Manage storage locations for your clinic inventory
               </p>
             </div>
-            <button
-              className="cursor-pointer inline-flex items-center justify-center gap-1.5 bg-gray-800 hover:bg-gray-900 text-white px-3 py-2 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 text-xs sm:text-sm font-medium"
-              onClick={handleAddLocation}
-            >
-              <PlusIcon className="h-5 w-5 mr-2" />
-              Add Location
-            </button>
+            {permissions.canCreate && (
+              <button
+                className="cursor-pointer inline-flex items-center justify-center gap-1.5 bg-gray-800 hover:bg-gray-900 text-white px-3 py-2 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 text-xs sm:text-sm font-medium"
+                onClick={handleAddLocation}
+              >
+                <PlusIcon className="h-5 w-5 mr-2" />
+                Add Location
+              </button>
+            )}
 
             {/* Add Location Modal */}
-            <AddLocationModal
-              isOpen={isAddModalOpen}
-              onClose={() => setIsAddModalOpen(false)}
-              onAddLocation={handleAddLocationSubmit}
-            />
+            {permissions.canCreate && (
+              <AddLocationModal
+                isOpen={isAddModalOpen}
+                onClose={() => setIsAddModalOpen(false)}
+                onAddLocation={handleAddLocationSubmit}
+              />
+            )}
 
             {/* Delete Location Modal */}
-            <DeleteLocationModal
-              isOpen={isDeleteModalOpen}
-              onClose={handleDeleteCancel}
-              onConfirm={handleDeleteConfirm}
-              locationName={locationToDelete?.location}
-            />
+            {permissions.canDelete && (
+              <DeleteLocationModal
+                isOpen={isDeleteModalOpen}
+                onClose={handleDeleteCancel}
+                onConfirm={handleDeleteConfirm}
+                locationName={locationToDelete?.location}
+              />
+            )}
 
             {/* Edit Location Modal */}
-            <EditLocationModal
-              isOpen={isEditModalOpen}
-              onClose={handleEditCancel}
-              onEditLocation={handleEditSubmit}
-              locationData={locationToEdit || undefined}
-            />
+            {permissions.canUpdate && (
+              <EditLocationModal
+                isOpen={isEditModalOpen}
+                onClose={handleEditCancel}
+                onEditLocation={handleEditSubmit}
+                locationData={locationToEdit || undefined}
+              />
+            )}
           </div>
         </div>
       </div>
@@ -460,13 +1000,15 @@ const StockLocationPage: NextPageWithLayout = () => {
               <p className="text-gray-500 mb-6">
                 Get started by adding your first storage location.
               </p>
-              <button
-                onClick={handleAddLocation}
-                className="cursor-pointer inline-flex items-center justify-center gap-1.5 bg-gray-800 hover:bg-gray-900 text-white px-3 py-2 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 text-xs sm:text-sm font-medium"
-              >
-                <PlusIcon className="h-5 w-5 mr-2" />
-                Add First Location
-              </button>
+              {permissions.canCreate && (
+                <button
+                  onClick={handleAddLocation}
+                  className="cursor-pointer inline-flex items-center justify-center gap-1.5 bg-gray-800 hover:bg-gray-900 text-white px-3 py-2 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 text-xs sm:text-sm font-medium"
+                >
+                  <PlusIcon className="h-5 w-5 mr-2" />
+                  Add First Location
+                </button>
+              )}
             </div>
           ) : (
             /* Data Table */
@@ -545,20 +1087,24 @@ const StockLocationPage: NextPageWithLayout = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <div className="flex justify-end space-x-2">
-                          <button
-                            onClick={() => handleEditClick(location)}
-                            className="text-blue-600 hover:text-blue-900 p-2 rounded-lg hover:bg-blue-50 transition-all duration-200"
-                            title="Edit"
-                          >
-                            <PencilIcon className="h-5 w-5" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteClick(location)}
-                            className="text-red-600 hover:text-red-900 p-2 rounded-lg hover:bg-red-50 transition-all duration-200"
-                            title="Delete"
-                          >
-                            <TrashIcon className="h-5 w-5" />
-                          </button>
+                          {permissions.canUpdate && (
+                            <button
+                              onClick={() => handleEditClick(location)}
+                              className="text-blue-600 hover:text-blue-900 p-2 rounded-lg hover:bg-blue-50 transition-all duration-200"
+                              title="Edit"
+                            >
+                              <PencilIcon className="h-5 w-5" />
+                            </button>
+                          )}
+                          {permissions.canDelete && (
+                            <button
+                              onClick={() => handleDeleteClick(location)}
+                              className="text-red-600 hover:text-red-900 p-2 rounded-lg hover:bg-red-50 transition-all duration-200"
+                              title="Delete"
+                            >
+                              <TrashIcon className="h-5 w-5" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

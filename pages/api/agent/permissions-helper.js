@@ -42,7 +42,7 @@ export async function checkAgentPermission(agentId, moduleKey, action, subModule
     );
 
     // Find the module permission using any of the candidate keys
-    const modulePermission = agentPermission.permissions.find(
+    let modulePermission = agentPermission.permissions.find(
       (p) => {
         const permModule = p.module || '';
         return moduleCandidates.some(candidate => 
@@ -51,6 +51,24 @@ export async function checkAgentPermission(agentId, moduleKey, action, subModule
         );
       }
     );
+
+    // If not found as direct module, check all modules' subModules
+    if (!modulePermission) {
+      for (const permission of agentPermission.permissions) {
+        if (Array.isArray(permission.subModules) && permission.subModules.length > 0) {
+          const subModule = permission.subModules.find((sm) => 
+            sm.moduleKey && moduleCandidates.some(candidate => 
+              sm.moduleKey === candidate || 
+              sm.moduleKey.replace(/^(admin|clinic|doctor)_/, '') === candidate.replace(/^(admin|clinic|doctor)_/, '')
+            )
+          );
+          if (subModule) {
+            modulePermission = subModule;
+            break;
+          }
+        }
+      }
+    }
 
     if (!modulePermission) {
       return { hasPermission: false, error: `Module ${moduleKey} not found in agent permissions` };
@@ -143,12 +161,17 @@ export async function getAgentModulePermissions(agentId, moduleKey) {
   }
 
   try {
+    console.log("[getAgentModulePermissions] Looking up permissions for agentId:", agentId, "moduleKey:", moduleKey);
+    
     const agentPermission = await AgentPermission.findOne({
       agentId,
       isActive: true
     });
 
+    console.log("[getAgentModulePermissions] Full agentPermission from DB:", JSON.stringify(agentPermission, null, 2));
+
     if (!agentPermission || !agentPermission.permissions || agentPermission.permissions.length === 0) {
+      console.log("[getAgentModulePermissions] No permissions found for this agent");
       return { permissions: null, error: "No permissions found for this agent" };
     }
 
@@ -162,24 +185,55 @@ export async function getAgentModulePermissions(agentId, moduleKey) {
         moduleKey ? `doctor_${moduleKey}` : null,
       ].filter(Boolean))
     );
+    
+    console.log("[getAgentModulePermissions] Module candidates:", moduleCandidates);
 
-    const modulePermission = agentPermission.permissions.find(
+    let modulePermission = agentPermission.permissions.find(
       (p) => {
         const permModule = p.module || '';
-        return moduleCandidates.some(candidate => 
+        const found = moduleCandidates.some(candidate => 
           permModule === candidate || 
           permModule.replace(/^(admin|clinic|doctor)_/, '') === candidate.replace(/^(admin|clinic|doctor)_/, '')
         );
+        console.log("[getAgentModulePermissions] Checking direct module:", permModule, "found:", found);
+        return found;
       }
     );
 
+    // If not found as direct module, check all modules' subModules
     if (!modulePermission) {
+      console.log("[getAgentModulePermissions] Not found as direct module, checking subModules of all modules");
+      for (const permission of agentPermission.permissions) {
+        console.log("[getAgentModulePermissions] Checking parent module:", permission.module);
+        if (Array.isArray(permission.subModules) && permission.subModules.length > 0) {
+          console.log("[getAgentModulePermissions] Parent module has subModules:", JSON.stringify(permission.subModules, null, 2));
+          const subModule = permission.subModules.find((sm) => {
+            console.log("[getAgentModulePermissions] Checking subModule:", JSON.stringify(sm, null, 2));
+            const found = sm.moduleKey && moduleCandidates.some(candidate => 
+              sm.moduleKey === candidate || 
+              sm.moduleKey.replace(/^(admin|clinic|doctor)_/, '') === candidate.replace(/^(admin|clinic|doctor)_/, '')
+            );
+            console.log("[getAgentModulePermissions] subModule found:", found);
+            return found;
+          });
+          if (subModule) {
+            console.log("[getAgentModulePermissions] Found matching subModule in parent:", permission.module, "subModule:", JSON.stringify(subModule, null, 2));
+            modulePermission = subModule;
+            break;
+          }
+        }
+      }
+    }
+
+    if (!modulePermission) {
+      console.log("[getAgentModulePermissions] No matching module found at all");
       return { permissions: null, error: `No permissions found for module: ${moduleKey}` };
     }
 
+    console.log("[getAgentModulePermissions] Found modulePermission:", JSON.stringify(modulePermission, null, 2));
     return { permissions: modulePermission, error: null };
   } catch (error) {
-    // console.error("Error getting agent module permissions:", error);
+    console.error("[getAgentModulePermissions] Error:", error);
     return { permissions: null, error: "Error getting permissions" };
   }
 }

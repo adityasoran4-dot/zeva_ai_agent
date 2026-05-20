@@ -1,11 +1,12 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import axios from "axios";
 import withClinicAuth from "../../components/withClinicAuth";
 import ClinicLayout from "../../components/ClinicLayout";
 import { Toaster, toast } from "react-hot-toast";
 import { Loader2, Edit2, Trash2, CheckCircle, AlertCircle, Package, ChevronDown, X, Calendar, Search, User, Users, Plus, Save, Stethoscope, Percent, Clock, Star, Wrench } from "lucide-react";
 import { getCurrencySymbol } from "@/lib/currencyHelper";
+import { useAgentPermissions } from "../../hooks/useAgentPermissions";
 
 const MODULE_KEY = "Clinic_services_setup";
 const TOKEN_PRIORITY = ["clinicToken", "agentToken", "doctorToken", "userToken", "staffToken", "adminToken"];
@@ -50,6 +51,338 @@ function isMembershipExpired(m) {
 }
 
 function ServicesSetupPage() {
+  // Permission states
+  const [permissions, setPermissions] = useState({
+    canRead: false,
+    canCreate: false,
+    canUpdate: false,
+    canDelete: false,
+  });
+  const [permissionsLoaded, setPermissionsLoaded] = useState(false);
+  const [hasAgentToken, setHasAgentToken] = useState(false);
+  const [isAgentRoute, setIsAgentRoute] = useState(false);
+
+  // Helper function to get user info from token
+  const getUserInfo = useCallback(() => {
+    if (typeof window === "undefined") return { role: null, id: null };
+    try {
+      for (const key of TOKEN_PRIORITY) {
+        const token = window.localStorage.getItem(key) || window.sessionStorage.getItem(key);
+        if (token) {
+          try {
+            const base64Url = token.split(".")[1];
+            const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+            const jsonPayload = decodeURIComponent(
+              atob(base64)
+                .split("")
+                .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+                .join(""),
+            );
+            const decoded = JSON.parse(jsonPayload);
+            return {
+              role: decoded.role || decoded.userRole || null,
+              id: decoded.userId || decoded.id || null,
+            };
+          } catch (e) {
+            continue;
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error getting user info:", error);
+    }
+    return { role: null, id: null };
+  }, []);
+
+  // Helper function to get user role from token
+  const getUserRole = useCallback(() => {
+    return getUserInfo().role;
+  }, [getUserInfo]);
+
+  // Sync token state on mount and storage change
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const syncTokens = () => {
+      const agentTok = localStorage.getItem("agentToken") || sessionStorage.getItem("agentToken");
+      setHasAgentToken(!!agentTok);
+    };
+    syncTokens();
+    window.addEventListener("storage", syncTokens);
+    return () => window.removeEventListener("storage", syncTokens);
+  }, []);
+
+  // Determine if this is an agent route
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const agentPath = window.location.pathname?.startsWith("/agent/");
+    setIsAgentRoute(agentPath && hasAgentToken);
+  }, [hasAgentToken]);
+
+  // Use agent permissions hook for agent routes
+  const agentPermissionsHook = useAgentPermissions(
+    isAgentRoute ? MODULE_KEY : null,
+  );
+  const agentPermissions = agentPermissionsHook?.permissions || {
+    canRead: false,
+    canCreate: false,
+    canUpdate: false,
+    canDelete: false,
+    canAll: false,
+  };
+  const agentPermissionsLoading = agentPermissionsHook?.loading || false;
+
+  // Handle agent permissions
+  useEffect(() => {
+    if (!isAgentRoute) return;
+    if (agentPermissionsLoading) return;
+
+    const newPermissions = {
+      canRead: Boolean(agentPermissions.canAll || agentPermissions.canRead),
+      canCreate: Boolean(agentPermissions.canAll || agentPermissions.canCreate),
+      canUpdate: Boolean(agentPermissions.canAll || agentPermissions.canUpdate),
+      canDelete: Boolean(agentPermissions.canAll || agentPermissions.canDelete),
+    };
+
+    setPermissions(newPermissions);
+    setPermissionsLoaded(true);
+  }, [isAgentRoute, agentPermissions, agentPermissionsLoading]);
+
+  // Handle clinic permissions - clinic, doctor have admin-level permissions; agent/doctorStaff need checks
+  useEffect(() => {
+    if (isAgentRoute) return;
+    let isMounted = true;
+
+    // Check which token type is being used
+    const clinicToken = typeof window !== "undefined" ? localStorage.getItem("clinicToken") || sessionStorage.getItem("clinicToken") : null;
+    const doctorToken = typeof window !== "undefined" ? localStorage.getItem("doctorToken") || sessionStorage.getItem("doctorToken") : null;
+    const agentToken = typeof window !== "undefined" ? localStorage.getItem("agentToken") || sessionStorage.getItem("agentToken") : null;
+    const staffToken = typeof window !== "undefined" ? localStorage.getItem("staffToken") || sessionStorage.getItem("staffToken") : null;
+    const userToken = typeof window !== "undefined" ? localStorage.getItem("userToken") || sessionStorage.getItem("userToken") : null;
+
+    const userRole = getUserRole();
+    const authToken = clinicToken || doctorToken || agentToken || staffToken || userToken;
+
+    // For admin role, grant full access (bypass permission checks)
+    if (userRole === "admin") {
+      if (!isMounted) return;
+      setPermissions({
+        canRead: true,
+        canCreate: true,
+        canUpdate: true,
+        canDelete: true,
+      });
+      setPermissionsLoaded(true);
+      return;
+    }
+
+    // For clinic and doctor roles, fetch admin-level permissions from /api/clinic/sidebar-permissions
+    if (userRole === "clinic" || userRole === "doctor") {
+      const fetchClinicPermissions = async () => {
+        try {
+          if (!authToken) {
+            if (!isMounted) return;
+            setPermissions({
+              canRead: false,
+              canCreate: false,
+              canUpdate: false,
+              canDelete: false,
+            });
+            setPermissionsLoaded(true);
+            return;
+          }
+
+          const res = await axios.get("/api/clinic/sidebar-permissions", {
+            headers: { Authorization: `Bearer ${authToken}` },
+          });
+
+          if (!isMounted) return;
+
+          if (res.data.success) {
+            console.log("Sidebar permissions API response:", res.data);
+            // Check if permissions array exists and is not null
+            if (res.data.permissions === null || !Array.isArray(res.data.permissions) || res.data.permissions.length === 0) {
+              // No admin restrictions set yet - default to full access for backward compatibility
+              setPermissions({
+                canRead: true,
+                canCreate: true,
+                canUpdate: true,
+                canDelete: true,
+              });
+            } else {
+              // Admin has set permissions - check the Clinic_services_setup module
+              const modulePermission = res.data.permissions.find((p) => {
+                if (!p?.module) return false;
+                // Check for Clinic_services_setup module variations
+                if (p.module === MODULE_KEY) return true;
+                if (p.module === "clinic_services_setup") return true;
+                if (p.module === "services_setup") return true;
+                if (p.module === "Clinic_Services_Setup") return true;
+                if (p.module === "clinic_Services_Setup") return true;
+                return false;
+              });
+
+              if (modulePermission) {
+                const actions = modulePermission.actions || {};
+
+                console.log("Found module permission:", modulePermission);
+                console.log("Actions:", actions);
+
+                // Check if "all" is true, which grants all permissions
+                const moduleAll = actions.all === true || actions.all === "true" || String(actions.all).toLowerCase() === "true";
+                const moduleCreate = actions.create === true || actions.create === "true" || String(actions.create).toLowerCase() === "true";
+                const moduleRead = actions.read === true || actions.read === "true" || String(actions.read).toLowerCase() === "true";
+                const moduleUpdate = actions.update === true || actions.update === "true" || String(actions.update).toLowerCase() === "true";
+                const moduleDelete = actions.delete === true || actions.delete === "true" || String(actions.delete).toLowerCase() === "true";
+
+                console.log("Parsed permissions - all:", moduleAll, "create:", moduleCreate, "read:", moduleRead, "update:", moduleUpdate, "delete:", moduleDelete);
+
+                setPermissions({
+                  canRead: moduleAll || moduleRead,
+                  canCreate: moduleAll || moduleCreate,
+                  canUpdate: moduleAll || moduleUpdate,
+                  canDelete: moduleAll || moduleDelete,
+                });
+              } else {
+                // Module permission not found in the permissions array - default to read-only
+                setPermissions({
+                  canRead: true, // Clinic/doctor can always read their own data
+                  canCreate: false,
+                  canUpdate: false,
+                  canDelete: false,
+                });
+              }
+            }
+          } else {
+            // API response doesn't have permissions, default to full access (backward compatibility)
+            setPermissions({
+              canRead: true,
+              canCreate: true,
+              canUpdate: true,
+              canDelete: true,
+            });
+          }
+        } catch (err) {
+          console.error("Error fetching clinic sidebar permissions:", err);
+          // On error, default to full access (backward compatibility)
+          if (isMounted) {
+            setPermissions({
+              canRead: true,
+              canCreate: true,
+              canUpdate: true,
+              canDelete: true,
+            });
+          }
+        } finally {
+          if (isMounted) {
+            setPermissionsLoaded(true);
+          }
+        }
+      };
+
+      fetchClinicPermissions();
+      return;
+    }
+
+    // For agent/doctorStaff tokens (when not on agent route), check permissions
+    const agentStaffToken = getStoredToken();
+    if (!agentStaffToken) {
+      setPermissions({
+        canRead: false,
+        canCreate: false,
+        canUpdate: false,
+        canDelete: false,
+      });
+      setPermissionsLoaded(true);
+      return;
+    }
+
+    // Only check permissions for agent/doctorStaff roles when not on agent route
+    if (agentToken || staffToken || userToken) {
+      const fetchPermissions = async () => {
+        try {
+          console.log("Fetching Agent/Staff Permissions for", MODULE_KEY, "...");
+          setPermissionsLoaded(false);
+          // Use agent permissions API for agent/doctorStaff
+          // Try Clinic_services_setup first
+          let res = await axios.get("/api/agent/get-module-permissions", {
+            params: { moduleKey: MODULE_KEY },
+            headers: { Authorization: `Bearer ${agentStaffToken}` },
+          });
+          let data = res.data;
+          
+          // If not found, try other variations
+          if (!data?.permissions && data?.error?.includes("not found")) {
+            res = await axios.get("/api/agent/get-module-permissions", {
+              params: { moduleKey: "clinic_services_setup" },
+              headers: { Authorization: `Bearer ${agentStaffToken}` },
+            });
+            data = res.data;
+          }
+          
+          console.log("Agent Permissions API Response:", data);
+
+          if (!isMounted) return;
+
+          // Default to true if module not found in permissions (matches backend logic)
+          if (!data?.permissions && data?.error?.includes("not found in agent permissions")) {
+            console.log("Module not found in permissions, granting full access by default");
+            setPermissions({
+              canRead: true,
+              canCreate: true,
+              canUpdate: true,
+              canDelete: true,
+            });
+            return;
+          }
+
+          const actions = data?.permissions?.actions || data?.data?.moduleActions || {};
+          const isTrue = (val) => val === true || val === "true" || String(val || "").toLowerCase() === "true";
+
+          const canAll = isTrue(actions.all);
+
+          const newPerms = {
+            canRead: canAll || isTrue(actions.read),
+            canCreate: canAll || isTrue(actions.create),
+            canUpdate: canAll || isTrue(actions.update),
+            canDelete: canAll || isTrue(actions.delete),
+          };
+
+          console.log("Final Agent/Staff Permissions:", newPerms);
+          setPermissions(newPerms);
+        } catch (err) {
+          console.error("Error fetching agent permissions:", err);
+          // Swallow agent permission errors; they will just result in no extra access
+          setPermissions({
+            canRead: false,
+            canCreate: false,
+            canUpdate: false,
+            canDelete: false,
+          });
+        } finally {
+          if (isMounted) {
+            setPermissionsLoaded(true);
+          }
+        }
+      };
+
+      fetchPermissions();
+    } else {
+      // Unknown token type - default to full access (likely clinic/doctor)
+      if (!isMounted) return;
+      setPermissions({
+        canRead: true,
+        canCreate: true,
+        canUpdate: true,
+        canDelete: true,
+      });
+      setPermissionsLoaded(true);
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isAgentRoute, getUserRole]);
+
   const [activeTab, setActiveTab] = useState("services");
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -300,14 +633,18 @@ function ServicesSetupPage() {
 
 
   useEffect(() => {
+    if (!permissionsLoaded) return;
+    if (!permissions.canRead) return;
     loadServices();
     loadDepartments();
-  }, []);
+  }, [permissionsLoaded, permissions.canRead]);
 
   useEffect(() => {
     // reload services on department filter change
-    loadServices();
-  }, [filterDepartmentId]);
+    if (permissionsLoaded && permissions.canRead) {
+      loadServices();
+    }
+  }, [filterDepartmentId, permissionsLoaded, permissions.canRead]);
 
   useEffect(() => {
     if (activeTab === "memberships") {
@@ -1011,6 +1348,26 @@ function ServicesSetupPage() {
 
 
 
+  // Show access denied message if no permission
+  if (!permissions.canRead) {
+    console.log("Rendering Access Denied - permissions:", permissions);
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-8 text-center max-w-md">
+          <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Wrench className="w-8 h-8 text-yellow-600" />
+          </div>
+          <h3 className="text-lg font-bold text-gray-900 mb-2">
+            Access Denied
+          </h3>
+          <p className="text-sm text-gray-700">
+            You do not have permission to view services setup. Please contact your administrator.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <Toaster position="top-right" />
@@ -1068,16 +1425,17 @@ function ServicesSetupPage() {
         {activeTab === "services" && (
           <>
             {/* Service Creation Form - Modern Healthcare UI */}
-            <div className="bg-gradient-to-br from-teal-50 to-cyan-50 border border-teal-200 rounded-xl p-4 mb-5 shadow-sm">
-              <div className="flex items-center gap-2.5 mb-4">
-                <div className="w-8 h-8 rounded-lg bg-teal-600 flex items-center justify-center shadow-sm">
-                  <Wrench className="w-4 h-4 text-white" />
+            {permissions.canCreate && (
+              <div className="bg-gradient-to-br from-teal-50 to-cyan-50 border border-teal-200 rounded-xl p-4 mb-5 shadow-sm">
+                <div className="flex items-center gap-2.5 mb-4">
+                  <div className="w-8 h-8 rounded-lg bg-teal-600 flex items-center justify-center shadow-sm">
+                    <Wrench className="w-4 h-4 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold text-teal-800 tracking-tight">Create New Service</h2>
+                    <p className="text-xs text-teal-600">Add a new service offering for your clinic</p>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="text-lg font-semibold text-teal-800 tracking-tight">Create New Service</h2>
-                  <p className="text-xs text-teal-600">Add a new service offering for your clinic</p>
-                </div>
-              </div>
               
               <form onSubmit={handleCreateBatch} className="space-y-3">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -1200,6 +1558,7 @@ function ServicesSetupPage() {
                 </div>
               </form>
             </div>
+            )}
             
             {/* Service Display Section - Modern Healthcare UI */}
             <div className="bg-white border border-teal-200 rounded-xl p-4 shadow-sm">
@@ -1367,6 +1726,7 @@ function ServicesSetupPage() {
                           <div className="flex items-center gap-1.5 mt-3 pt-2 border-t border-gray-100">
                             {editingId !== s._id ? (
                               <>
+                                {permissions.canUpdate && (
                                 <button
                                   onClick={() => {
                                     setEditingId(s._id);
@@ -1382,12 +1742,15 @@ function ServicesSetupPage() {
                                   <Edit2 className="w-3 h-3" />
                                   Edit
                                 </button>
+                                )}
+                                {permissions.canDelete && (
                                 <button
                                   onClick={() => handleDelete(s._id)}
                                   className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 bg-red-100 text-red-700 text-xs font-medium rounded-md hover:bg-red-200 transition-colors"
                                 >
                                   <Trash2 className="w-3 h-3" />
                                 </button>
+                                )}
                               </>
                             ) : (
                               <div className="space-y-3 p-3 bg-teal-50 rounded-lg border border-teal-200">
@@ -1534,16 +1897,17 @@ function ServicesSetupPage() {
                {activeTab === "memberships" && (
           <>
             {/* Membership Creation Form - Compact Healthcare UI */}
-            <div className="bg-gradient-to-br from-teal-50 to-cyan-50 border border-teal-200 rounded-xl p-4 mb-5 shadow-sm">
-              <div className="flex items-center gap-2.5 mb-4">
-                <div className="w-8 h-8 rounded-lg bg-teal-600 flex items-center justify-center shadow-sm">
-                  <User className="w-4 h-4 text-white" />
+            {permissions.canCreate && (
+              <div className="bg-gradient-to-br from-teal-50 to-cyan-50 border border-teal-200 rounded-xl p-4 mb-5 shadow-sm">
+                <div className="flex items-center gap-2.5 mb-4">
+                  <div className="w-8 h-8 rounded-lg bg-teal-600 flex items-center justify-center shadow-sm">
+                    <User className="w-4 h-4 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold text-teal-800 tracking-tight">Create New Membership</h2>
+                    <p className="text-xs text-teal-600">Set up membership plans for your patients</p>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="text-lg font-semibold text-teal-800 tracking-tight">Create New Membership</h2>
-                  <p className="text-xs text-teal-600">Set up membership plans for your patients</p>
-                </div>
-              </div>
               <form onSubmit={handleCreateMembership} className="space-y-3">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div>
@@ -1664,6 +2028,7 @@ function ServicesSetupPage() {
                 </div>
               </form>
             </div>
+            )}
 
             {/* Membership Display Section - Compact Healthcare UI */}
             <div className="bg-white border border-teal-200 rounded-xl p-4 shadow-sm">
@@ -1908,6 +2273,7 @@ function ServicesSetupPage() {
                           <div className="flex items-center gap-1.5 mt-3 pt-2 border-t border-gray-100">
                             {memEditingId !== m._id ? (
                               <>
+                                {permissions.canUpdate && (
                                 <button
                                   onClick={() => {
                                     setMemEditingId(m._id);
@@ -1924,12 +2290,15 @@ function ServicesSetupPage() {
                                   <Edit2 className="w-3 h-3" />
                                   Edit
                                 </button>
+                                )}
+                                {permissions.canDelete && (
                                 <button
                                   onClick={() => handleDeleteMembership(m._id)}
                                   className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 bg-red-100 text-red-700 text-xs font-medium rounded-md hover:bg-red-200 transition-colors"
                                 >
                                   <Trash2 className="w-3 h-3" />
                                 </button>
+                                )}
                               </>
                             ) : (
                               <div className="space-y-3 p-3 bg-[#2D9AA5]/5 rounded-lg border border-[#2D9AA5]/20">
@@ -2084,6 +2453,7 @@ function ServicesSetupPage() {
         )}
         {activeTab === "packages" && (
           <>
+            {permissions.canCreate && (
             <div className="bg-gradient-to-br from-teal-50 to-cyan-50 border border-teal-200 rounded-xl p-5 mb-6 shadow-sm">
               <div className="flex items-center gap-3 mb-5">
                 <div className="w-10 h-10 rounded-lg bg-teal-600 flex items-center justify-center shadow-md">
@@ -2420,6 +2790,7 @@ function ServicesSetupPage() {
                 </div>
               </form>
             </div>
+            )}
             
             <div className="mt-6">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-6">
@@ -2489,6 +2860,7 @@ function ServicesSetupPage() {
                           <h3 className="text-sm font-bold text-teal-800 truncate flex-1">{pkg.name}</h3>
                         </div>
                         <div className="flex gap-1 ml-2 flex-shrink-0">
+                          {permissions.canUpdate && (
                           <button
                             onClick={() => openEditModal(pkg)}
                             className="p-1.5 text-teal-600 hover:bg-teal-100 rounded-md transition-colors"
@@ -2496,6 +2868,8 @@ function ServicesSetupPage() {
                           >
                             <Edit2 className="w-3.5 h-3.5" />
                           </button>
+                          )}
+                          {permissions.canDelete && (
                           <button
                             onClick={() => handleDeletePackage(pkg._id)}
                             className="p-1.5 text-red-600 hover:bg-red-50 rounded-md transition-colors"
@@ -2503,6 +2877,7 @@ function ServicesSetupPage() {
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
+                          )}
                         </div>
                       </div>
                                             

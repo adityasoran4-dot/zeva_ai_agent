@@ -15,10 +15,11 @@ const AddLocationModal: React.FC<AddLocationModalProps> = ({
   loading = false,
 }) => {
   const [location, setLocation] = useState("");
+  const [status, setStatus] = useState("Active");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!location.trim()) return;
+    if (!location.trim() || !status) return;
 
     onAddLocation({
       location: location.trim(),
@@ -27,11 +28,7 @@ const AddLocationModal: React.FC<AddLocationModalProps> = ({
 
     // Reset form
     setLocation("");
-  };
-
-  const handleClose = () => {
-    setLocation("");
-    onClose();
+    setStatus("Active");
   };
 
   if (!isOpen) return null;
@@ -78,6 +75,35 @@ const AddLocationModal: React.FC<AddLocationModalProps> = ({
                 disabled={loading}
                 required
               />
+            </div>
+
+            {/* Status Selection - Select Dropdown */}
+            <div className="space-y-2">
+              <label className="block text-sm font-bold text-gray-900">
+                Status *
+              </label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                className="w-full px-4 py-3 text-sm text-gray-600 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-800/20 focus:border-gray-800 transition-all disabled:bg-gray-100 disabled:cursor-not-allowed bg-white"
+                disabled={loading}
+                required
+              >
+                <option value="">Select Status</option>
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+                <option value="Allocated">Allocated</option>
+              </select>
+              <div className="flex gap-2 text-xs text-gray-600 mt-1">
+                <div className="flex items-center">
+                  <div className="w-3 h-3 rounded-full bg-green-500 mr-1"></div>
+                  <span>Active: Operational</span>
+                </div>
+                <div className="flex items-center">
+                  <div className="w-3 h-3 rounded-full bg-red-500 mr-1"></div>
+                  <span>Inactive: Not available</span>
+                </div>
+              </div>
             </div>
           </form>
         </div>

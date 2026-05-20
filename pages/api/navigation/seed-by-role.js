@@ -397,12 +397,17 @@ export default async function handler(req, res) {
         role: role,
         parentId: item.parentId || null,
         subModules: Array.isArray(item.children)
-          ? item.children.map((child, childIdx) => ({
-              name: child.label,
-              path: child.path || "",
-              icon: child.icon,
-              order: typeof child.order === "number" ? child.order : childIdx + 1,
-            }))
+          ? item.children.map((child, childIdx) => {
+              const childModuleKey = child.moduleKey || 
+                child.label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+              return {
+                name: child.label,
+                path: child.path || "",
+                icon: child.icon,
+                order: typeof child.order === "number" ? child.order : childIdx + 1,
+                moduleKey: childModuleKey,
+              };
+            })
           : [],
         isActive: true,
       };

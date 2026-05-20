@@ -64,7 +64,16 @@ const RoomUtilization: React.FC<RoomUtilizationProps> = ({
         }
       } catch (err: any) {
        console.error('Error fetching room utilization:', err);
-        setError(err.response?.data?.message || 'An error occurred');
+        const errorMessage = err.response?.data?.message || 'An error occurred';
+        
+        // Don't show error for permission issues if no data is available
+        if (err.response?.status === 403) {
+          console.warn('Permission denied for room utilization:', errorMessage);
+          setUtilizationData([]);
+          setError(null);
+        } else {
+          setError(errorMessage);
+        }
       } finally {
         setLoading(false);
       }

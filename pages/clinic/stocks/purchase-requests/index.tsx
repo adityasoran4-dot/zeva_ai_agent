@@ -1,7 +1,7 @@
 import ClinicLayout from "@/components/ClinicLayout";
 import withClinicAuth from "@/components/withClinicAuth";
 import { NextPageWithLayout } from "@/pages/_app";
-import React, { ReactElement, useState, useCallback, useEffect } from "react";
+import React, { ReactElement, useState, useCallback, useEffect, useRef } from "react";
 import axios from "axios";
 import { getTokenByPath } from "@/lib/helper";
 import {
@@ -17,9 +17,49 @@ import DeletePurchaseRequestModal from "./_components/DeletePurchaseRequestModal
 import EditPurchaseRequestModal from "./_components/EditPurchaseRequestModal";
 import PurchaseRequestDetailModal from "./_components/PurchaseRequestDetailModal";
 import FilterModal from "./_components/FilterModal";
-import { Printer } from "lucide-react";
+import { Printer, Loader2, Building2 } from "lucide-react";
+import { useRouter } from "next/router";
+import { useAgentPermissions } from "@/hooks/useAgentPermissions";
 
-const PurchaseRequestsPage: NextPageWithLayout = () => {
+const MODULE_KEY = "clinic_stock_purchase_requests";
+
+const TOKEN_PRIORITY = [
+  "clinicToken",
+  "doctorToken",
+  "agentToken",
+  "staffToken",
+  "userToken",
+  "adminToken",
+];
+
+const getStoredToken = () => {
+  if (typeof window === "undefined") return null;
+  for (const key of TOKEN_PRIORITY) {
+    const value =
+      window.localStorage.getItem(key) || window.sessionStorage.getItem(key);
+    if (value) return value;
+  }
+  return null;
+};
+
+const PurchaseRequestsPage: NextPageWithLayout = ({
+  contextOverride = null,
+}: {
+  contextOverride?: "clinic" | "agent" | null;
+}) => {
+  const router = useRouter();
+  const [routeContext, setRouteContext] = useState<"clinic" | "agent">(
+    contextOverride || "clinic",
+  );
+  const [permissions, setPermissions] = useState({
+    canRead: false,
+    canCreate: false,
+    canUpdate: false,
+    canDelete: false,
+  });
+  const [permissionsLoaded, setPermissionsLoaded] = useState(false);
+  const [hasAgentToken, setHasAgentToken] = useState(false);
+  const [isAgentRoute, setIsAgentRoute] = useState(false);
   const token = getTokenByPath();
   const [purchaseRequests, setPurchaseRequests] = useState<PurchaseRecord[]>(
     [],
@@ -64,6 +104,419 @@ const PurchaseRequestsPage: NextPageWithLayout = () => {
     toDate: new Date().toISOString().split("T")[0],
     status: "",
   });
+
+  // Detect agent route and token
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const syncTokens = () => {
+      const hasAgent =
+        Boolean(
+          localStorage.getItem("agentToken") ||
+            sessionStorage.getItem("agentToken"),
+        ) ||
+        Boolean(
+          localStorage.getItem("staffToken") ||
+            sessionStorage.getItem("staffToken"),
+        ) ||
+        Boolean(
+          localStorage.getItem("userToken") ||
+            sessionStorage.getItem("userToken"),
+        );
+      setHasAgentToken(hasAgent);
+    };
+    syncTokens();
+    window.addEventListener("storage", syncTokens);
+    return () => window.removeEventListener("storage", syncTokens);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const agentPath =
+      router?.pathname?.startsWith("/agent/") ||
+      window.location.pathname?.startsWith("/agent/");
+    setIsAgentRoute(agentPath && hasAgentToken);
+  }, [router.pathname, hasAgentToken]);
+
+  useEffect(() => {
+    if (contextOverride) {
+      setRouteContext(contextOverride);
+      return;
+    }
+    if (typeof window === "undefined") return;
+    const currentPath = window.location.pathname || "";
+    if (currentPath.startsWith("/agent/")) {
+      setRouteContext("agent");
+    } else {
+      setRouteContext("clinic");
+    }
+  }, [contextOverride]);
+
+  // Use agent permissions hook for agent routes
+  const agentPermissionsHook: any = useAgentPermissions(
+    isAgentRoute ? MODULE_KEY : null,
+  );
+  const agentPermissions = agentPermissionsHook?.permissions || {
+    canRead: false,
+    canCreate: false,
+    canUpdate: false,
+    canDelete: false,
+    canAll: false,
+  };
+  const agentPermissionsLoading = agentPermissionsHook?.loading || false;
+
+  // Handle agent permissions
+  useEffect(() => {
+    if (!isAgentRoute) return;
+    if (agentPermissionsLoading) return;
+
+    const newPermissions = {
+      canRead: Boolean(agentPermissions.canAll || agentPermissions.canRead),
+      canCreate: Boolean(
+        agentPermissions.canAll || agentPermissions.canCreate,
+      ),
+      canUpdate: Boolean(
+        agentPermissions.canAll || agentPermissions.canUpdate,
+      ),
+      canDelete: Boolean(
+        agentPermissions.canAll || agentPermissions.canDelete,
+      ),
+    };
+
+    setPermissions(newPermissions);
+    setPermissionsLoaded(true);
+  }, [isAgentRoute, agentPermissions, agentPermissionsLoading]);
+
+  // Helper function to get user info from token
+  const getUserInfo = (): { role: string | null; id: string | null } => {
+    if (typeof window === "undefined") return { role: null, id: null };
+    try {
+      for (const key of TOKEN_PRIORITY) {
+        const token =
+          window.localStorage.getItem(key) ||
+          window.sessionStorage.getItem(key);
+        if (token) {
+          try {
+            const base64Url = token.split(".")[1];
+            const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+            const jsonPayload = decodeURIComponent(
+              atob(base64)
+                .split("")
+                .map(
+                  (c) =>
+                    "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2),
+                )
+                .join(""),
+            );
+            const decoded = JSON.parse(jsonPayload);
+            return {
+              role: decoded.role || decoded.userRole || null,
+              id: decoded.userId || decoded.id || null,
+            };
+          } catch (e) {
+            continue;
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error getting user info:", error);
+    }
+    return { role: null, id: null };
+  };
+
+  // Helper function to get user role from token
+  const getUserRole = (): string | null => {
+    return getUserInfo().role;
+  };
+
+  // Handle clinic permissions - clinic, doctor have admin-level permissions; agent/doctorStaff need checks
+  useEffect(() => {
+    if (isAgentRoute) return;
+    let isMounted = true;
+
+    // Check which token type is being used
+    const clinicToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("clinicToken") ||
+          sessionStorage.getItem("clinicToken")
+        : null;
+    const doctorToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("doctorToken") ||
+          sessionStorage.getItem("doctorToken")
+        : null;
+    const agentToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("agentToken") ||
+          sessionStorage.getItem("agentToken")
+        : null;
+    const staffToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("staffToken") ||
+          sessionStorage.getItem("staffToken")
+        : null;
+    const userToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("userToken") ||
+          sessionStorage.getItem("userToken")
+        : null;
+
+    const userRole = getUserRole();
+    const authToken =
+      clinicToken || doctorToken || agentToken || staffToken || userToken;
+
+    // ✅ For admin role, grant full access (bypass permission checks)
+    if (userRole === "admin") {
+      if (!isMounted) return;
+      setPermissions({
+        canRead: true,
+        canCreate: true,
+        canUpdate: true,
+        canDelete: true,
+      });
+      setPermissionsLoaded(true);
+      return;
+    }
+
+    // ✅ For clinic and doctor roles, fetch admin-level permissions from /api/clinic/sidebar-permissions
+    if (userRole === "clinic" || userRole === "doctor") {
+      const fetchClinicPermissions = async () => {
+        try {
+          if (!authToken) {
+            if (!isMounted) return;
+            setPermissions({
+              canRead: false,
+              canCreate: false,
+              canUpdate: false,
+              canDelete: false,
+            });
+            setPermissionsLoaded(true);
+            return;
+          }
+
+          const res = await axios.get("/api/clinic/sidebar-permissions", {
+            headers: { Authorization: `Bearer ${authToken}` },
+          });
+
+          if (!isMounted) return;
+
+          if (res.data.success) {
+            console.log("Clinic Sidebar Permissions Response:", res.data);
+            // Check if permissions array exists and is not null
+            // If permissions is null, admin hasn't set any restrictions yet - allow full access (backward compatibility)
+            if (
+              res.data.permissions === null ||
+              !Array.isArray(res.data.permissions) ||
+              res.data.permissions.length === 0
+            ) {
+              console.log("No permissions set, granting full access");
+              // No admin restrictions set yet - default to full access for backward compatibility
+              setPermissions({
+                canRead: true,
+                canCreate: true,
+                canUpdate: true,
+                canDelete: true,
+              });
+            } else {
+              // Admin has set permissions - check the clinic_stock_purchase_requests module OR parent clinic_stock module's subModules
+              let modulePermission = res.data.permissions.find((p: any) => {
+                if (!p?.module) return false;
+                // Check for clinic_stock_purchase_requests module variations
+                if (p.module === "clinic_stock_purchase_requests") return true;
+                if (p.module === "clinic_stock_purchase_requests") return true;
+                if (p.module === "stock_purchase_requests") return true;
+                return false;
+              });
+
+              console.log("Direct module permission found:", modulePermission);
+
+              // If not found as direct module, check parent clinic_stock module's subModules
+              if (!modulePermission) {
+                const parentStockModule = res.data.permissions.find((p: any) => 
+                  p?.module === "clinic_stock" && Array.isArray(p.subModules)
+                );
+                
+                console.log("Parent stock module found:", parentStockModule);
+                
+                if (parentStockModule) {
+                  modulePermission = parentStockModule.subModules.find((sm: any) => 
+                    sm?.moduleKey === "clinic_stock_purchase_requests"
+                  );
+                  console.log("Submodule permission found:", modulePermission);
+                }
+              }
+
+              if (modulePermission) {
+                const actions = modulePermission.actions || {};
+                console.log("Module permission actions:", actions);
+
+                // Check if "all" is true, which grants all permissions
+                const moduleAll =
+                  actions.all === true ||
+                  actions.all === "true" ||
+                  String(actions.all).toLowerCase() === "true";
+                const moduleCreate =
+                  actions.create === true ||
+                  actions.create === "true" ||
+                  String(actions.create).toLowerCase() === "true";
+                const moduleRead =
+                  actions.read === true ||
+                  actions.read === "true" ||
+                  String(actions.read).toLowerCase() === "true";
+                const moduleUpdate =
+                  actions.update === true ||
+                  actions.update === "true" ||
+                  String(actions.update).toLowerCase() === "true";
+                const moduleDelete =
+                  actions.delete === true ||
+                  actions.delete === "true" ||
+                  String(actions.delete).toLowerCase() === "true";
+
+                const newPermissions = {
+                  canRead: moduleAll || moduleRead,
+                  canCreate: moduleAll || moduleCreate,
+                  canUpdate: moduleAll || moduleUpdate,
+                  canDelete: moduleAll || moduleDelete,
+                };
+                console.log("Setting permissions:", newPermissions);
+                setPermissions(newPermissions);
+              } else {
+                // Module permission not found in the permissions array - default to read-only
+                setPermissions({
+                  canRead: true, // Clinic/doctor can always read their own data
+                  canCreate: false,
+                  canUpdate: false,
+                  canDelete: false,
+                });
+              }
+            }
+          } else {
+            // API response doesn't have permissions, default to full access (backward compatibility)
+            setPermissions({
+              canRead: true,
+              canCreate: true,
+              canUpdate: true,
+              canDelete: true,
+            });
+          }
+        } catch (err: any) {
+          console.error("Error fetching clinic sidebar permissions:", err);
+          // On error, default to full access (backward compatibility)
+          if (isMounted) {
+            setPermissions({
+              canRead: true,
+              canCreate: true,
+              canUpdate: true,
+              canDelete: true,
+            });
+          }
+        } finally {
+          if (isMounted) {
+            setPermissionsLoaded(true);
+          }
+        }
+      };
+
+      fetchClinicPermissions();
+      return;
+    }
+
+    // For agent/doctorStaff tokens (when not on agent route), check permissions
+    const agentStaffToken = getStoredToken();
+    if (!agentStaffToken) {
+      setPermissions({
+        canRead: false,
+        canCreate: false,
+        canUpdate: false,
+        canDelete: false,
+      });
+      setPermissionsLoaded(true);
+      return;
+    }
+
+    // Only check permissions for agent/doctorStaff roles when not on agent route
+    if (agentToken || staffToken || userToken) {
+      const fetchPermissions = async () => {
+        try {
+          console.log(
+            "Fetching Agent/Staff Permissions for clinic_stock_purchase_requests...",
+          );
+          setPermissionsLoaded(false);
+          // Use agent permissions API for agent/doctorStaff
+          const res = await axios.get("/api/agent/get-module-permissions", {
+            params: { moduleKey: MODULE_KEY },
+            headers: { Authorization: `Bearer ${agentStaffToken}` },
+          });
+          const data = res.data;
+          console.log("Agent Permissions API Response:", data);
+
+          if (!isMounted) return;
+
+          // Default to true if module not found in permissions (matches backend logic)
+          if (
+            !data?.permissions &&
+            data?.error?.includes("not found in agent permissions")
+          ) {
+            console.log(
+              "Module not found in permissions, granting full access by default",
+            );
+            setPermissions({
+              canRead: true,
+              canCreate: true,
+              canUpdate: true,
+              canDelete: true,
+            });
+            return;
+          }
+
+          const actions =
+            data?.permissions?.actions || data?.data?.moduleActions || {};
+          const isTrue = (val: any) =>
+            val === true ||
+            val === "true" ||
+            String(val || "").toLowerCase() === "true";
+
+          const canAll = isTrue(actions.all);
+
+          const newPerms = {
+            canRead: canAll || isTrue(actions.read),
+            canCreate: canAll || isTrue(actions.create),
+            canUpdate: canAll || isTrue(actions.update),
+            canDelete: canAll || isTrue(actions.delete),
+          };
+
+          setPermissions(newPerms);
+          console.log("Setting permissions:", newPerms);
+        } catch (err: any) {
+          console.error("Error fetching agent permissions:", err);
+          if (isMounted) {
+            // Default to full access on error (backward compatibility)
+            setPermissions({
+              canRead: true,
+              canCreate: true,
+              canUpdate: true,
+              canDelete: true,
+            });
+          }
+        } finally {
+          if (isMounted) {
+            setPermissionsLoaded(true);
+          }
+        }
+      };
+
+      fetchPermissions();
+      return;
+    }
+
+    // Default to full access for other cases
+    setPermissions({
+      canRead: true,
+      canCreate: true,
+      canUpdate: true,
+      canDelete: true,
+    });
+    setPermissionsLoaded(true);
+  }, [isAgentRoute]);
 
   // Fetch purchase requests with proper error handling
   const fetchPurchaseRequests = useCallback(
@@ -132,8 +585,14 @@ const PurchaseRequestsPage: NextPageWithLayout = () => {
 
   // Initial fetch on mount
   useEffect(() => {
-    fetchPurchaseRequests(1, "", filterData);
-  }, []);
+    // Only fetch purchase requests if permissions are loaded and canRead is true
+    if (permissionsLoaded && permissions.canRead) {
+      fetchPurchaseRequests(1, "", filterData);
+    } else if (permissionsLoaded) {
+      // If canRead is false, don't fetch anything
+      setLoading(false);
+    }
+  }, [permissionsLoaded, permissions.canRead]);
 
   // Handle page change
   const handlePageChange = useCallback(
@@ -144,8 +603,10 @@ const PurchaseRequestsPage: NextPageWithLayout = () => {
   );
 
   useEffect(() => {
-    fetchPurchaseRequests(1, searchTerm, filterData);
-  }, [searchTerm, filterData]);
+    if (permissionsLoaded && permissions.canRead) {
+      fetchPurchaseRequests(1, searchTerm, filterData);
+    }
+  }, [searchTerm, filterData, permissionsLoaded, permissions.canRead]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -180,16 +641,18 @@ const PurchaseRequestsPage: NextPageWithLayout = () => {
   const displayData = purchaseRequests.length > 0 ? purchaseRequests : [];
 
   const handleAddPurchaseRequest = useCallback(() => {
+    if (!permissions.canCreate) return;
     setIsAddModalOpen(true);
-  }, []);
+  }, [permissions.canCreate]);
 
   const handleDeleteClick = useCallback((purchaseRequest: PurchaseRecord) => {
+    if (!permissions.canDelete) return;
     setPurchaseRequestToDelete(purchaseRequest);
     setIsDeleteModalOpen(true);
-  }, []);
+  }, [permissions.canDelete]);
 
   const handleDeleteConfirm = useCallback(async () => {
-    if (!purchaseRequestToDelete) return;
+    if (!purchaseRequestToDelete || !permissions.canDelete) return;
 
     try {
       const token = getTokenByPath();
@@ -224,6 +687,8 @@ const PurchaseRequestsPage: NextPageWithLayout = () => {
     pagination.currentPage,
     searchTerm,
     filterData,
+    purchaseRequests,
+    permissions.canDelete,
   ]);
 
   const handleDeleteCancel = useCallback(() => {
@@ -232,9 +697,10 @@ const PurchaseRequestsPage: NextPageWithLayout = () => {
   }, []);
 
   const handleEditClick = useCallback((purchaseRequest: PurchaseRecord) => {
+    if (!permissions.canUpdate) return;
     setPurchaseRequestToEdit(purchaseRequest);
     setIsEditModalOpen(true);
-  }, []);
+  }, [permissions.canUpdate]);
 
   const handleEditCancel = useCallback(() => {
     setIsEditModalOpen(false);
@@ -251,6 +717,83 @@ const PurchaseRequestsPage: NextPageWithLayout = () => {
     setPurchaseRequestForDetail(null);
   }, []);
 
+  // If permissions are not loaded yet, show loading spinner
+  if (!permissionsLoaded) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-6 flex items-center justify-center">
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6 text-center text-gray-700">
+          <Loader2 className="w-5 h-5 mx-auto mb-2 animate-spin" />
+          <p className="text-xs sm:text-sm">Checking your permissions...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If canRead is false, show access denied
+  if (!permissions.canRead && !permissions.canCreate) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-6 flex items-center justify-center">
+        <div className="bg-white rounded-lg shadow-lg border border-red-200 p-8 text-center max-w-md">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Building2 className="w-8 h-8 text-red-600" />
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Access Denied</h2>
+          <p className="text-sm text-gray-700 mb-4">
+            You do not have permission to view purchase requests.
+          </p>
+          <p className="text-xs text-gray-600">
+            Please contact your administrator to request access to the Purchase Requests module.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // If canRead is false but canCreate is true, show only add button
+  if (!permissions.canRead && permissions.canCreate) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-6">
+        {/* Header Section */}
+        <div className="mb-8">
+          <div className="max-w-9xl mx-auto">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">
+                  Purchase Requests
+                </h1>
+                <p className="mt-1 sm:mt-2 text-xs sm:text-sm text-gray-600">
+                  Manage your purchase requests and procurement workflow
+                </p>
+              </div>
+              <button
+                className="cursor-pointer inline-flex items-center justify-center gap-1.5 bg-gray-800 hover:bg-gray-900 text-white px-3 py-2 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 text-xs sm:text-sm font-medium"
+                onClick={handleAddPurchaseRequest}
+              >
+                <PlusIcon className="h-5 w-5 mr-2" />
+                Add Purchase Request
+              </button>
+
+              {/* Add Purchase Request Modal */}
+              <AddPurchaseRequestModal
+                token={token || ""}
+                isOpen={isAddModalOpen}
+                onClose={() => setIsAddModalOpen(false)}
+                onSuccess={(purchaseRequestData: PurchaseRecord) => {
+                  setPurchaseRequests((prev) => [...prev, purchaseRequestData]);
+                  fetchPurchaseRequests(
+                    pagination.currentPage,
+                    searchTerm,
+                    filterData,
+                  );
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-6">
       {/* Header Section */}
@@ -266,76 +809,86 @@ const PurchaseRequestsPage: NextPageWithLayout = () => {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <button
-                className="cursor-pointer inline-flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 text-xs sm:text-sm font-medium"
-                onClick={() => setIsFilterOpen(true)}
-              >
-                <svg
-                  className="h-5 w-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
+              {permissions.canRead && (
+                <button
+                  className="cursor-pointer inline-flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 text-xs sm:text-sm font-medium"
+                  onClick={() => setIsFilterOpen(true)}
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
-                  />
-                </svg>
-                Advanced Filter
-              </button>
-              <button
-                className="cursor-pointer inline-flex items-center justify-center gap-1.5 bg-gray-800 hover:bg-gray-900 text-white px-3 py-2 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 text-xs sm:text-sm font-medium"
-                onClick={handleAddPurchaseRequest}
-              >
-                <PlusIcon className="h-5 w-5 mr-2" />
-                Add Purchase Request
-              </button>
+                  <svg
+                    className="h-5 w-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
+                    />
+                  </svg>
+                  Advanced Filter
+                </button>
+              )}
+              {permissions.canCreate && (
+                <button
+                  className="cursor-pointer inline-flex items-center justify-center gap-1.5 bg-gray-800 hover:bg-gray-900 text-white px-3 py-2 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 text-xs sm:text-sm font-medium"
+                  onClick={handleAddPurchaseRequest}
+                >
+                  <PlusIcon className="h-5 w-5 mr-2" />
+                  Add Purchase Request
+                </button>
+              )}
             </div>
 
             {/* Add Purchase Request Modal */}
-            <AddPurchaseRequestModal
-              token={token || ""}
-              isOpen={isAddModalOpen}
-              onClose={() => setIsAddModalOpen(false)}
-              onSuccess={(purchaseRequestData: PurchaseRecord) => {
-                setPurchaseRequests((prev) => [...prev, purchaseRequestData]);
-                fetchPurchaseRequests(
-                  pagination.currentPage,
-                  searchTerm,
-                  filterData,
-                );
-              }}
-            />
+            {permissions.canCreate && (
+              <AddPurchaseRequestModal
+                token={token || ""}
+                isOpen={isAddModalOpen}
+                onClose={() => setIsAddModalOpen(false)}
+                onSuccess={(purchaseRequestData: PurchaseRecord) => {
+                  setPurchaseRequests((prev) => [...prev, purchaseRequestData]);
+                  fetchPurchaseRequests(
+                    pagination.currentPage,
+                    searchTerm,
+                    filterData,
+                  );
+                }}
+              />
+            )}
 
             {/* Delete Purchase Request Modal */}
-            <DeletePurchaseRequestModal
-              isOpen={isDeleteModalOpen}
-              onClose={handleDeleteCancel}
-              onConfirm={handleDeleteConfirm}
-              purchaseRequestName={purchaseRequestToDelete?.orderNo}
-              loading={isDeleting}
-            />
+            {permissions.canDelete && (
+              <DeletePurchaseRequestModal
+                isOpen={isDeleteModalOpen}
+                onClose={handleDeleteCancel}
+                onConfirm={handleDeleteConfirm}
+                purchaseRequestName={purchaseRequestToDelete?.orderNo}
+                loading={isDeleting}
+              />
+            )}
 
             {/* Edit Purchase Request Modal */}
-            <EditPurchaseRequestModal
-              token={token || ""}
-              isOpen={isEditModalOpen}
-              onClose={handleEditCancel}
-              purchaseRequestData={purchaseRequestToEdit}
-              onSuccess={(purchaseRequestData) => {
-                const updatedPurchaseRequests = purchaseRequests.map((pr) =>
-                  pr._id === purchaseRequestData._id ? purchaseRequestData : pr,
-                );
-                setPurchaseRequests(updatedPurchaseRequests);
-                fetchPurchaseRequests(
-                  pagination.currentPage,
-                  searchTerm,
-                  filterData,
-                );
-              }}
-            />
+            {permissions.canUpdate && (
+              <EditPurchaseRequestModal
+                token={token || ""}
+                isOpen={isEditModalOpen}
+                onClose={handleEditCancel}
+                purchaseRequestData={purchaseRequestToEdit}
+                onSuccess={(purchaseRequestData) => {
+                  const updatedPurchaseRequests = purchaseRequests.map((pr) =>
+                    pr._id === purchaseRequestData._id ? purchaseRequestData : pr,
+                  );
+                  setPurchaseRequests(updatedPurchaseRequests);
+                  fetchPurchaseRequests(
+                    pagination.currentPage,
+                    searchTerm,
+                    filterData,
+                  );
+                }}
+              />
+            )}
 
             {/* Purchase Request Detail Modal */}
             <PurchaseRequestDetailModal
@@ -345,22 +898,24 @@ const PurchaseRequestsPage: NextPageWithLayout = () => {
             />
 
             {/* Filter Modal */}
-            <FilterModal
-              isOpen={isFilterOpen}
-              onClose={() => setIsFilterOpen(false)}
-              onApply={(filters) => {
-                fetchPurchaseRequests(1, searchTerm, filters);
-              }}
-              filterData={filterData}
-              setFilterData={setFilterData}
-              title="Advanced Filter - Purchase Requests"
-            />
+            {permissions.canRead && (
+              <FilterModal
+                isOpen={isFilterOpen}
+                onClose={() => setIsFilterOpen(false)}
+                onApply={(filters) => {
+                  fetchPurchaseRequests(1, searchTerm, filters);
+                }}
+                filterData={filterData}
+                setFilterData={setFilterData}
+                title="Advanced Filter - Purchase Requests"
+              />
+            )}
           </div>
         </div>
       </div>
 
       {/* Enhanced Stats Cards */}
-      <div className="max-w-9l mx-auto mb-8">
+      <div className="max-w-9xl mx-auto mb-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {/* Total Purchase Requests Card */}
           <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
@@ -404,7 +959,7 @@ const PurchaseRequestsPage: NextPageWithLayout = () => {
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         strokeWidth={2}
-                        d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                        d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 0 11-4 0 2 2 0 014 0zM7 10a2 0 11-4 0 2 2 0 014 0z"
                       />
                     </svg>
                   </div>
@@ -499,7 +1054,7 @@ const PurchaseRequestsPage: NextPageWithLayout = () => {
       </div>
 
       {/* Enhanced Data Table Section */}
-      <div className="max-w-9l mx-auto">
+      <div className="max-w-9xl mx-auto">
         <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
           {/* Table Header */}
           <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
@@ -583,13 +1138,15 @@ const PurchaseRequestsPage: NextPageWithLayout = () => {
               <p className="text-gray-500 mb-6">
                 Get started by adding your first purchase request.
               </p>
-              <button
-                onClick={handleAddPurchaseRequest}
-                className="cursor-pointer inline-flex items-center justify-center gap-1.5 bg-gray-800 hover:bg-gray-900 text-white px-3 py-2 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 text-xs sm:text-sm font-medium"
-              >
-                <PlusIcon className="h-5 w-5 mr-2" />
-                Add First Request
-              </button>
+              {permissions.canCreate && (
+                <button
+                  onClick={handleAddPurchaseRequest}
+                  className="cursor-pointer inline-flex items-center justify-center gap-1.5 bg-gray-800 hover:bg-gray-900 text-white px-3 py-2 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 text-xs sm:text-sm font-medium"
+                >
+                  <PlusIcon className="h-5 w-5 mr-2" />
+                  Add First Request
+                </button>
+              )}
             </div>
           ) : (
             /* Data Table */
@@ -785,38 +1342,39 @@ const PurchaseRequestsPage: NextPageWithLayout = () => {
                               } z-10 mt-2 w-48 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-gray-200 ring-opacity-5 focus:outline-none`}
                             >
                               <div className="py-1" role="none">
-                                {![
-                                  "Partly_Delivered",
-                                  "Delivered",
-                                  "Partly_Invoiced",
-                                  "Invoiced",
-                                  "Rejected",
-                                  "Cancelled",
-                                  "Deleted",
-                                  "Converted_To_PO",
-                                  "Converted_To_PI",
-                                  "Converted_To_GRN",
-                                ].includes(request.status) && (
-                                  <button
-                                    onClick={() => {
-                                      handleEditClick(request);
-                                      // Close the dropdown after clicking
-                                      const menuEl = document.getElementById(
-                                        `menu-${request._id}`,
-                                      );
-                                      if (menuEl) {
-                                        menuEl.classList.remove("block");
-                                        menuEl.classList.add("hidden");
-                                      }
-                                    }}
-                                    className="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"
-                                  >
-                                    <div className="flex items-center">
-                                      <PencilIcon className="h-4 w-4 mr-2" />
-                                      Edit
-                                    </div>
-                                  </button>
-                                )}
+                                {permissions.canUpdate &&
+                                  ![
+                                    "Partly_Delivered",
+                                    "Delivered",
+                                    "Partly_Invoiced",
+                                    "Invoiced",
+                                    "Rejected",
+                                    "Cancelled",
+                                    "Deleted",
+                                    "Converted_To_PO",
+                                    "Converted_To_PI",
+                                    "Converted_To_GRN",
+                                  ].includes(request.status) && (
+                                    <button
+                                      onClick={() => {
+                                        handleEditClick(request);
+                                        // Close the dropdown after clicking
+                                        const menuEl = document.getElementById(
+                                          `menu-${request._id}`,
+                                        );
+                                        if (menuEl) {
+                                          menuEl.classList.remove("block");
+                                          menuEl.classList.add("hidden");
+                                        }
+                                      }}
+                                      className="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"
+                                    >
+                                      <div className="flex items-center">
+                                        <PencilIcon className="h-4 w-4 mr-2" />
+                                        Edit
+                                      </div>
+                                    </button>
+                                  )}
                                 <button
                                   onClick={() => {
                                     // Open print page in new tab
@@ -901,232 +1459,87 @@ const PurchaseRequestsPage: NextPageWithLayout = () => {
                                         d="M19 9l-7 7-7-7"
                                       />
                                     </svg>
-                                    {expandedRows[request._id]
-                                      ? "Hide Items"
-                                      : "Show Items"}
+                                    View Items
                                   </div>
                                 </button>
-                                <button
-                                  onClick={() => {
-                                    handleDeleteClick(request);
-                                    // Close the dropdown after clicking
-                                    const menuEl = document.getElementById(
-                                      `menu-${request._id}`,
-                                    );
-                                    if (menuEl) {
-                                      menuEl.classList.remove("block");
-                                      menuEl.classList.add("hidden");
-                                    }
-                                  }}
-                                  className="block w-full px-4 py-2 text-left text-sm text-red-700 hover:bg-red-50"
-                                >
-                                  <div className="flex items-center">
-                                    <TrashIcon className="h-4 w-4 mr-2" />
-                                    Delete
-                                  </div>
-                                </button>
+                                {permissions.canDelete &&
+                                  ![
+                                    "Partly_Delivered",
+                                    "Delivered",
+                                    "Partly_Invoiced",
+                                    "Invoiced",
+                                    "Rejected",
+                                    "Cancelled",
+                                    "Deleted",
+                                    "Converted_To_PO",
+                                    "Converted_To_PI",
+                                    "Converted_To_GRN",
+                                  ].includes(request.status) && (
+                                    <button
+                                      onClick={() => {
+                                        handleDeleteClick(request);
+                                        // Close the dropdown after clicking
+                                        const menuEl = document.getElementById(
+                                          `menu-${request._id}`,
+                                        );
+                                        if (menuEl) {
+                                          menuEl.classList.remove("block");
+                                          menuEl.classList.add("hidden");
+                                        }
+                                      }}
+                                      className="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-gray-100"
+                                    >
+                                      <div className="flex items-center">
+                                        <TrashIcon className="h-4 w-4 mr-2" />
+                                        Delete
+                                      </div>
+                                    </button>
+                                  )}
                               </div>
                             </div>
                           </div>
                         </td>
                       </tr>
-
-                      {/* Expanded row for items */}
                       {expandedRows[request._id] && (
                         <tr>
-                          <td
-                            colSpan={9}
-                            className="px-6 py-6 bg-gradient-to-r from-gray-50 to-gray-100 border-t border-gray-200"
-                          >
-                            <div className="ml-8 mr-4">
-                              <div className="flex items-center justify-between mb-4">
-                                <h4 className="text-lg font-bold text-gray-900 flex items-center">
-                                  <svg
-                                    className="w-5 h-5 text-blue-600 mr-2"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-                                    />
-                                  </svg>
-                                  Items in Request #{request.orderNo}
-                                </h4>
-                                <div className="flex items-center space-x-4 text-sm text-gray-600">
-                                  <div className="flex items-center">
-                                    <svg
-                                      className="w-4 h-4 mr-1 text-gray-500"
-                                      fill="none"
-                                      stroke="currentColor"
-                                      viewBox="0 0 24 24"
-                                    >
-                                      <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-                                      />
-                                    </svg>
-                                    <span>{request.items.length} items</span>
-                                  </div>
-                                  <div className="flex items-center">
-                                    <svg
-                                      className="w-4 h-4 mr-1 text-gray-500"
-                                      fill="none"
-                                      stroke="currentColor"
-                                      viewBox="0 0 24 24"
-                                    >
-                                      <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                                      />
-                                    </svg>
-                                    <span>
-                                      AED{" "}
-                                      {request.items
-                                        .reduce(
-                                          (sum, item) => sum + item.totalPrice,
-                                          0,
-                                        )
-                                        .toFixed(2)}{" "}
-                                      total
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                                <div className="overflow-x-auto">
-                                  <table className="min-w-full divide-y divide-gray-200">
-                                    <thead className="bg-gray-50">
-                                      <tr>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                                          <div className="flex items-center">
-                                            <svg
-                                              className="w-4 h-4 mr-2 text-gray-500"
-                                              fill="none"
-                                              stroke="currentColor"
-                                              viewBox="0 0 24 24"
-                                            >
-                                              <path
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                strokeWidth={2}
-                                                d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"
-                                              />
-                                            </svg>
-                                            Item Name
-                                          </div>
-                                        </th>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                                          <div className="flex items-center">
-                                            <svg
-                                              className="w-4 h-4 mr-2 text-gray-500"
-                                              fill="none"
-                                              stroke="currentColor"
-                                              viewBox="0 0 24 24"
-                                            >
-                                              <path
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                strokeWidth={2}
-                                                d="M9 12h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"
-                                              />
-                                            </svg>
-                                            Description
-                                          </div>
-                                        </th>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                                          <div className="flex items-center">
-                                            <svg
-                                              className="w-4 h-4 mr-2 text-gray-500"
-                                              fill="none"
-                                              stroke="currentColor"
-                                              viewBox="0 0 24 24"
-                                            >
-                                              <path
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                strokeWidth={2}
-                                                d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"
-                                              />
-                                            </svg>
-                                            Quantity
-                                          </div>
-                                        </th>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                                          <div className="flex items-center">
-                                            <svg
-                                              className="w-4 h-4 mr-2 text-gray-500"
-                                              fill="none"
-                                              stroke="currentColor"
-                                              viewBox="0 0 24 24"
-                                            >
-                                              <path
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                strokeWidth={2}
-                                                d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"
-                                              />
-                                            </svg>
-                                            UOM
-                                          </div>
-                                        </th>
-                                      </tr>
-                                    </thead>
-                                    <tbody className="bg-white divide-y divide-gray-200">
-                                      {request.items.map((item, itemIndex) => (
-                                        <tr
-                                          key={itemIndex}
-                                          className="hover:bg-blue-50 transition-colors duration-150"
-                                        >
-                                          <td className="px-4 py-3 whitespace-nowrap">
-                                            <div className="flex items-center">
-                                              <div className="flex-shrink-0 h-8 w-8 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
-                                                <span className="text-white text-xs font-bold">
-                                                  {item.name.charAt(0)}
-                                                </span>
-                                              </div>
-                                              <div className="ml-3">
-                                                <div className="text-sm font-medium text-gray-900">
-                                                  {item.name}
-                                                </div>
-                                              </div>
-                                            </div>
-                                          </td>
-                                          <td className="px-4 py-3">
-                                            <div className="text-sm text-gray-600 max-w-xs truncate">
-                                              {item.description || (
-                                                <span className="text-gray-400 italic">
-                                                  No description
-                                                </span>
-                                              )}
-                                            </div>
-                                          </td>
-                                          <td className="px-4 py-3 whitespace-nowrap">
-                                            <div className="flex items-center">
-                                              <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                                {item.quantity}
-                                              </span>
-                                            </div>
-                                          </td>
-                                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
-                                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                              {item.uom || "N/A"}
-                                            </span>
-                                          </td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
-                                </div>
-                              </div>
+                          <td colSpan={9} className="px-6 py-4 bg-gray-50">
+                            <div className="overflow-x-auto">
+                              <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-white">
+                                  <tr>
+                                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                      Item Name
+                                    </th>
+                                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                      Quantity
+                                    </th>
+                                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                      Unit Price
+                                    </th>
+                                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                      Total
+                                    </th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-200">
+                                  {request.items.map((item, idx) => (
+                                    <tr key={idx}>
+                                      <td className="px-4 py-2 text-sm text-gray-900">
+                                        {item.itemName}
+                                      </td>
+                                      <td className="px-4 py-2 text-sm text-gray-500">
+                                        {item.quantity}
+                                      </td>
+                                      <td className="px-4 py-2 text-sm text-gray-500">
+                                        AED {item.unitPrice.toFixed(2)}
+                                      </td>
+                                      <td className="px-4 py-2 text-sm text-gray-500">
+                                        AED {item.totalPrice.toFixed(2)}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
                             </div>
                           </td>
                         </tr>
@@ -1166,24 +1579,22 @@ const PurchaseRequestsPage: NextPageWithLayout = () => {
                   Previous
                 </button>
                 <div className="flex space-x-1">
-                  {[...Array(Math.min(5, pagination.totalPages))].map(
-                    (_, i) => {
-                      const pageNum = i + 1;
-                      return (
-                        <button
-                          key={pageNum}
-                          onClick={() => handlePageChange(pageNum)}
-                          className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                            pageNum === pagination.currentPage
-                              ? "bg-blue-600 text-white"
-                              : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
-                          }`}
-                        >
-                          {pageNum}
-                        </button>
-                      );
-                    },
-                  )}
+                  {[...Array(Math.min(5, pagination.totalPages))].map((_, i) => {
+                    const pageNum = i + 1;
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => handlePageChange(pageNum)}
+                        className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${{
+                          true: "bg-blue-600 text-white",
+                          false:
+                            "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50",
+                        }[pagination.currentPage === pageNum]}`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
                 </div>
                 <button
                   onClick={() => handlePageChange(pagination.currentPage + 1)}
@@ -1211,9 +1622,7 @@ PurchaseRequestsPage.getLayout = function getLayout(page: ReactElement) {
 };
 
 // Export protected page with auth
-const ProtectedPurchaseRequestsPage = withClinicAuth(
-  PurchaseRequestsPage,
-) as NextPageWithLayout;
+const ProtectedPurchaseRequestsPage = withClinicAuth(PurchaseRequestsPage) as NextPageWithLayout;
 ProtectedPurchaseRequestsPage.getLayout = PurchaseRequestsPage.getLayout;
 
 export default ProtectedPurchaseRequestsPage;

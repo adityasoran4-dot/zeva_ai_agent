@@ -1,6 +1,6 @@
 import ClinicLayout from "@/components/ClinicLayout";
 import withClinicAuth from "@/components/withClinicAuth";
-import React, { ReactElement, useEffect } from "react";
+import React, { ReactElement, useEffect, useState, useCallback } from "react";
 import { NextPageWithLayout } from "../../_app";
 import {
   Search,
@@ -20,14 +20,361 @@ import {
   MessageSquare,
   Mail,
   Copy,
+  Calendar,
 } from "lucide-react";
+import axios from "axios";
+import { useAgentPermissions } from "@/hooks/useAgentPermissions";
 import CreateCampaignModal from "./_components/CreateCampaignModal";
 import DeleteCampaignModal from "./_components/DeleteCampaignModal";
 import PreviewCampaignModal from "./_components/PreviewCampaignModal";
 import useCampaigns from "@/hooks/useCampaigns";
 import { FaWhatsapp } from "react-icons/fa";
 
+const TOKEN_PRIORITY = ["clinicToken", "doctorToken", "agentToken", "staffToken", "userToken", "adminToken"];
+const getStoredToken = () => {
+  if (typeof window === "undefined") return null;
+  for (const key of TOKEN_PRIORITY) {
+    const v = localStorage.getItem(key) || sessionStorage.getItem(key);
+    if (v) return v;
+  }
+  return null;
+};
+
 const CampaignsPage: NextPageWithLayout = () => {
+  // Permission states
+  const [permissions, setPermissions] = useState({
+    canRead: false,
+    canCreate: false,
+    canUpdate: false,
+    canDelete: false,
+  });
+  const [permissionsLoaded, setPermissionsLoaded] = useState(false);
+  const [hasAgentToken, setHasAgentToken] = useState(false);
+  const [isAgentRoute, setIsAgentRoute] = useState(false);
+
+  // Helper function to get user info from token
+  const getUserInfo = useCallback(() => {
+    if (typeof window === "undefined") return { role: null, id: null };
+    try {
+      for (const key of TOKEN_PRIORITY) {
+        const token = window.localStorage.getItem(key) || window.sessionStorage.getItem(key);
+        if (token) {
+          try {
+            const base64Url = token.split(".")[1];
+            const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+            const jsonPayload = decodeURIComponent(
+              atob(base64)
+                .split("")
+                .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+                .join(""),
+            );
+            const decoded = JSON.parse(jsonPayload);
+            return {
+              role: decoded.role || decoded.userRole || null,
+              id: decoded.userId || decoded.id || null,
+            };
+          } catch (e) {
+            continue;
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error getting user info:", error);
+    }
+    return { role: null, id: null };
+  }, []);
+
+  // Helper function to get user role from token
+  const getUserRole = useCallback(() => {
+    return getUserInfo().role;
+  }, [getUserInfo]);
+
+  // Sync token state on mount and storage change
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const syncTokens = () => {
+      const agentTok = localStorage.getItem("agentToken") || sessionStorage.getItem("agentToken");
+      setHasAgentToken(!!agentTok);
+    };
+    syncTokens();
+    window.addEventListener("storage", syncTokens);
+    return () => window.removeEventListener("storage", syncTokens);
+  }, []);
+
+  // Determine if this is an agent route
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const agentPath = window.location.pathname?.startsWith("/agent/");
+    setIsAgentRoute(agentPath && hasAgentToken);
+  }, [hasAgentToken]);
+
+  // Use agent permissions hook for agent routes
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const agentPermissionsHook: any = useAgentPermissions(
+    isAgentRoute ? "Clinic_Campaigns" : null,
+  );
+  const agentPermissions = agentPermissionsHook?.permissions || {
+    canRead: false,
+    canCreate: false,
+    canUpdate: false,
+    canDelete: false,
+    canAll: false,
+  };
+  const agentPermissionsLoading = agentPermissionsHook?.loading || false;
+
+  // Handle agent permissions
+  useEffect(() => {
+    if (!isAgentRoute) return;
+    if (agentPermissionsLoading) return;
+
+    const newPermissions = {
+      canRead: Boolean(agentPermissions.canAll || agentPermissions.canRead),
+      canCreate: Boolean(agentPermissions.canAll || agentPermissions.canCreate),
+      canUpdate: Boolean(agentPermissions.canAll || agentPermissions.canUpdate),
+      canDelete: Boolean(agentPermissions.canAll || agentPermissions.canDelete),
+    };
+
+    setPermissions(newPermissions);
+    setPermissionsLoaded(true);
+  }, [isAgentRoute, agentPermissions, agentPermissionsLoading]);
+
+  // Handle clinic permissions - clinic, doctor have admin-level permissions; agent/doctorStaff need checks
+  useEffect(() => {
+    if (isAgentRoute) return;
+    let isMounted = true;
+
+    // Check which token type is being used
+    const clinicToken = typeof window !== "undefined" ? localStorage.getItem("clinicToken") || sessionStorage.getItem("clinicToken") : null;
+    const doctorToken = typeof window !== "undefined" ? localStorage.getItem("doctorToken") || sessionStorage.getItem("doctorToken") : null;
+    const agentToken = typeof window !== "undefined" ? localStorage.getItem("agentToken") || sessionStorage.getItem("agentToken") : null;
+    const staffToken = typeof window !== "undefined" ? localStorage.getItem("staffToken") || sessionStorage.getItem("staffToken") : null;
+    const userToken = typeof window !== "undefined" ? localStorage.getItem("userToken") || sessionStorage.getItem("userToken") : null;
+
+    const userRole = getUserRole();
+    const authToken = clinicToken || doctorToken || agentToken || staffToken || userToken;
+
+    // For admin role, grant full access (bypass permission checks)
+    if (userRole === "admin") {
+      if (!isMounted) return;
+      setPermissions({
+        canRead: true,
+        canCreate: true,
+        canUpdate: true,
+        canDelete: true,
+      });
+      setPermissionsLoaded(true);
+      return;
+    }
+
+    // For clinic and doctor roles, fetch admin-level permissions from /api/clinic/sidebar-permissions
+    if (userRole === "clinic" || userRole === "doctor") {
+      const fetchClinicPermissions = async () => {
+        try {
+          if (!authToken) {
+            if (!isMounted) return;
+            setPermissions({
+              canRead: false,
+              canCreate: false,
+              canUpdate: false,
+              canDelete: false,
+            });
+            setPermissionsLoaded(true);
+            return;
+          }
+
+          const res = await axios.get("/api/clinic/sidebar-permissions", {
+            headers: { Authorization: `Bearer ${authToken}` },
+          });
+
+          if (!isMounted) return;
+
+          if (res.data.success) {
+            console.log("Sidebar permissions API response:", res.data);
+            // Check if permissions array exists and is not null
+            if (res.data.permissions === null || !Array.isArray(res.data.permissions) || res.data.permissions.length === 0) {
+              // No admin restrictions set yet - default to full access for backward compatibility
+              setPermissions({
+                canRead: true,
+                canCreate: true,
+                canUpdate: true,
+                canDelete: true,
+              });
+            } else {
+              // Admin has set permissions - check the clinic_Campaigns module
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const modulePermission = res.data.permissions.find((p: any) => {
+                if (!p?.module) return false;
+                // Check for clinic_Campaigns module variations
+                if (p.module === "clinic_Campaigns") return true;
+                if (p.module === "clinic_campaigns") return true;
+                if (p.module === "Clinic_Campaigns") return true;
+                if (p.module === "campaign") return true;
+                return false;
+              });
+
+              if (modulePermission) {
+                const actions = modulePermission.actions || {};
+
+                console.log("Found module permission:", modulePermission);
+                console.log("Actions:", actions);
+
+                // Check if "all" is true, which grants all permissions
+                const moduleAll = actions.all === true || actions.all === "true" || String(actions.all).toLowerCase() === "true";
+                const moduleCreate = actions.create === true || actions.create === "true" || String(actions.create).toLowerCase() === "true";
+                const moduleRead = actions.read === true || actions.read === "true" || String(actions.read).toLowerCase() === "true";
+                const moduleUpdate = actions.update === true || actions.update === "true" || String(actions.update).toLowerCase() === "true";
+                const moduleDelete = actions.delete === true || actions.delete === "true" || String(actions.delete).toLowerCase() === "true";
+
+                console.log("Parsed permissions - all:", moduleAll, "create:", moduleCreate, "read:", moduleRead, "update:", moduleUpdate, "delete:", moduleDelete);
+
+                setPermissions({
+                  canRead: moduleAll || moduleRead,
+                  canCreate: moduleAll || moduleCreate,
+                  canUpdate: moduleAll || moduleUpdate,
+                  canDelete: moduleAll || moduleDelete,
+                });
+              } else {
+                // Module permission not found in the permissions array - default to read-only
+                setPermissions({
+                  canRead: true, // Clinic/doctor can always read their own data
+                  canCreate: false,
+                  canUpdate: false,
+                  canDelete: false,
+                });
+              }
+            }
+          } else {
+            // API response doesn't have permissions, default to full access (backward compatibility)
+            setPermissions({
+              canRead: true,
+              canCreate: true,
+              canUpdate: true,
+              canDelete: true,
+            });
+          }
+        } catch (err) {
+          console.error("Error fetching clinic sidebar permissions:", err);
+          // On error, default to full access (backward compatibility)
+          if (isMounted) {
+            setPermissions({
+              canRead: true,
+              canCreate: true,
+              canUpdate: true,
+              canDelete: true,
+            });
+          }
+        } finally {
+          if (isMounted) {
+            setPermissionsLoaded(true);
+          }
+        }
+      };
+
+      fetchClinicPermissions();
+      return;
+    }
+
+    // For agent/doctorStaff tokens (when not on agent route), check permissions
+    const agentStaffToken = getStoredToken();
+    if (!agentStaffToken) {
+      setPermissions({
+        canRead: false,
+        canCreate: false,
+        canUpdate: false,
+        canDelete: false,
+      });
+      setPermissionsLoaded(true);
+      return;
+    }
+
+    // Only check permissions for agent/doctorStaff roles when not on agent route
+    if (agentToken || staffToken || userToken) {
+      const fetchPermissions = async () => {
+        try {
+          console.log("Fetching Agent/Staff Permissions for clinic_Campaigns...");
+          setPermissionsLoaded(false);
+          // Use agent permissions API for agent/doctorStaff
+          // Try clinic_Campaigns first (proper casing)
+          let res = await axios.get("/api/agent/get-module-permissions", {
+            params: { moduleKey: "Clinic_Campaigns" },
+            headers: { Authorization: `Bearer ${agentStaffToken}` },
+          });
+          let data = res.data;
+          
+          // If not found, try clinic_campaigns (lowercase)
+          if (!data?.permissions && data?.error?.includes("not found")) {
+            res = await axios.get("/api/agent/get-module-permissions", {
+              params: { moduleKey: "Clinic_Campaigns" },
+              headers: { Authorization: `Bearer ${agentStaffToken}` },
+            });
+            data = res.data;
+          }
+          
+          console.log("Agent Permissions API Response:", data);
+
+          if (!isMounted) return;
+
+          // Default to true if module not found in permissions (matches backend logic)
+          if (!data?.permissions && data?.error?.includes("not found in agent permissions")) {
+            console.log("Module not found in permissions, granting full access by default");
+            setPermissions({
+              canRead: true,
+              canCreate: true,
+              canUpdate: true,
+              canDelete: true,
+            });
+            return;
+          }
+
+          const actions = data?.permissions?.actions || data?.data?.moduleActions || {};
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const isTrue = (val: any) => val === true || val === "true" || String(val || "").toLowerCase() === "true";
+
+          const canAll = isTrue(actions.all);
+
+          const newPerms = {
+            canRead: canAll || isTrue(actions.read),
+            canCreate: canAll || isTrue(actions.create),
+            canUpdate: canAll || isTrue(actions.update),
+            canDelete: canAll || isTrue(actions.delete),
+          };
+
+          console.log("Final Agent/Staff Permissions:", newPerms);
+          setPermissions(newPerms);
+        } catch (err) {
+          console.error("Error fetching agent permissions:", err);
+          // Swallow agent permission errors; they will just result in no extra access
+          setPermissions({
+            canRead: false,
+            canCreate: false,
+            canUpdate: false,
+            canDelete: false,
+          });
+        } finally {
+          if (isMounted) {
+            setPermissionsLoaded(true);
+          }
+        }
+      };
+
+      fetchPermissions();
+    } else {
+      // Unknown token type - default to full access (likely clinic/doctor)
+      if (!isMounted) return;
+      setPermissions({
+        canRead: true,
+        canCreate: true,
+        canUpdate: true,
+        canDelete: true,
+      });
+      setPermissionsLoaded(true);
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isAgentRoute, getUserRole]);
+
   const {
     state,
     setCurrentPage,
@@ -86,8 +433,30 @@ const CampaignsPage: NextPageWithLayout = () => {
   } = state;
 
   useEffect(() => {
+    if (!permissionsLoaded) return;
+    if (!permissions.canRead) return;
     fetchCampaigns();
-  }, [fetchCampaigns]);
+  }, [fetchCampaigns, permissionsLoaded, permissions.canRead]);
+
+  // Show access denied message if no permission
+  if (!permissions.canRead) {
+    console.log("Rendering Access Denied - permissions:", permissions);
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-8 text-center max-w-md">
+          <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Calendar className="w-8 h-8 text-yellow-600" />
+          </div>
+          <h3 className="text-lg font-bold text-gray-900 mb-2">
+            Access Denied
+          </h3>
+          <p className="text-sm text-gray-700">
+            You do not have permission to view campaigns. Please contact your administrator.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
@@ -115,13 +484,15 @@ const CampaignsPage: NextPageWithLayout = () => {
               />
               {!isRefreshing ? "Refresh" : "Refreshing..."}
             </button>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="inline-flex items-center justify-center cursor-pointer gap-1.5 bg-gray-800 hover:bg-gray-900 text-white px-3 py-2 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 text-xs sm:text-sm font-medium"
-            >
-              <Plus className="h-5 w-5" />
-              Create Campaign
-            </button>
+            {permissions.canCreate && (
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="inline-flex items-center justify-center cursor-pointer gap-1.5 bg-gray-800 hover:bg-gray-900 text-white px-3 py-2 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 text-xs sm:text-sm font-medium"
+              >
+                <Plus className="h-5 w-5" />
+                Create Campaign
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -444,7 +815,7 @@ const CampaignsPage: NextPageWithLayout = () => {
                           <Copy className="h-4 w-4" />
                         </button>
                       )}
-                      {campaign.status === "draft" && (
+                      {campaign.status === "draft" && permissions.canUpdate && (
                         <button
                           onClick={() =>
                             handleCampaignAction("edit", campaign._id)
@@ -510,7 +881,7 @@ const CampaignsPage: NextPageWithLayout = () => {
                         "paused",
                         "failed",
                         "completed",
-                      ].includes(campaign.status) && (
+                      ].includes(campaign.status) && permissions.canDelete && (
                         <button
                           onClick={() => {
                             setSelectedCampaign(campaign);
@@ -690,7 +1061,7 @@ const CampaignsPage: NextPageWithLayout = () => {
                             </button>
                           )}
 
-                          {campaign.status === "draft" && (
+                          {campaign.status === "draft" && permissions.canUpdate && (
                             <button
                               onClick={() =>
                                 handleCampaignAction("edit", campaign._id)
@@ -721,7 +1092,7 @@ const CampaignsPage: NextPageWithLayout = () => {
                             "paused",
                             "failed",
                             "completed",
-                          ].includes(campaign.status) && (
+                          ].includes(campaign.status) && permissions.canDelete && (
                             <button
                               onClick={() => {
                                 setSelectedCampaign(campaign);
@@ -758,13 +1129,15 @@ const CampaignsPage: NextPageWithLayout = () => {
               ? "Try adjusting your search or filters to find what you're looking for."
               : "Get started by creating your first communication campaign."}
           </p>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="inline-flex items-center justify-center cursor-pointer gap-1.5 bg-gray-800 hover:bg-gray-900 text-white px-3 py-2 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 text-xs sm:text-sm font-medium"
-          >
-            <Plus className="h-5 w-5" />
-            Create Campaign
-          </button>
+          {permissions.canCreate && (
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="inline-flex items-center justify-center cursor-pointer gap-1.5 bg-gray-800 hover:bg-gray-900 text-white px-3 py-2 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 text-xs sm:text-sm font-medium"
+            >
+              <Plus className="h-5 w-5" />
+              Create Campaign
+            </button>
+          )}
         </div>
       )}
 

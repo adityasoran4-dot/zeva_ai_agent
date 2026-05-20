@@ -17,6 +17,7 @@ import {
   Grid,
   List,
   RefreshCcw,
+  Calendar,
 } from "lucide-react";
 import axios from "axios";
 import { Template } from "@/types/templates";
@@ -25,6 +26,11 @@ import { FaWhatsapp } from "react-icons/fa";
 import DeleteTemplateModal from "./_components/DeleteTemplateModal";
 import { useRouter } from "next/router";
 import { getTokenByPath } from "@/lib/helper";
+import { useAgentPermissions } from "@/hooks/useAgentPermissions";
+import Loader from "@/components/Loader";
+
+const TEMPLATE_MODULE_KEY = "clinic_templates";
+
 
 const TemplatesPage: NextPageWithLayout = () => {
   const router = useRouter();
@@ -34,15 +40,17 @@ const TemplatesPage: NextPageWithLayout = () => {
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const [isMounted, setIsMounted] = useState(false);
 
-  const [permissions, _setPermissions] = useState({
+
+  const [permissions, setPermissions] = useState({
     canCreate: false,
     canUpdate: false,
     canDelete: false,
     canRead: false,
     canAssign: false,
   });
-  // const [permissionsLoaded, setPermissionsLoaded] = useState(false);
+  const [permissionsLoaded, setPermissionsLoaded] = useState(false);
 
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [totalPages, setTotalPages] = useState<number>(1);
@@ -60,7 +68,425 @@ const TemplatesPage: NextPageWithLayout = () => {
   const [showPreviewModal, setShowPreviewModal] = useState<boolean>(false);
 
   const templatesPerPage = 10;
+
   const token = getTokenByPath();
+
+  // Check if on agent route
+  const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
+  const isAgentRoute = currentPath.startsWith("/agent/");
+
+  // Use agent permissions hook for agent routes
+  const agentPermissionsHook: any = useAgentPermissions(
+    isAgentRoute ? TEMPLATE_MODULE_KEY : null,
+  );
+  const agentPermissions = agentPermissionsHook?.permissions || {
+    canRead: false,
+    canCreate: false,
+    canUpdate: false,
+    canDelete: false,
+    canAll: false,
+  };
+  const agentPermissionsLoading = agentPermissionsHook?.loading || false;
+
+
+  // Handle agent permissions
+  useEffect(() => {
+    if (!isAgentRoute) return;
+    if (agentPermissionsLoading) return;
+
+    const newPermissions = {
+      canRead: Boolean(agentPermissions.canAll || agentPermissions.canRead),
+      canCreate: Boolean(agentPermissions.canAll || agentPermissions.canCreate),
+      canUpdate: Boolean(agentPermissions.canAll || agentPermissions.canUpdate),
+      canDelete: Boolean(agentPermissions.canAll || agentPermissions.canDelete),
+      canAssign: Boolean(agentPermissions.canAll),
+    };
+
+    setPermissions(newPermissions);
+    setPermissionsLoaded(true);
+  }, [isAgentRoute, agentPermissions, agentPermissionsLoading]);
+
+  // Helper function to get user info from token
+  const getUserInfo = (): { role: string | null; id: string | null } => {
+    if (typeof window === "undefined") return { role: null, id: null };
+    try {
+      const TOKEN_PRIORITY = [
+        "clinicToken",
+        "doctorToken",
+        "agentToken",
+        "staffToken",
+        "userToken",
+      ];
+      for (const key of TOKEN_PRIORITY) {
+        const tokenVal =
+          localStorage.getItem(key) || sessionStorage.getItem(key);
+        if (tokenVal) {
+          try {
+            const base64Url = tokenVal.split(".")[1];
+            const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+            const jsonPayload = decodeURIComponent(
+              atob(base64)
+                .split("")
+                .map(
+                  (c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2),
+                )
+                .join(""),
+            );
+            const decoded = JSON.parse(jsonPayload);
+            return {
+              role: decoded.role || decoded.userRole || null,
+              id: decoded.userId || decoded.id || null,
+            };
+          } catch (e) {
+            continue;
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error getting user info:", error);
+    }
+    return { role: null, id: null };
+  };
+
+
+  // Helper function to get user role from token
+  const getUserRole = (): string | null => {
+    return getUserInfo().role;
+  };
+
+  // Helper function to get stored token
+  const getStoredToken = (): string | null => {
+    if (typeof window === "undefined") return null;
+    return (
+      localStorage.getItem("agentToken") ||
+      sessionStorage.getItem("agentToken") ||
+      localStorage.getItem("staffToken") ||
+      sessionStorage.getItem("staffToken") ||
+      localStorage.getItem("userToken") ||
+      sessionStorage.getItem("userToken") ||
+      null
+    );
+  };
+
+  // Handle clinic permissions - clinic, doctor have admin-level permissions; agent/doctorStaff need checks
+  useEffect(() => {
+    if (isAgentRoute) return;
+    if (!isMounted) return;
+    let isMountedFlag = true;
+
+
+    // Check which token type is being used
+    const clinicToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("clinicToken") ||
+          sessionStorage.getItem("clinicToken")
+        : null;
+    const doctorToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("doctorToken") ||
+          sessionStorage.getItem("doctorToken")
+        : null;
+    const agentToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("agentToken") ||
+          sessionStorage.getItem("agentToken")
+        : null;
+    const staffToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("staffToken") ||
+          sessionStorage.getItem("staffToken")
+        : null;
+    const userToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("userToken") ||
+          sessionStorage.getItem("userToken")
+        : null;
+
+    const userRole = getUserRole();
+    const authToken =
+      clinicToken || doctorToken || agentToken || staffToken || userToken;
+
+
+    // For admin role, grant full access (bypass permission checks)
+    if (userRole === "admin") {
+      if (!isMountedFlag) return;
+      setPermissions({
+        canRead: true,
+        canCreate: true,
+        canUpdate: true,
+        canDelete: true,
+        canAssign: true,
+      });
+      setPermissionsLoaded(true);
+      return;
+    }
+
+    // For clinic and doctor roles, fetch admin-level permissions from /api/clinic/sidebar-permissions
+    if (userRole === "clinic" || userRole === "doctor") {
+      const fetchClinicPermissions = async () => {
+        try {
+          if (!authToken) {
+            if (!isMountedFlag) return;
+            setPermissions({
+              canRead: false,
+              canCreate: false,
+              canUpdate: false,
+              canDelete: false,
+              canAssign: false,
+            });
+            setPermissionsLoaded(true);
+            return;
+          }
+
+          const res = await axios.get("/api/clinic/sidebar-permissions", {
+            headers: { Authorization: `Bearer ${authToken}` },
+          });
+
+
+          if (!isMountedFlag) return;
+
+
+          if (res.data.success) {
+            // Check if permissions array exists and is not null
+            // If permissions is null, admin hasn't set any restrictions yet - allow full access (backward compatibility)
+            if (
+              res.data.permissions === null ||
+              !Array.isArray(res.data.permissions) ||
+              res.data.permissions.length === 0
+            ) {
+              // No admin restrictions set yet - default to full access for backward compatibility
+              setPermissions({
+                canRead: true,
+                canCreate: true,
+                canUpdate: true,
+                canDelete: true,
+                canAssign: true,
+              });
+            } else {
+              // Admin has set permissions - check the clinic_templates module
+              // First check top-level permissions
+              let modulePermission = res.data.permissions.find((p: any) => {
+                if (!p?.module && !p?.moduleKey) return false;
+                // Check for clinic_templates module variations
+                if (p.module === "clinic_templates") return true;
+                if (p.module === "clinic_Templates") return true;
+                if (p.module === "templates") return true;
+                if (p.moduleKey === "clinic_templates") return true;
+                if (p.moduleKey === "clinic_Templates") return true;
+                if (p.moduleKey === "templates") return true;
+                return false;
+              });
+
+              // If not found at top level, check in subModules of parent modules
+              if (!modulePermission) {
+                for (const parentModule of res.data.permissions) {
+                  if (parentModule.subModules && parentModule.subModules.length > 0) {
+                    const foundInSubModule = parentModule.subModules.find((sm: any) => {
+                      if (sm.moduleKey === "clinic_templates") return true;
+                      if (sm.moduleKey === "clinic_Templates") return true;
+                      if (sm.moduleKey === "templates") return true;
+                      return false;
+                    });
+                    if (foundInSubModule) {
+                      modulePermission = { actions: foundInSubModule.actions };
+                      break;
+                    }
+                  }
+                }
+              }
+
+              if (modulePermission) {
+                const actions = modulePermission.actions || {};
+
+
+                // Check if "all" is true, which grants all permissions
+                const moduleAll =
+                  actions.all === true ||
+                  actions.all === "true" ||
+                  String(actions.all).toLowerCase() === "true";
+                const moduleCreate =
+                  actions.create === true ||
+                  actions.create === "true" ||
+                  String(actions.create).toLowerCase() === "true";
+                const moduleRead =
+                  actions.read === true ||
+                  actions.read === "true" ||
+                  String(actions.read).toLowerCase() === "true";
+                const moduleUpdate =
+                  actions.update === true ||
+                  actions.update === "true" ||
+                  String(actions.update).toLowerCase() === "true";
+                const moduleDelete =
+                  actions.delete === true ||
+                  actions.delete === "true" ||
+                  String(actions.delete).toLowerCase() === "true";
+
+                setPermissions({
+                  canRead: moduleAll || moduleRead,
+                  canCreate: moduleAll || moduleCreate,
+                  canUpdate: moduleAll || moduleUpdate,
+                  canDelete: moduleAll || moduleDelete,
+                  canAssign: moduleAll,
+                });
+              } else {
+                // Module permission not found in the permissions array - default to read-only
+                setPermissions({
+                  canRead: true, // Clinic/doctor can always read their own data
+                  canCreate: false,
+                  canUpdate: false,
+                  canDelete: false,
+                  canAssign: false,
+                });
+              }
+            }
+          } else {
+            // API response doesn't have permissions, default to full access (backward compatibility)
+            setPermissions({
+              canRead: true,
+              canCreate: true,
+              canUpdate: true,
+              canDelete: true,
+              canAssign: true,
+            });
+          }
+        } catch (err: any) {
+          console.error("Error fetching clinic sidebar permissions:", err);
+          // On error, default to full access (backward compatibility)
+          if (isMountedFlag) {
+            setPermissions({
+              canRead: true,
+              canCreate: true,
+              canUpdate: true,
+              canDelete: true,
+              canAssign: true,
+            });
+          }
+        } finally {
+          if (isMountedFlag) {
+            setPermissionsLoaded(true);
+          }
+        }
+      };
+
+
+      fetchClinicPermissions();
+      return;
+    }
+
+    // For agent/doctorStaff tokens (when not on agent route), check permissions
+    const agentStaffToken = getStoredToken();
+    if (!agentStaffToken) {
+      setPermissions({
+        canRead: false,
+        canCreate: false,
+        canUpdate: false,
+        canDelete: false,
+        canAssign: false,
+      });
+      setPermissionsLoaded(true);
+      return;
+    }
+
+    // Only check permissions for agent/doctorStaff roles when not on agent route
+    if (agentToken || staffToken || userToken) {
+      const fetchPermissions = async () => {
+        try {
+          console.log(
+            "Fetching Agent/Staff Permissions for", TEMPLATE_MODULE_KEY, "...",
+          );
+          setPermissionsLoaded(false);
+          // Use agent permissions API for agent/doctorStaff
+          const res = await axios.get("/api/agent/get-module-permissions", {
+            params: { moduleKey: TEMPLATE_MODULE_KEY },
+            headers: { Authorization: `Bearer ${agentStaffToken}` },
+          });
+          const data = res.data;
+          console.log("Agent Permissions API Response:", data);
+
+
+          if (!isMountedFlag) return;
+
+
+          // Default to true if module not found in permissions (matches backend logic)
+          if (
+            !data?.permissions &&
+            data?.error?.includes("not found in agent permissions")
+          ) {
+            console.log(
+              "Module not found in permissions, granting full access by default",
+            );
+            setPermissions({
+              canRead: true,
+              canCreate: true,
+              canUpdate: true,
+              canDelete: true,
+              canAssign: true,
+            });
+            return;
+          }
+
+          const actions =
+            data?.permissions?.actions || data?.data?.moduleActions || {};
+          const isTrue = (val: any) =>
+            val === true ||
+            val === "true" ||
+            String(val || "").toLowerCase() === "true";
+
+          const canAll = isTrue(actions.all);
+
+          const newPerms = {
+            canRead: canAll || isTrue(actions.read),
+            canCreate: canAll || isTrue(actions.create),
+            canUpdate: canAll || isTrue(actions.update),
+            canDelete: canAll || isTrue(actions.delete),
+            canAssign: canAll,
+          };
+
+
+          console.log("Final Agent/Staff Permissions:", newPerms);
+          setPermissions(newPerms);
+        } catch (err: any) {
+          console.error("Error fetching agent permissions:", err);
+          // Swallow agent permission errors; they will just result in no extra access
+          setPermissions({
+            canRead: false,
+            canCreate: false,
+            canUpdate: false,
+            canDelete: false,
+            canAssign: false,
+          });
+        } finally {
+          if (isMountedFlag) {
+            setPermissionsLoaded(true);
+          }
+        }
+      };
+
+
+      fetchPermissions();
+    } else {
+      // Unknown token type - default to full access (likely clinic/doctor)
+      if (!isMountedFlag) return;
+      setPermissions({
+        canRead: true,
+        canCreate: true,
+        canUpdate: true,
+        canDelete: true,
+        canAssign: true,
+      });
+      setPermissionsLoaded(true);
+    }
+
+    return () => {
+      isMountedFlag = false;
+    };
+  }, [isAgentRoute, isMounted]);
+
+
+  // Set mounted flag
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const fetchTemplates = useCallback(async () => {
     if (!token) return;
@@ -258,7 +684,15 @@ const TemplatesPage: NextPageWithLayout = () => {
     }
   };
 
+  // Fetch templates only when permissions are loaded and user has read permission
   useEffect(() => {
+    if (!permissionsLoaded) return;
+
+    // Only fetch template data if user has read permission
+    if (!permissions.canRead) {
+      return;
+    }
+
     fetchTemplates();
   }, [
     currentPage,
@@ -267,7 +701,44 @@ const TemplatesPage: NextPageWithLayout = () => {
     searchQuery,
     token,
     templatesPerPage,
+    permissionsLoaded,
+    permissions.canRead,
+    fetchTemplates,
   ]);
+
+
+  // Show loading while permissions are being fetched
+  if (!permissionsLoaded) {
+    return <Loader />;
+  }
+
+  // Show access denied message if no permission
+  if (!permissions.canRead) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-8 text-center max-w-md">
+          <div className="w-16 h-16 bg-yellow-100 dark:bg-yellow-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Calendar className="w-8 h-8 text-yellow-600 dark:text-yellow-400" />
+          </div>
+          <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-2">
+            Access Denied
+          </h3>
+          <p className="text-gray-600 dark:text-gray-400 mb-6">
+            You do not have permission to view templates. Please contact your
+            administrator if you believe this is an error.
+          </p>
+          {permissions.canCreate && (
+            <Link href="/clinic/all-templates/new">
+              <button className="inline-flex items-center justify-center cursor-pointer gap-1.5 bg-gray-800 hover:bg-gray-900 text-white px-4 py-2 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 text-sm font-medium">
+                <Plus className="h-5 w-5" />
+                Create Template
+              </button>
+            </Link>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
@@ -292,12 +763,14 @@ const TemplatesPage: NextPageWithLayout = () => {
               <RefreshCcw className="h-5 w-5" />
               {!isSyncing ? "Sync Templates" : "Syncing..."}
             </button>
-            <Link href="/clinic/all-templates/new">
-              <button className="inline-flex items-center justify-center cursor-pointer gap-1.5 bg-gray-800 hover:bg-gray-900 text-white px-3 py-2 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 text-xs sm:text-sm font-medium">
-                <Plus className="h-5 w-5" />
-                Create Template
-              </button>
-            </Link>
+            {permissions.canCreate && (
+              <Link href="/clinic/all-templates/new">
+                <button className="inline-flex items-center justify-center cursor-pointer gap-1.5 bg-gray-800 hover:bg-gray-900 text-white px-3 py-2 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 text-xs sm:text-sm font-medium">
+                  <Plus className="h-5 w-5" />
+                  Create Template
+                </button>
+              </Link>
+            )}
           </div>
         </div>
       </div>
@@ -534,13 +1007,15 @@ const TemplatesPage: NextPageWithLayout = () => {
                     Updated {formatDate(template.updatedAt)}
                   </div>
                   <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleTemplateAction("edit", template._id)}
-                      className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
-                      title="Edit"
-                    >
-                      <Edit2 className="h-4 w-4" />
-                    </button>
+                    {permissions.canUpdate && (
+                      <button
+                        onClick={() => handleTemplateAction("edit", template._id)}
+                        className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
+                        title="Edit"
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </button>
+                    )}
 
                     <button
                       onClick={() =>
@@ -551,16 +1026,18 @@ const TemplatesPage: NextPageWithLayout = () => {
                     >
                       <Eye className="h-4 w-4" />
                     </button>
-                    <button
-                      onClick={() => {
-                        setSelectedTemplate(template);
-                        setShowDeleteTemplateModal(true);
-                      }}
-                      className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded"
-                      title="Delete"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    {permissions.canDelete && (
+                      <button
+                        onClick={() => {
+                          setSelectedTemplate(template);
+                          setShowDeleteTemplateModal(true);
+                        }}
+                        className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded"
+                        title="Delete"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -638,25 +1115,28 @@ const TemplatesPage: NextPageWithLayout = () => {
                       >
                         <Eye className="h-4 w-4" />
                       </button>
-                      <button
-                        onClick={() =>
-                          handleTemplateAction("edit", template._id)
-                        }
-                        className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
-                        title="Edit"
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </button>
-
-                      <button
-                        onClick={() =>
-                          handleTemplateAction("delete", template._id)
-                        }
-                        className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded"
-                        title="Delete"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                      {permissions.canUpdate && (
+                        <button
+                          onClick={() =>
+                            handleTemplateAction("edit", template._id)
+                          }
+                          className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
+                          title="Edit"
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </button>
+                      )}
+                      {permissions.canDelete && (
+                        <button
+                          onClick={() =>
+                            handleTemplateAction("delete", template._id)
+                          }
+                          className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded"
+                          title="Delete"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -680,12 +1160,14 @@ const TemplatesPage: NextPageWithLayout = () => {
               ? "Try adjusting your search or filters to find what you're looking for."
               : "Get started by creating your first communication template."}
           </p>
-          <Link href="/all-templates/new">
-            <button className="inline-flex items-center justify-center cursor-pointer gap-1.5 bg-gray-800 hover:bg-gray-900 text-white px-3 py-2 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 text-xs sm:text-sm font-medium">
-              <Plus className="h-5 w-5" />
-              Create Template
-            </button>
-          </Link>
+          {permissions.canCreate && (
+            <Link href="/clinic/all-templates/new">
+              <button className="inline-flex items-center justify-center cursor-pointer gap-1.5 bg-gray-800 hover:bg-gray-900 text-white px-3 py-2 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 text-xs sm:text-sm font-medium">
+                <Plus className="h-5 w-5" />
+                Create Template
+              </button>
+            </Link>
+          )}
         </div>
       )}
 

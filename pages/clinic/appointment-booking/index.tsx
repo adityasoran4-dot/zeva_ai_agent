@@ -1,4 +1,10 @@
-import React, { useState, useMemo, useCallback, useEffect } from "react";
+import React, {
+  useState,
+  useMemo,
+  useCallback,
+  useEffect,
+  useRef,
+} from "react";
 import {
   Calendar,
   Clock,
@@ -16,6 +22,9 @@ import {
   Globe,
   Mail,
   Phone,
+  Search,
+  Users,
+  X,
 } from "lucide-react";
 import { useRouter } from "next/router";
 import axios from "axios";
@@ -298,12 +307,100 @@ const AppointmentBookingPage = (): React.ReactNode => {
   const [servicePage, setServicePage] = useState(1);
   const [totalServicePages, setTotalServicePages] = useState(0);
   const [totalServices, setTotalServices] = useState(0);
+
+  // Patient search states
+  const [patientSearchPhone, setPatientSearchPhone] = useState("");
+  const [patientSearchResults, setPatientSearchResults] = useState<any[]>([]);
+  const [showPatientDropdown, setShowPatientDropdown] = useState(false);
+  const [isSearchingPatient, setIsSearchingPatient] = useState(false);
+  const [selectedPatient, setSelectedPatient] = useState<any>(null);
+  const patientSearchRef = useRef<HTMLDivElement>(null);
   const [doctors, setDoctors] = useState<any[]>([]);
   const [selectedDoctor, setSelectedDoctor] = useState<string | null>(null);
   const [doctorSearch, setDoctorSearch] = useState("");
   const [doctorPage, setDoctorPage] = useState(1);
   const [totalDoctorPages, setTotalDoctorPages] = useState(0);
   const [totalDoctors, setTotalDoctors] = useState(0);
+
+  // Patient search by phone
+  useEffect(() => {
+    if (patientSearchPhone.length < 3) {
+      setPatientSearchResults([]);
+      setShowPatientDropdown(false);
+      return;
+    }
+
+    if (!clinicId) {
+      return;
+    }
+
+    const timeoutId = setTimeout(async () => {
+      setIsSearchingPatient(true);
+      try {
+        const { data } = await axios.get(
+          `/api/appointment-booking/search-patient?phone=${encodeURIComponent(patientSearchPhone)}&clinicId=${clinicId}&limit=10`,
+        );
+        if (data?.success && Array.isArray(data?.data)) {
+          setPatientSearchResults(data.data);
+          setShowPatientDropdown(true);
+        } else {
+          setPatientSearchResults([]);
+          setShowPatientDropdown(false);
+        }
+      } catch (error) {
+        console.error("Error searching patients:", error);
+        setPatientSearchResults([]);
+        setShowPatientDropdown(false);
+      } finally {
+        setIsSearchingPatient(false);
+      }
+    }, 400);
+
+    return () => clearTimeout(timeoutId);
+  }, [patientSearchPhone, clinicId]);
+
+  // Close patient dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        patientSearchRef.current &&
+        !patientSearchRef.current.contains(event.target as Node)
+      ) {
+        setShowPatientDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Handle patient selection
+  const handlePatientSelect = (patient: any) => {
+    setSelectedPatient(patient);
+    setCustomerInfo({
+      firstName: patient.firstName || "",
+      lastName: patient.lastName || "",
+      gender: patient.gender || "",
+      phone: patient.mobileNumber || patient.phone || "",
+      email: patient.email || "",
+    });
+    // Clear search input and close dropdown to prevent re-opening
+    setPatientSearchPhone("");
+    setPatientSearchResults([]);
+    setShowPatientDropdown(false);
+  };
+
+  // Clear patient selection
+  const clearPatientSelection = () => {
+    setSelectedPatient(null);
+    setPatientSearchPhone("");
+    setCustomerInfo({
+      firstName: "",
+      lastName: "",
+      gender: "",
+      phone: "",
+      email: "",
+    });
+  };
 
   const days = useMemo(() => getDaysInMay2026(), []);
 
@@ -1782,6 +1879,205 @@ const AppointmentBookingPage = (): React.ReactNode => {
                     <User className="w-5 h-5" style={{ color: primaryColor }} />
                     Patient Details
                   </h2>
+
+                  {/* Patient Search Section */}
+                  <div className="mb-6 relative" ref={patientSearchRef}>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Search Patient by Phone Number
+                    </label>
+                    <div className="relative">
+                      <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                        {isSearchingPatient ? (
+                          <div className="w-5 h-5 border-2 border-gray-300 border-t-primaryColor rounded-full animate-spin" />
+                        ) : (
+                          <Search className="w-5 h-5" />
+                        )}
+                      </div>
+                      <input
+                        type="tel"
+                        value={patientSearchPhone}
+                        onChange={(e) => setPatientSearchPhone(e.target.value)}
+                        placeholder="Enter phone number (e.g., +971 50 123 4567)"
+                        className="w-full pl-12 pr-12 py-3.5 text-gray-700 rounded-xl border-2 border-gray-200 focus:outline-none transition-all"
+                        style={{ borderColor: primaryColor }}
+                        onFocus={(e) =>
+                          (e.target.style.borderColor = primaryColor)
+                        }
+                        onBlur={(e) => (e.target.style.borderColor = "#e5e7eb")}
+                      />
+                      {selectedPatient && (
+                        <button
+                          onClick={clearPatientSelection}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 transition-colors"
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Patient Search Dropdown */}
+                    {showPatientDropdown && patientSearchResults.length > 0 && (
+                      <div className="absolute z-50 mt-2 w-full bg-white rounded-xl shadow-2xl border border-gray-100 max-h-80 overflow-y-auto">
+                        <div className="p-2 bg-gradient-to-r from-gray-50 to-white border-b border-gray-100">
+                          <p className="text-xs font-medium text-gray-500 px-3 py-1">
+                            {patientSearchResults.length} patient
+                            {patientSearchResults.length > 1 ? "s" : ""} found
+                          </p>
+                        </div>
+                        {patientSearchResults.map((patient, index) => (
+                          <button
+                            key={patient._id || index}
+                            onClick={() => handlePatientSelect(patient)}
+                            className="w-full px-4 py-3 hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 transition-all border-b border-gray-50 last:border-b-0 group"
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                                {(patient.firstName?.[0] || "").toUpperCase()}
+                                {(patient.lastName?.[0] || "").toUpperCase()}
+                              </div>
+                              <div className="flex-1 text-left">
+                                <p className="font-semibold text-gray-800 group-hover:text-green-700 transition-colors">
+                                  {patient.firstName} {patient.lastName}
+                                </p>
+                                <div className="flex items-center gap-3 mt-1 text-sm text-gray-600">
+                                  <span className="flex items-center gap-1">
+                                    <Phone className="w-3 h-3" />
+                                    {patient.mobileNumber || patient.phone}
+                                  </span>
+                                  {patient.gender && (
+                                    <span className="px-2 py-0.5 bg-gray-100 rounded-full text-xs">
+                                      {patient.gender}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                                <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
+                                  <Users className="w-4 h-4 text-green-600" />
+                                </div>
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* No Results */}
+                    {showPatientDropdown &&
+                      patientSearchPhone.length >= 3 &&
+                      patientSearchResults.length === 0 &&
+                      !isSearchingPatient && (
+                        <div className="absolute z-50 mt-2 w-full bg-white rounded-xl shadow-2xl border border-gray-100 p-6 text-center">
+                          <Users className="w-12 h-12 mx-auto text-gray-300 mb-2" />
+                          <p className="text-sm text-gray-600 font-medium">
+                            No patients found
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Fill in the details below to create a new patient
+                            record
+                          </p>
+                        </div>
+                      )}
+                  </div>
+
+                  {/* Selected Patient Badge */}
+                  {selectedPatient && (
+                    <div className="relative group mb-6 overflow-hidden bg-white/80 backdrop-blur-sm border border-gray-100 rounded-2xl shadow-lg shadow-gray-200/50 hover:shadow-xl transition-all duration-300">
+                      {/* Animated gradient background */}
+                      <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 via-teal-500/5 to-green-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+
+                      {/* Left accent bar */}
+                      <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-emerald-500 to-teal-500 rounded-l-2xl"></div>
+
+                      <div className="relative p-4">
+                        <div className="flex items-center gap-4">
+                          {/* Modern Avatar with pulse animation */}
+                          <div className="relative">
+                            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-emerald-500/25">
+                              {(
+                                selectedPatient.firstName?.[0] || ""
+                              ).toUpperCase()}
+                              {(
+                                selectedPatient.lastName?.[0] || ""
+                              ).toUpperCase()}
+                            </div>
+                            <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 border-2 border-white rounded-full"></div>
+                          </div>
+
+                          {/* Patient Info */}
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-bold text-gray-800 text-lg">
+                                {selectedPatient.firstName}{" "}
+                                {selectedPatient.lastName}
+                              </p>
+                              <span className="px-2.5 py-1 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-xs font-semibold rounded-lg shadow-sm shadow-emerald-500/20">
+                                Existing Patient
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-3 mt-1.5">
+                              <div className="flex items-center gap-1.5 text-gray-500 text-sm">
+                                <svg
+                                  className="w-4 h-4"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth="2"
+                                    d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
+                                  />
+                                </svg>
+                                <span>
+                                  {selectedPatient.mobileNumber ||
+                                    selectedPatient.phone}
+                                </span>
+                              </div>
+                              {selectedPatient.email && (
+                                <div className="flex items-center gap-1.5 text-gray-500 text-sm">
+                                  <svg
+                                    className="w-4 h-4"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth="2"
+                                      d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                                    />
+                                  </svg>
+                                  <span>{selectedPatient.email}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* X Button - Properly placed */}
+                          <button
+                            onClick={clearPatientSelection}
+                            className="relative group/btn p-2 rounded-xl bg-gray-50 hover:bg-red-50 border border-gray-100 hover:border-red-200 transition-all duration-200 hover:scale-105 active:scale-95"
+                            title="Remove patient"
+                          >
+                            <X className="w-5 h-5 text-gray-400 group-hover/btn:text-red-500 transition-colors duration-200" />
+                          </button>
+                        </div>
+
+                        {/* Optional: Add patient ID or additional info */}
+                        {selectedPatient.patientId && (
+                          <div className="mt-3 pt-2 border-t border-gray-100">
+                            <p className="text-xs text-gray-400">
+                              Patient ID: {selectedPatient.patientId}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>

@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/router";
 import PatientRegistration from "../staff/patient-registration";
 import { PatientInformation } from "../staff/patient-information";
 import ClinicLayout from '../../components/ClinicLayout';
 import withClinicAuth from '../../components/withClinicAuth';
-import { X, UserPlus, Upload, Download, FileText, AlertCircle, CheckCircle, XCircle, Edit } from "lucide-react";
+import { X, UserPlus, Upload, Download, FileText, AlertCircle, CheckCircle, XCircle, Edit, AlertCircle as AlertCircleIcon } from "lucide-react";
 import PatientUpdateForm from "../../components/patient/PatientUpdateForm";
 import axios from "axios";
 import csv from "csvtojson";
@@ -35,46 +35,406 @@ const getStoredToken = () => {
   return null;
 };
 
-const getAuthHeaders = () => {
-  const token = getStoredToken();
+const getAuthHeaders = (routeContext) => {
+  let token = null;
+
+  if (routeContext === "agent") {
+    token =
+      localStorage.getItem("agentToken") ||
+      sessionStorage.getItem("agentToken") ||
+      localStorage.getItem("staffToken") ||
+      sessionStorage.getItem("staffToken") ||
+      localStorage.getItem("userToken") ||
+      sessionStorage.getItem("userToken");
+  } else {
+    token =
+      localStorage.getItem("clinicToken") ||
+      sessionStorage.getItem("clinicToken");
+  }
+
+  if (!token) {
+    token =
+      localStorage.getItem("userToken") ||
+      sessionStorage.getItem("userToken");
+  }
+
   return token ? { Authorization: `Bearer ${token}` } : null;
 };
 
-const getUserRole = () => {
-  if (typeof window === "undefined") return null;
+const getUserInfo = () => {
+  if (typeof window === "undefined") return { role: null, id: null };
   try {
     for (const key of TOKEN_PRIORITY) {
-      const token = window.localStorage.getItem(key) || window.sessionStorage.getItem(key);
+      const token =
+        window.localStorage.getItem(key) ||
+        window.sessionStorage.getItem(key);
       if (token) {
         try {
-          const payload = JSON.parse(atob(token.split('.')[1]));
-          return payload.role || null;
+          const base64Url = token.split(".")[1];
+          const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+          const jsonPayload = decodeURIComponent(
+            atob(base64)
+              .split("")
+              .map(
+                (c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2),
+              )
+              .join(""),
+          );
+          const decoded = JSON.parse(jsonPayload);
+          return {
+            role: decoded.role || decoded.userRole || null,
+            id: decoded.userId || decoded.id || null,
+          };
         } catch (e) {
           continue;
         }
       }
     }
   } catch (error) {
-    console.error("Error getting user role:", error);
+    console.error("Error getting user info:", error);
   }
-  return null;
+  return { role: null, id: null };
 };
 
-function ClinicPatientRegistration() {
+const getUserRole = () => {
+  return getUserInfo().role;
+};
+
+function ClinicPatientRegistration({
+  contextOverride = null,
+}) {
   const router = useRouter();
+  const [routeContext, setRouteContext] = useState(
+    contextOverride || "clinic",
+  );
+  const [permissions, setPermissions] = useState({
+    canRead: false,
+    canCreate: false,
+    canUpdate: false,
+    canDelete: false,
+  });
+  const [permissionsLoaded, setPermissionsLoaded] = useState(false);
+  const [hasAgentToken, setHasAgentToken] = useState(false);
+  const [isAgentRoute, setIsAgentRoute] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [editPatientId, setEditPatientId] = useState(null);
   const [showSavePopup, setShowSavePopup] = useState(false);
-  
-  // Detect route context - check if this is a staff route
-  const [routeContext, setRouteContext] = useState("clinic");
+
+  useEffect(() => {
+    if (contextOverride) {
+      setRouteContext(contextOverride);
+      return;
+    }
+    if (typeof window === "undefined") return;
+    const currentPath = window.location.pathname || "";
+    if (currentPath.startsWith("/agent/")) {
+      setRouteContext("agent");
+    } else {
+      setRouteContext("clinic");
+    }
+  }, [contextOverride]);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const isStaffRoute = window.location.pathname?.startsWith("/staff/") ?? false;
-    setRouteContext(isStaffRoute ? "staff" : "clinic");
+    const syncTokens = () => {
+      const hasAgent =
+        Boolean(
+          localStorage.getItem("agentToken") ||
+          sessionStorage.getItem("agentToken"),
+        ) ||
+        Boolean(
+          localStorage.getItem("staffToken") ||
+          sessionStorage.getItem("staffToken"),
+        ) ||
+        Boolean(
+          localStorage.getItem("userToken") ||
+          sessionStorage.getItem("userToken"),
+        );
+      setHasAgentToken(hasAgent);
+    };
+    syncTokens();
+    window.addEventListener("storage", syncTokens);
+    return () => window.removeEventListener("storage", syncTokens);
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const agentPath =
+      router?.pathname?.startsWith("/agent/") ||
+      window.location.pathname?.startsWith("/agent/");
+    setIsAgentRoute(agentPath && hasAgentToken);
+  }, [router.pathname, hasAgentToken]);
+
+  const agentPermissionsHook = useAgentPermissions(
+    isAgentRoute ? "clinic_patient_registration" : null,
+  );
+  const agentPermissions = agentPermissionsHook?.permissions || {
+    canRead: false,
+    canCreate: false,
+    canUpdate: false,
+    canDelete: false,
+    canAll: false,
+  };
+  const agentPermissionsLoading = agentPermissionsHook?.loading || false;
+
+  useEffect(() => {
+    if (!isAgentRoute) return;
+    if (agentPermissionsLoading) return;
+
+    const newPermissions = {
+      canRead: Boolean(agentPermissions.canAll || agentPermissions.canRead),
+      canCreate: Boolean(agentPermissions.canAll || agentPermissions.canCreate),
+      canUpdate: Boolean(agentPermissions.canAll || agentPermissions.canUpdate),
+      canDelete: Boolean(agentPermissions.canAll || agentPermissions.canDelete),
+    };
+
+    setPermissions(newPermissions);
+    setPermissionsLoaded(true);
+  }, [isAgentRoute, agentPermissions, agentPermissionsLoading]);
+
+  useEffect(() => {
+    if (isAgentRoute) return;
+    let isMounted = true;
+
+    const clinicToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("clinicToken") ||
+          sessionStorage.getItem("clinicToken")
+        : null;
+    const doctorToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("doctorToken") ||
+          sessionStorage.getItem("doctorToken")
+        : null;
+    const agentToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("agentToken") ||
+          sessionStorage.getItem("agentToken")
+        : null;
+    const staffToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("staffToken") ||
+          sessionStorage.getItem("staffToken")
+        : null;
+    const userToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("userToken") ||
+          sessionStorage.getItem("userToken")
+        : null;
+
+    const userRole = getUserRole();
+    const authToken =
+      clinicToken || doctorToken || agentToken || staffToken || userToken;
+
+    if (userRole === "admin") {
+      if (!isMounted) return;
+      setPermissions({
+        canRead: true,
+        canCreate: true,
+        canUpdate: true,
+        canDelete: true,
+      });
+      setPermissionsLoaded(true);
+      return;
+    }
+
+    if (userRole === "clinic" || userRole === "doctor") {
+      const fetchClinicPermissions = async () => {
+        try {
+          if (!authToken) {
+            if (!isMounted) return;
+            setPermissions({
+              canRead: false,
+              canCreate: false,
+              canUpdate: false,
+              canDelete: false,
+            });
+            setPermissionsLoaded(true);
+            return;
+          }
+
+          const res = await axios.get("/api/clinic/sidebar-permissions", {
+            headers: { Authorization: `Bearer ${authToken}` },
+          });
+
+          if (!isMounted) return;
+
+          if (res.data.success) {
+            if (
+              res.data.permissions === null ||
+              !Array.isArray(res.data.permissions) ||
+              res.data.permissions.length === 0
+            ) {
+              setPermissions({
+                canRead: true,
+                canCreate: true,
+                canUpdate: true,
+                canDelete: true,
+              });
+            } else {
+              const modulePermission = res.data.permissions.find((p) => {
+                if (!p?.module) return false;
+                if (p.module === "clinic_patient_registration") return true;
+                if (p.module === "patient_registration") return true;
+                return false;
+              });
+
+              if (modulePermission) {
+                const actions = modulePermission.actions || {};
+
+                const moduleAll =
+                  actions.all === true ||
+                  actions.all === "true" ||
+                  String(actions.all).toLowerCase() === "true";
+                const moduleCreate =
+                  actions.create === true ||
+                  actions.create === "true" ||
+                  String(actions.create).toLowerCase() === "true";
+                const moduleRead =
+                  actions.read === true ||
+                  actions.read === "true" ||
+                  String(actions.read).toLowerCase() === "true";
+                const moduleUpdate =
+                  actions.update === true ||
+                  actions.update === "true" ||
+                  String(actions.update).toLowerCase() === "true";
+                const moduleDelete =
+                  actions.delete === true ||
+                  actions.delete === "true" ||
+                  String(actions.delete).toLowerCase() === "true";
+
+                setPermissions({
+                  canRead: moduleAll || moduleRead,
+                  canCreate: moduleAll || moduleCreate,
+                  canUpdate: moduleAll || moduleUpdate,
+                  canDelete: moduleAll || moduleDelete,
+                });
+              } else {
+                setPermissions({
+                  canRead: true,
+                  canCreate: false,
+                  canUpdate: false,
+                  canDelete: false,
+                });
+              }
+            }
+          } else {
+            setPermissions({
+              canRead: true,
+              canUpdate: true,
+              canDelete: true,
+              canCreate: true,
+            });
+          }
+        } catch (err) {
+          console.error("Error fetching clinic sidebar permissions:", err);
+          if (isMounted) {
+            setPermissions({
+              canRead: true,
+              canCreate: true,
+              canUpdate: true,
+              canDelete: true,
+            });
+          }
+        } finally {
+          if (isMounted) {
+            setPermissionsLoaded(true);
+          }
+        }
+      };
+
+      fetchClinicPermissions();
+      return;
+    }
+
+    const agentStaffToken = getStoredToken();
+    if (!agentStaffToken) {
+      setPermissions({
+        canRead: false,
+        canCreate: false,
+        canUpdate: false,
+        canDelete: false,
+      });
+      setPermissionsLoaded(true);
+      return;
+    }
+
+    if (agentToken || staffToken || userToken) {
+      const fetchPermissions = async () => {
+        try {
+          console.log(
+            "Fetching Agent/Staff Permissions for clinic_patient_registration...",
+          );
+          setPermissionsLoaded(false);
+          const res = await axios.get("/api/agent/get-module-permissions", {
+            params: { moduleKey: "clinic_patient_registration" },
+            headers: { Authorization: `Bearer ${agentStaffToken}` },
+          });
+          const data = res.data;
+          console.log("Agent Permissions API Response:", data);
+
+          if (!isMounted) return;
+
+          if (
+            !data?.permissions &&
+            data?.error?.includes("not found in agent permissions")
+          ) {
+            console.log(
+              "Module not found in permissions, granting full access by default",
+            );
+            setPermissions({
+              canRead: true,
+              canCreate: true,
+              canUpdate: true,
+              canDelete: true,
+            });
+            setPermissionsLoaded(true);
+            return;
+          }
+
+          const actions =
+            data?.permissions?.actions || data?.data?.moduleActions || {};
+          const isTrue = (val) =>
+            val === true ||
+            val === "true" ||
+            String(val || "").toLowerCase() === "true";
+
+          const canAll = isTrue(actions.all);
+
+          const newPerms = {
+            canRead: canAll || isTrue(actions.read),
+            canCreate: canAll || isTrue(actions.create),
+            canUpdate: canAll || isTrue(actions.update),
+            canDelete: canAll || isTrue(actions.delete),
+          };
+          setPermissions(newPerms);
+        } catch (err) {
+          console.error("Error fetching agent permissions:", err);
+          setPermissions({
+            canCreate: false,
+            canUpdate: false,
+            canDelete: false,
+            canRead: false,
+          });
+        } finally {
+          setPermissionsLoaded(true);
+        }
+      };
+
+      fetchPermissions();
+      return;
+    }
+
+    setPermissions({
+      canRead: false,
+      canUpdate: false,
+      canDelete: false,
+      canCreate: false,
+    });
+    setPermissionsLoaded(true);
+  }, [isAgentRoute, routeContext]);
 
   useEffect(() => {
     if (showSavePopup) {
@@ -93,7 +453,6 @@ function ClinicPatientRegistration() {
 
   const handleRegistrationSuccess = () => {
     setIsModalOpen(false);
-    // Trigger refresh of patient information
     setRefreshKey(prev => prev + 1);
     setShowSavePopup(true);
   };
@@ -122,9 +481,85 @@ function ClinicPatientRegistration() {
     setRefreshKey((prev) => prev + 1);
   };
 
+  if (!permissionsLoaded) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-2 border-gray-300 border-t-teal-600"></div>
+      </div>
+    );
+  }
+
+  if (!permissions.canRead && !permissions.canCreate) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg shadow-lg border border-red-200 p-8 text-center max-w-md">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <UserPlus className="w-8 h-8 text-red-600" />
+          </div>
+          <h2 className="text-xl font-bold text-teal-900 mb-2">Access Denied</h2>
+          <p className="text-sm text-teal-700 mb-4">
+            You do not have permission to view or register patients.
+          </p>
+          <p className="text-xs text-teal-600">
+            Please contact your administrator to request access to the Patient Registration module.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 p-2 sm:p-4">
-      {/* Register Patient Modal */}
+      <div className="w-full space-y-1">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+            <div>
+              <h1 className="text-xl font-semibold text-gray-900">Patient Management</h1>
+              <p className="text-gray-700 text-xs mt-1">View and manage all patient records and information</p>
+            </div>
+            {permissions.canCreate && (
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleOpenImportModal}
+                  className="inline-flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-700 text-white border border-white/30 px-4 py-2 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 text-sm font-medium backdrop-blur-sm"
+                >
+                  <Upload className="h-4 w-4"/>
+                  <span>Import Patients</span>
+                </button>
+                <button
+                  onClick={handleOpenModal}
+                  className="inline-flex items-center justify-center gap-2 bg-teal-600 text-white hover:bg-teal-700 px-4 py-2 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 text-sm font-medium"
+                >
+                  <UserPlus className="h-4 w-4"/>
+                  <span>Register Patient</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {!permissions.canRead ? (
+          <div className="bg-white rounded-lg p-6 sm:p-8 border border-gray-200 shadow-sm">
+            <div className="text-center max-w-md mx-auto">
+              <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+                <AlertCircleIcon className="w-6 h-6 text-red-600" />
+              </div>
+              <h3 className="text-lg font-bold text-teal-900 mb-2">
+                Access Denied
+              </h3>
+              <p className="text-sm text-teal-700 mb-3">
+                You do not have permission to view patient information.
+              </p>
+              <p className="text-xs text-teal-600">
+                Please contact your administrator to request access to view patients.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <PatientInformation key={refreshKey} hideHeader={true} onEditPatient={handleOpenEditModal} permissions={permissions} routeContext={routeContext} />
+        )}
+      </div>
+
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto bg-black/60 backdrop-blur-md">
           <div className="relative w-full max-w-7xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
@@ -149,24 +584,13 @@ function ClinicPatientRegistration() {
         </div>
       )}
 
-      {/* Import Patients Modal */}
       {isImportModalOpen && (
         <PatientImportModal
           onClose={handleCloseImportModal}
           onSuccess={handleImportSuccess}
-        />
-      )}
-
-      {/* Main Content - Patient Information with Register Button */}
-      <div className="w-full space-y-1">
-        <PatientInformationWithButton 
-          onRegisterClick={handleOpenModal}
-          onImportClick={handleOpenImportModal}
-          refreshKey={refreshKey}
-          onEditPatient={handleOpenEditModal}
           routeContext={routeContext}
         />
-      </div>
+      )}
 
       {editPatientId && (
         <PatientUpdateForm
@@ -205,20 +629,18 @@ function ClinicPatientRegistration() {
   );
 }
 
-// Wrapper component for PatientRegistration to handle success callback
 const PatientRegistrationWrapper = ({ onSuccess, onCancel, isCompact, routeContext }) => {
   return <PatientRegistration onSuccess={onSuccess} onCancel={onCancel} isCompact={!!isCompact} routeContext={routeContext} />;
 };
 
-// Patient Import Modal Component
-function PatientImportModal({ onClose, onSuccess }) {
+function PatientImportModal({ onClose, onSuccess, routeContext }) {
   const [file, setFile] = useState(null);
   const [filePreview, setFilePreview] = useState(null);
   const [columnMapping, setColumnMapping] = useState({});
   const [availableColumns, setAvailableColumns] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState(null);
-  const [step, setStep] = useState(1); // 1: Upload, 2: Mapping, 3: Result
+  const [step, setStep] = useState(1);
   const [showErrorModal, setShowErrorModal] = useState(false);
 
   const fieldLabels = {
@@ -247,7 +669,6 @@ function PatientImportModal({ onClose, onSuccess }) {
     setFile(selectedFile);
     setUploadResult(null);
 
-    // Parse file to get columns
     try {
       const fileBuffer = await selectedFile.arrayBuffer();
       const fileName = selectedFile.name.toLowerCase();
@@ -265,12 +686,10 @@ function PatientImportModal({ onClose, onSuccess }) {
       if (jsonArray && jsonArray.length > 0) {
         const columns = Object.keys(jsonArray[0]);
         setAvailableColumns(columns);
-        setFilePreview(jsonArray.slice(0, 5)); // Preview first 5 rows
+        setFilePreview(jsonArray.slice(0, 5));
 
-        // Auto-map columns if names match
         const autoMapping = {};
         
-        // Common column name mappings for better auto-detection
         const commonMappings = {
           'name': 'firstName',
           'patient name': 'firstName',
@@ -293,13 +712,11 @@ function PatientImportModal({ onClose, onSuccess }) {
         columns.forEach((col) => {
           const colLower = col.toLowerCase().trim();
           
-          // First check common mappings
           if (commonMappings[colLower]) {
             if (!autoMapping[col]) {
               autoMapping[col] = commonMappings[colLower];
             }
           } else {
-            // Then check field labels
             Object.keys(fieldLabels).forEach((field) => {
               const fieldWithSpaces = field.replace(/([A-Z])/g, ' $1').toLowerCase().trim();
               if (colLower === field.toLowerCase() || 
@@ -392,7 +809,7 @@ function PatientImportModal({ onClose, onSuccess }) {
       formData.append("file", file);
       formData.append("columnMapping", JSON.stringify(columnMapping));
 
-      const authHeaders = getAuthHeaders();
+      const authHeaders = getAuthHeaders(routeContext);
       const response = await axios.post("/api/clinic/import-patients", formData, {
         headers: {
           ...authHeaders,
@@ -407,11 +824,9 @@ function PatientImportModal({ onClose, onSuccess }) {
           data: response.data.data,
         });
         setStep(3);
-        // Show error modal if there are errors, even if some patients were imported
         if (response.data.data && response.data.data.errors && response.data.data.errors.length > 0) {
           setShowErrorModal(true);
         } else if (onSuccess) {
-          // Only auto-refresh if no errors
           setTimeout(() => {
             onSuccess();
           }, 2000);
@@ -423,7 +838,6 @@ function PatientImportModal({ onClose, onSuccess }) {
           data: response.data.data,
         });
         setStep(3);
-        // Show error modal if there are errors
         if (response.data.data && response.data.data.errors && response.data.data.errors.length > 0) {
           setShowErrorModal(true);
         }
@@ -436,11 +850,9 @@ function PatientImportModal({ onClose, onSuccess }) {
         data: error.response?.data?.data,
       });
       setStep(3);
-      // Show error modal if there are errors
       if (error.response?.data?.data && error.response?.data?.data.errors && error.response?.data?.data.errors.length > 0) {
         setShowErrorModal(true);
       } else {
-        // Show modal even if no specific errors array, but there's an error
         setShowErrorModal(true);
       }
     } finally {
@@ -450,7 +862,6 @@ function PatientImportModal({ onClose, onSuccess }) {
 
   const handleErrorModalOk = () => {
     setShowErrorModal(false);
-    // Refresh the page to reload data
     if (onSuccess) {
       onSuccess();
     } else {
@@ -568,7 +979,6 @@ function PatientImportModal({ onClose, onSuccess }) {
 
               <div className="space-y-3 max-h-96 overflow-y-auto">
                 {Object.entries(fieldLabels).map(([field, label]) => {
-                  // Find which column is mapped to this field
                   const mappedColumn = Object.keys(columnMapping).find(
                     (col) => columnMapping[col] === field
                   ) || "";
@@ -582,13 +992,11 @@ function PatientImportModal({ onClose, onSuccess }) {
                         value={mappedColumn}
                         onChange={(e) => {
                           const newMapping = { ...columnMapping };
-                          // Remove old mapping for this field
                           Object.keys(newMapping).forEach((key) => {
                             if (newMapping[key] === field) {
                               delete newMapping[key];
                             }
                           });
-                          // Add new mapping
                           if (e.target.value) {
                             newMapping[e.target.value] = field;
                           }
@@ -690,7 +1098,6 @@ function PatientImportModal({ onClose, onSuccess }) {
         </div>
       </div>
 
-      {/* Error Modal */}
       {showErrorModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-2 sm:p-4 overflow-y-auto bg-black/60 backdrop-blur-sm">
           <div className="relative bg-white rounded-lg sm:rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto flex flex-col">
@@ -761,371 +1168,6 @@ function PatientImportModal({ onClose, onSuccess }) {
   );
 }
 
-// Enhanced Patient Information component with Register button
-function PatientInformationWithButton({ onRegisterClick, onImportClick, refreshKey, onEditPatient, routeContext = "clinic" }) {
-  const [permissions, setPermissions] = useState({
-    canRead: false,
-    canUpdate: false,
-    canDelete: false,
-    canCreate: false,
-  });
-  const [permissionsLoaded, setPermissionsLoaded] = useState(false);
-
-  // Get user role from token
-  const getUserRole = () => {
-    if (typeof window === "undefined") return null;
-    try {
-      const TOKEN_PRIORITY = ["clinicToken", "doctorToken", "agentToken", "userToken", "adminToken"];
-      for (const key of TOKEN_PRIORITY) {
-        const token = window.localStorage.getItem(key) || window.sessionStorage.getItem(key);
-        if (token) {
-          try {
-            const payload = JSON.parse(atob(token.split('.')[1]));
-            return payload.role || null;
-          } catch (e) {
-            continue;
-          }
-        }
-      }
-    } catch (error) {
-      console.error("Error getting user role:", error);
-    }
-    return null;
-  };
-
-  const userRole = getUserRole();
-  const isStaffRoute = routeContext === "staff";
-  const isAgentOrDoctorStaff = userRole === "agent" || userRole === "doctorStaff";
-  
-  // Use hook only for agent/doctorStaff on staff routes
-  const agentPermissionsResult = useAgentPermissions(
-    (isStaffRoute && isAgentOrDoctorStaff) ? "clinic_patient_registration" : null
-  );
-  const agentPermissions = agentPermissionsResult?.permissions || {
-    canCreate: false,
-    canRead: false,
-    canUpdate: false,
-    canDelete: false,
-    canAll: false,
-  };
-  const agentLoading = agentPermissionsResult?.loading || false;
-
-  // Handle agent/doctorStaff permissions from useAgentPermissions hook (for staff routes)
-  useEffect(() => {
-    if (!isStaffRoute || !isAgentOrDoctorStaff) return;
-    if (agentLoading) return;
-
-    // Set permissions from agent permissions hook (same logic for both agent and doctorStaff)
-    const newPermissions = {
-      canCreate: Boolean(agentPermissions.canAll || agentPermissions.canCreate),
-      canUpdate: Boolean(agentPermissions.canAll || agentPermissions.canUpdate),
-      canDelete: Boolean(agentPermissions.canAll || agentPermissions.canDelete),
-      canRead: Boolean(agentPermissions.canAll || agentPermissions.canRead),
-    };
-
-    console.log('[patient-registration] Setting permissions from agentPermissions:', {
-      userRole,
-      agentPermissions,
-      newPermissions,
-      hasAnyPermission: newPermissions.canCreate || newPermissions.canRead || newPermissions.canUpdate || newPermissions.canDelete
-    });
-
-    setPermissions(newPermissions);
-    setPermissionsLoaded(true);
-  }, [isStaffRoute, isAgentOrDoctorStaff, agentPermissions, agentLoading, userRole]);
-
-  // Fetch clinic/admin level permissions for clinic routes
-  // Also handle agent/doctorStaff on clinic routes (not staff routes)
-  useEffect(() => {
-    // Skip if staff route with agent/doctorStaff (handled by useAgentPermissions hook)
-    if (isStaffRoute && isAgentOrDoctorStaff) return;
-
-    const fetchPermissions = async () => {
-      try {
-        const authHeaders = getAuthHeaders();
-        if (!authHeaders) {
-          setPermissions({
-            canRead: false,
-            canUpdate: false,
-            canDelete: false,
-            canCreate: false,
-          });
-          setPermissionsLoaded(true);
-          return;
-        }
-
-        const currentUserRole = getUserRole();
-        
-        // For admin role, grant full access (bypass permission checks)
-        if (currentUserRole === "admin") {
-          setPermissions({
-            canCreate: true,
-            canRead: true,
-            canUpdate: true,
-            canDelete: true,
-          });
-          setPermissionsLoaded(true);
-          return;
-        }
-
-        // For clinic and doctor roles, fetch admin-level permissions from /api/clinic/sidebar-permissions
-        if (currentUserRole === "clinic" || currentUserRole === "doctor") {
-          try {
-            const res = await axios.get("/api/clinic/sidebar-permissions", {
-              headers: authHeaders,
-            });
-            
-            if (res.data.success) {
-              if (res.data.permissions === null || !Array.isArray(res.data.permissions) || res.data.permissions.length === 0) {
-                setPermissions({
-                  canRead: true,
-                  canUpdate: true,
-                  canDelete: true,
-                  canCreate: true,
-                });
-              } else {
-                const modulePermission = res.data.permissions.find((p) => {
-                  if (!p?.module) return false;
-                  if (p.module === "clinic_patient_registration") return true;
-                  if (p.module === "patient_registration") return true;
-                  return false;
-                });
-
-                if (modulePermission) {
-                  const actions = modulePermission.actions || {};
-                  const moduleAll = actions.all === true || actions.all === "true" || String(actions.all).toLowerCase() === "true";
-                  const moduleRead = actions.read === true || actions.read === "true" || String(actions.read).toLowerCase() === "true";
-                  const moduleCreate = actions.create === true || actions.create === "true" || String(actions.create).toLowerCase() === "true";
-                  const moduleUpdate = actions.update === true || actions.update === "true" || String(actions.update).toLowerCase() === "true";
-                  const moduleDelete = actions.delete === true || actions.delete === "true" || String(actions.delete).toLowerCase() === "true";
-
-                  setPermissions({
-                    canRead: moduleAll || moduleRead,
-                    canCreate: moduleAll || moduleCreate,
-                    canUpdate: moduleAll || moduleUpdate,
-                    canDelete: moduleAll || moduleDelete,
-                  });
-                } else {
-                  setPermissions({
-                    canRead: true,
-                    canCreate: false,
-                    canUpdate: false,
-                    canDelete: false,
-                  });
-                }
-              }
-            } else {
-              setPermissions({
-                canRead: true,
-                canUpdate: true,
-                canDelete: true,
-                canCreate: true,
-              });
-            }
-          } catch (err) {
-            console.error("Error fetching clinic sidebar permissions:", err);
-            setPermissions({
-              canRead: true,
-              canUpdate: true,
-              canDelete: true,
-              canCreate: true,
-            });
-          }
-          setPermissionsLoaded(true);
-          return;
-        }
-
-        // For agent/doctorStaff roles on clinic routes (not staff routes), check agent permissions
-        if (currentUserRole === "agent" || currentUserRole === "doctorStaff") {
-          try {
-            // For agent: use agentToken, for doctorStaff: use userToken
-            let agentStaffToken = null;
-            if (currentUserRole === "agent") {
-              agentStaffToken =
-                localStorage.getItem("agentToken") ||
-                sessionStorage.getItem("agentToken");
-            } else if (currentUserRole === "doctorStaff") {
-              agentStaffToken =
-                localStorage.getItem("userToken") ||
-                sessionStorage.getItem("userToken");
-            }
-
-            if (!agentStaffToken) {
-              setPermissions({
-                canCreate: false,
-                canUpdate: false,
-                canDelete: false,
-                canRead: false,
-              });
-              setPermissionsLoaded(true);
-              return;
-            }
-
-            // Use agent permissions API (same for both agent and doctorStaff)
-            const res = await axios.get("/api/agent/get-module-permissions", {
-              params: { moduleKey: "clinic_patient_registration" },
-              headers: { Authorization: `Bearer ${agentStaffToken}` },
-            });
-
-            if (res.data.success && res.data.permissions) {
-              const actions = res.data.permissions.actions || {};
-              const isTrue = (value) => {
-                if (value === true) return true;
-                if (value === "true") return true;
-                if (String(value).toLowerCase() === "true") return true;
-                return false;
-              };
-
-              const moduleAll = isTrue(actions.all);
-              const moduleCreate = isTrue(actions.create);
-              const moduleRead = isTrue(actions.read);
-              const moduleUpdate = isTrue(actions.update);
-              const moduleDelete = isTrue(actions.delete);
-
-              setPermissions({
-                canCreate: moduleAll || moduleCreate,
-                canRead: moduleAll || moduleRead,
-                canUpdate: moduleAll || moduleUpdate,
-                canDelete: moduleAll || moduleDelete,
-              });
-            } else {
-              // No permissions found
-              setPermissions({
-                canCreate: false,
-                canUpdate: false,
-                canDelete: false,
-                canRead: false,
-              });
-            }
-          } catch (err) {
-            console.error("Error fetching agent permissions:", err);
-            setPermissions({
-              canCreate: false,
-              canUpdate: false,
-              canDelete: false,
-              canRead: false,
-            });
-          }
-          setPermissionsLoaded(true);
-          return;
-        }
-
-        // For other roles, deny access
-        setPermissions({
-          canRead: false,
-          canUpdate: false,
-          canDelete: false,
-          canCreate: false,
-        });
-        setPermissionsLoaded(true);
-      } catch (err) {
-        console.error("Error fetching permissions:", err);
-        setPermissions({
-          canRead: false,
-          canUpdate: false,
-          canDelete: false,
-          canCreate: false,
-        });
-        setPermissionsLoaded(true);
-      }
-    };
-
-    fetchPermissions();
-  }, [isStaffRoute, isAgentOrDoctorStaff, routeContext]);
-
-  // Don't render until permissions are loaded
-  if (!permissionsLoaded) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-2 border-gray-300 border-t-blue-600"></div>
-      </div>
-    );
-  }
-
-  // If both canRead and canCreate are false, show access denied message
-  if (!permissions.canRead && !permissions.canCreate) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-lg shadow-lg border border-red-200 p-8 text-center max-w-md">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <UserPlus className="w-8 h-8 text-red-600" />
-          </div>
-          <h2 className="text-xl font-bold text-teal-900 mb-2">Access Denied</h2>
-          <p className="text-sm text-teal-700 mb-4">
-            You do not have permission to view or register patients.
-          </p>
-          <p className="text-xs text-teal-600">
-            Please contact your administrator to request access to the Patient Registration module.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div>
-      {/* Header with Register Button - Enhanced modern UI */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
-          <div>
-            <h1 className="text-xl font-semibold text-gray-900">Patient Management</h1>
-            <p className="text-gray-700 text-xs mt-1">View and manage all patient records and information</p>
-          </div>
-          {permissions.canCreate && (
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => {
-                  
-                }}
-                className="hidden" 
-              >
-              </button>
-              <button
-                onClick={onImportClick}
-                className="inline-flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-700 text-white border border-white/30 px-4 py-2 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 text-sm font-medium backdrop-blur-sm"
-              >
-                <Upload className="h-4 w-4"/>
-                <span>Import Patients</span>
-              </button>
-              <button
-                onClick={onRegisterClick}
-                className="inline-flex items-center justify-center gap-2 bg-teal-600 text-white hover:bg-teal-700 px-4 py-2 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 text-sm font-medium"
-              >
-                <UserPlus className="h-4 w-4"/>
-                <span>Register Patient</span>
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Patient Information Content - Show access denied if canRead is false, otherwise show patient list */}
-      {!permissions.canRead ? (
-        <div className="bg-white rounded-lg p-6 sm:p-8 border border-gray-200 shadow-sm">
-          <div className="text-center max-w-md mx-auto">
-            <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center mx-auto mb-3">
-              <UserPlus className="w-6 h-6 text-red-600" />
-            </div>
-            <h3 className="text-lg font-bold text-teal-900 mb-2">
-              Access Denied
-            </h3>
-            <p className="text-sm text-teal-700 mb-3">
-              You do not have permission to view patient information.
-            </p>
-            <p className="text-xs text-teal-600">
-              Please contact your administrator to request access to view patients.
-            </p>
-          </div>
-        </div>
-      ) : (
-        <PatientInformation key={refreshKey} hideHeader={true} onEditPatient={onEditPatient} permissions={permissions} routeContext={routeContext} />
-      )}
-    </div>
-  );
-}
-
-// Layout: _app.tsx will use ClinicLayout for /clinic/* routes
-// and force AgentLayout for /agent/* routes (overriding this)
 ClinicPatientRegistration.getLayout = function PageLayout(page) {
   return <ClinicLayout>{page}</ClinicLayout>;
 };
