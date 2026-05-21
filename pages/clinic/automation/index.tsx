@@ -18,12 +18,90 @@ import {
 import { NextPageWithLayout } from "@/pages/_app";
 import ClinicLayout from "@/components/ClinicLayout";
 import withClinicAuth from "@/components/withClinicAuth";
+import Loader from "@/components/Loader";
 import AddWorkflow from "./_components/AddWorkflow";
 import DeleteWorkflowConfirmModal from "./_components/DeleteWorkflowConfirmModal";
 import axios from "axios";
 import { getTokenByPath } from "@/lib/helper";
 import { Workflow } from "@/types/workflows";
 import { useRouter } from "next/router";
+
+const AUTOMATION_MODULE_KEY = "Clinic_Automation";
+
+const TOKEN_PRIORITY = [
+  "clinicToken",
+  "doctorToken",
+  "agentToken",
+  "staffToken",
+  "userToken",
+  "adminToken",
+];
+
+const getStoredToken = () => {
+  if (typeof window === "undefined") return null;
+  for (const key of TOKEN_PRIORITY) {
+    const value =
+      localStorage.getItem(key) || sessionStorage.getItem(key);
+    if (value) return value;
+  }
+  return null;
+};
+
+const isTruthy = (val: unknown) =>
+  val === true || val === "true" || String(val || "").toLowerCase() === "true";
+
+const getUserInfo = (): { role: string | null; id: string | null } => {
+  if (typeof window === "undefined") return { role: null, id: null };
+  try {
+    for (const key of TOKEN_PRIORITY) {
+      const token = localStorage.getItem(key) || sessionStorage.getItem(key);
+      if (!token) continue;
+      try {
+        const base64Url = token.split(".")[1];
+        const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+        const jsonPayload = decodeURIComponent(
+          atob(base64)
+            .split("")
+            .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+            .join(""),
+        );
+        const decoded = JSON.parse(jsonPayload);
+        return {
+          role: decoded.role || decoded.userRole || null,
+          id: decoded.userId || decoded.id || null,
+        };
+      } catch {
+        continue;
+      }
+    }
+  } catch (error) {
+    console.error("Error getting user info:", error);
+  }
+  return { role: null, id: null };
+};
+
+const getUserRole = () => getUserInfo().role;
+
+const findAutomationModule = (permissionsList: any[]) =>
+  permissionsList.find((p: any) => {
+    if (!p?.module) return false;
+    const mod = String(p.module).toLowerCase();
+    return (
+      mod === "clinic_automation" ||
+      mod === "automation" ||
+      mod === "clinic_automations"
+    );
+  });
+
+const parsePermissionActions = (actions: Record<string, unknown> = {}) => {
+  const moduleAll = isTruthy(actions.all);
+  return {
+    canRead: moduleAll || isTruthy(actions.read),
+    canCreate: moduleAll || isTruthy(actions.create),
+    canUpdate: moduleAll || isTruthy(actions.update),
+    canDelete: moduleAll || isTruthy(actions.delete),
+  };
+};
 
 const statusColors = {
   Active: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20",
@@ -77,6 +155,249 @@ const AutomationPage: NextPageWithLayout = () => {
   const [filterStatus, setFilterStatus] = useState("all");
   const [itemsPerPage] = useState(9);
   const [viewMode, setViewMode] = useState<"grid" | "list">("list");
+  const [permissions, setPermissions] = useState({
+    canRead: false,
+    canCreate: false,
+    canUpdate: false,
+    canDelete: false,
+  });
+  const [permissionsLoaded, setPermissionsLoaded] = useState(false);
+
+  // Clinic-level (sidebar-permissions) + agent/doctorStaff-level (get-module-permissions)
+  useEffect(() => {
+    let isMounted = true;
+
+    const clinicToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("clinicToken") ||
+          sessionStorage.getItem("clinicToken")
+        : null;
+    const doctorToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("doctorToken") ||
+          sessionStorage.getItem("doctorToken")
+        : null;
+    const agentToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("agentToken") ||
+          sessionStorage.getItem("agentToken")
+        : null;
+    const staffToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("staffToken") ||
+          sessionStorage.getItem("staffToken")
+        : null;
+    const userToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("userToken") ||
+          sessionStorage.getItem("userToken")
+        : null;
+
+    const userRole = getUserRole();
+    const authToken = getStoredToken();
+
+    if (userRole === "admin") {
+      if (!isMounted) return;
+      setPermissions({
+        canRead: true,
+        canCreate: true,
+        canUpdate: true,
+        canDelete: true,
+      });
+      setPermissionsLoaded(true);
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    if (userRole === "clinic" || userRole === "doctor") {
+      const fetchClinicPermissions = async () => {
+        try {
+          const clinicAuthToken = clinicToken || doctorToken || authToken;
+          if (!clinicAuthToken) {
+            if (!isMounted) return;
+            setPermissions({
+              canRead: false,
+              canCreate: false,
+              canUpdate: false,
+              canDelete: false,
+            });
+            setPermissionsLoaded(true);
+            return;
+          }
+
+          const res = await axios.get("/api/clinic/sidebar-permissions", {
+            headers: { Authorization: `Bearer ${clinicAuthToken}` },
+          });
+
+          if (!isMounted) return;
+
+          if (res.data.success) {
+            if (
+              res.data.permissions === null ||
+              !Array.isArray(res.data.permissions) ||
+              res.data.permissions.length === 0
+            ) {
+              setPermissions({
+                canRead: true,
+                canCreate: true,
+                canUpdate: true,
+                canDelete: true,
+              });
+            } else {
+              const modulePermission = findAutomationModule(res.data.permissions);
+              if (modulePermission) {
+                setPermissions(
+                  parsePermissionActions(modulePermission.actions || {}),
+                );
+              } else {
+                setPermissions({
+                  canRead: true,
+                  canCreate: false,
+                  canUpdate: false,
+                  canDelete: false,
+                });
+              }
+            }
+          } else {
+            setPermissions({
+              canRead: true,
+              canCreate: true,
+              canUpdate: true,
+              canDelete: true,
+            });
+          }
+        } catch (err) {
+          console.error("Error fetching clinic sidebar permissions:", err);
+          if (isMounted) {
+            setPermissions({
+              canRead: true,
+              canCreate: true,
+              canUpdate: true,
+              canDelete: true,
+            });
+          }
+        } finally {
+          if (isMounted) setPermissionsLoaded(true);
+        }
+      };
+
+      fetchClinicPermissions();
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    const agentStaffToken = getStoredToken();
+    if (!agentStaffToken) {
+      setPermissions({
+        canRead: false,
+        canCreate: false,
+        canUpdate: false,
+        canDelete: false,
+      });
+      setPermissionsLoaded(true);
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    if (
+      agentToken ||
+      staffToken ||
+      userToken ||
+      userRole === "agent" ||
+      userRole === "doctorStaff" ||
+      userRole === "staff"
+    ) {
+      const fetchAgentPermissions = async () => {
+        try {
+          setPermissionsLoaded(false);
+          let permissionToken = agentStaffToken;
+          if (userRole === "agent") {
+            permissionToken = agentToken || agentStaffToken;
+          } else if (userRole === "doctorStaff" || userRole === "staff") {
+            permissionToken = userToken || staffToken || agentStaffToken;
+          }
+
+          const res = await axios.get("/api/agent/get-module-permissions", {
+            params: { moduleKey: AUTOMATION_MODULE_KEY },
+            headers: { Authorization: `Bearer ${permissionToken}` },
+          });
+
+          if (!isMounted) return;
+
+          if (
+            !res.data?.permissions &&
+            res.data?.error?.includes("not found in agent permissions")
+          ) {
+            setPermissions({
+              canRead: true,
+              canCreate: true,
+              canUpdate: true,
+              canDelete: true,
+            });
+            return;
+          }
+
+          if (res.data?.success && res.data?.permissions) {
+            setPermissions(
+              parsePermissionActions(res.data.permissions.actions || {}),
+            );
+          } else {
+            setPermissions({
+              canRead: false,
+              canCreate: false,
+              canUpdate: false,
+              canDelete: false,
+            });
+          }
+        } catch (err) {
+          console.error("Error fetching agent permissions:", err);
+          if (isMounted) {
+            setPermissions({
+              canRead: false,
+              canCreate: false,
+              canUpdate: false,
+              canDelete: false,
+            });
+          }
+        } finally {
+          if (isMounted) setPermissionsLoaded(true);
+        }
+      };
+
+      fetchAgentPermissions();
+    } else {
+      setPermissions({
+        canRead: true,
+        canCreate: true,
+        canUpdate: true,
+        canDelete: true,
+      });
+      setPermissionsLoaded(true);
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!permissionsLoaded) return;
+    if (!permissions.canRead) {
+      setWorkflows([]);
+      setLoading(false);
+      setError(null);
+      setIsDeleteModalOpen(false);
+      setWorkflowToDelete(null);
+    }
+  }, [permissionsLoaded, permissions.canRead]);
+
+  const canViewData = permissions.canRead;
+  const canCreateActions = permissions.canCreate;
+  const canUpdateActions = permissions.canRead && permissions.canUpdate;
+  const canDeleteActions = permissions.canRead && permissions.canDelete;
 
   const fetchWorkflows = useCallback(async () => {
     setLoading(true);
@@ -116,15 +437,18 @@ const AutomationPage: NextPageWithLayout = () => {
   }, [currentPage, itemsPerPage, searchTerm, filterStatus]);
 
   useEffect(() => {
+    if (!permissionsLoaded || !canViewData) return;
     fetchWorkflows();
-  }, [fetchWorkflows]);
+  }, [fetchWorkflows, permissionsLoaded, canViewData]);
 
   const handleDeleteWorkflow = async (workflow: Workflow) => {
+    if (!canDeleteActions) return;
     setWorkflowToDelete(workflow);
     setIsDeleteModalOpen(true);
   };
 
   const confirmDeleteWorkflow = async () => {
+    if (!canDeleteActions) return;
     if (!workflowToDelete) return;
 
     try {
@@ -157,6 +481,31 @@ const AutomationPage: NextPageWithLayout = () => {
 
   const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
 
+  if (!permissionsLoaded) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">
+        <Loader />
+      </div>
+    );
+  }
+
+  if (!canViewData && !canCreateActions) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-8 text-center max-w-md">
+          <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Zap className="w-8 h-8 text-yellow-600" />
+          </div>
+          <h3 className="text-lg font-bold text-gray-900 mb-2">Access Denied</h3>
+          <p className="text-sm text-gray-700">
+            You do not have permission to view automation workflows. Please contact
+            your administrator.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       {/* Header */}
@@ -176,21 +525,38 @@ const AutomationPage: NextPageWithLayout = () => {
                 Streamline your clinic's operations with intelligent workflows.
               </p>
             </div>
-            <button
-              onClick={() => setIsModalOpen(true)}
-              className="group relative px-6 py-3.5 bg-white text-blue-700 rounded-xl font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200"
-            >
-              <div className="flex items-center gap-2">
-                <Plus className="w-5 h-5" />
-                Create Workflow
-              </div>
-            </button>
+            {canCreateActions && (
+              <button
+                onClick={() => setIsModalOpen(true)}
+                className="group relative px-6 py-3.5 bg-white text-blue-700 rounded-xl font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200"
+              >
+                <div className="flex items-center gap-2">
+                  <Plus className="w-5 h-5" />
+                  Create Workflow
+                </div>
+              </button>
+            )}
           </div>
         </div>
       </div>
 
       {/* Main content */}
       <div className="px-4 sm:px-6 lg:px-8 py-8">
+        {!canViewData && (
+          <div className="mb-8 rounded-xl border border-yellow-200 bg-yellow-50 p-6 text-center">
+            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-yellow-100">
+              <Zap className="h-6 w-6 text-yellow-600" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900">Access Denied</h3>
+            <p className="mt-2 text-sm text-gray-700">
+              You do not have permission to view automation workflows. You can still
+              create new workflows if permitted.
+            </p>
+          </div>
+        )}
+
+        {canViewData && (
+        <>
         {/* Stats Overview */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200/60">
@@ -379,24 +745,28 @@ const AutomationPage: NextPageWithLayout = () => {
                             </div>
                           </div>
                           <div className="flex items-center gap-1">
-                            <button
-                              onClick={() => handleDeleteWorkflow(workflow)}
-                              className="text-gray-400 hover:text-red-600 p-2 rounded-lg hover:bg-red-50 transition-colors"
-                              title="Delete Workflow"
-                            >
-                              <Trash2 className="w-5 h-5" />
-                            </button>
-                            <button
-                              onClick={() =>
-                                router.push(
-                                  `/clinic/automation/${workflow._id}`,
-                                )
-                              }
-                              className="text-gray-400 hover:text-blue-600 p-2 rounded-lg hover:bg-blue-50 transition-colors"
-                              title="Workflow Settings"
-                            >
-                              <Settings className="w-5 h-5" />
-                            </button>
+                            {canDeleteActions && (
+                              <button
+                                onClick={() => handleDeleteWorkflow(workflow)}
+                                className="text-gray-400 hover:text-red-600 p-2 rounded-lg hover:bg-red-50 transition-colors"
+                                title="Delete Workflow"
+                              >
+                                <Trash2 className="w-5 h-5" />
+                              </button>
+                            )}
+                            {canUpdateActions && (
+                              <button
+                                onClick={() =>
+                                  router.push(
+                                    `/clinic/automation/${workflow._id}`,
+                                  )
+                                }
+                                className="text-gray-400 hover:text-blue-600 p-2 rounded-lg hover:bg-blue-50 transition-colors"
+                                title="Workflow Settings"
+                              >
+                                <Settings className="w-5 h-5" />
+                              </button>
+                            )}
                           </div>
                         </div>
 
@@ -577,25 +947,29 @@ const AutomationPage: NextPageWithLayout = () => {
                             </td>
                             <td className="px-6 py-4 text-right">
                               <div className="flex justify-end gap-1">
-                                <button
-                                  onClick={() =>
-                                    router.push(
-                                      `/clinic/automation/${workflow._id}`,
-                                    )
-                                  }
-                                  className="p-2 hover:bg-blue-50 text-gray-400 hover:text-blue-600 rounded-lg transition-all"
-                                  title="Workflow Settings"
-                                >
-                                  <Settings className="w-4 h-4" />
-                                </button>
+                                {canUpdateActions && (
+                                  <button
+                                    onClick={() =>
+                                      router.push(
+                                        `/clinic/automation/${workflow._id}`,
+                                      )
+                                    }
+                                    className="p-2 hover:bg-blue-50 text-gray-400 hover:text-blue-600 rounded-lg transition-all"
+                                    title="Workflow Settings"
+                                  >
+                                    <Settings className="w-4 h-4" />
+                                  </button>
+                                )}
 
-                                <button
-                                  onClick={() => handleDeleteWorkflow(workflow)}
-                                  className="p-2 hover:bg-red-50 text-gray-400 hover:text-red-600 rounded-lg transition-all"
-                                  title="Delete Workflow"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
+                                {canDeleteActions && (
+                                  <button
+                                    onClick={() => handleDeleteWorkflow(workflow)}
+                                    className="p-2 hover:bg-red-50 text-gray-400 hover:text-red-600 rounded-lg transition-all"
+                                    title="Delete Workflow"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -669,12 +1043,18 @@ const AutomationPage: NextPageWithLayout = () => {
             )}
           </>
         )}
+        </>
+        )}
       </div>
-      <AddWorkflow
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onWorkflowCreated={fetchWorkflows}
-      />
+      {canCreateActions && (
+        <AddWorkflow
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          onWorkflowCreated={() => {
+            if (canViewData) fetchWorkflows();
+          }}
+        />
+      )}
       <DeleteWorkflowConfirmModal
         isOpen={isDeleteModalOpen}
         onClose={() => {

@@ -7,8 +7,11 @@ import {
 } from 'lucide-react';
 import ClinicLayout from '../../components/ClinicLayout';
 import withClinicAuth from '../../components/withClinicAuth';
+import Loader from '../../components/Loader';
 import type { NextPageWithLayout } from '../_app';
 import { getCurrencySymbol } from '@/lib/currencyHelper';
+
+const USER_PACKAGE_MODULE_KEY = 'Clinic_user_package';
 
 const TOKEN_PRIORITY = [
   "clinicToken",
@@ -54,6 +57,56 @@ const getAuthHeaders = () => {
   return { Authorization: `Bearer ${token}` };
 };
 
+const isTruthy = (val: unknown) =>
+  val === true || val === 'true' || String(val || '').toLowerCase() === 'true';
+
+const getUserInfo = (): { role: string | null; id: string | null } => {
+  if (typeof window === 'undefined') return { role: null, id: null };
+  try {
+    for (const key of TOKEN_PRIORITY) {
+      const token = localStorage.getItem(key) || sessionStorage.getItem(key);
+      if (!token) continue;
+      try {
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(
+          atob(base64)
+            .split('')
+            .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+            .join('')
+        );
+        const decoded = JSON.parse(jsonPayload);
+        return {
+          role: decoded.role || decoded.userRole || null,
+          id: decoded.userId || decoded.id || null,
+        };
+      } catch {
+        continue;
+      }
+    }
+  } catch (error) {
+    console.error('Error getting user info:', error);
+  }
+  return { role: null, id: null };
+};
+
+const getUserRole = () => getUserInfo().role;
+
+const findUserPackageModule = (permissionsList: any[]) =>
+  permissionsList.find((p: any) => {
+    if (!p?.module) return false;
+    const mod = String(p.module).toLowerCase();
+    return (
+      mod === 'clinic_user_package' ||
+      mod === 'user_package' ||
+      mod === 'userpackages' ||
+      mod === 'user_packages'
+    );
+  });
+
+const canReadFromActions = (actions: Record<string, unknown> = {}) =>
+  isTruthy(actions.all) || isTruthy(actions.read);
+
 interface UserPackage {
   _id: string;
   patientId: {
@@ -93,20 +146,177 @@ const UserPackagesPage: NextPageWithLayout = () => {
   const [selectedPackage, setSelectedPackage] = useState<UserPackage | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [currency, setCurrency] = useState('INR');
+  const [canRead, setCanRead] = useState(false);
+  const [permissionsLoaded, setPermissionsLoaded] = useState(false);
 
+  // Clinic-level (sidebar-permissions) + agent/doctorStaff-level (get-module-permissions); read only
   useEffect(() => {
-    fetchAllPackages();
+    let isMounted = true;
+
+    const clinicToken =
+      typeof window !== 'undefined'
+        ? localStorage.getItem('clinicToken') || sessionStorage.getItem('clinicToken')
+        : null;
+    const doctorToken =
+      typeof window !== 'undefined'
+        ? localStorage.getItem('doctorToken') || sessionStorage.getItem('doctorToken')
+        : null;
+    const agentToken =
+      typeof window !== 'undefined'
+        ? localStorage.getItem('agentToken') || sessionStorage.getItem('agentToken')
+        : null;
+    const staffToken =
+      typeof window !== 'undefined'
+        ? localStorage.getItem('staffToken') || sessionStorage.getItem('staffToken')
+        : null;
+    const userToken =
+      typeof window !== 'undefined'
+        ? localStorage.getItem('userToken') || sessionStorage.getItem('userToken')
+        : null;
+
+    const userRole = getUserRole();
+    const authToken = getStoredToken();
+
+    if (userRole === 'admin') {
+      if (!isMounted) return;
+      setCanRead(true);
+      setPermissionsLoaded(true);
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    if (userRole === 'clinic' || userRole === 'doctor') {
+      const fetchClinicPermissions = async () => {
+        try {
+          const clinicAuthToken = clinicToken || doctorToken || authToken;
+          if (!clinicAuthToken) {
+            if (!isMounted) return;
+            setCanRead(false);
+            setPermissionsLoaded(true);
+            return;
+          }
+
+          const res = await axios.get('/api/clinic/sidebar-permissions', {
+            headers: { Authorization: `Bearer ${clinicAuthToken}` },
+          });
+
+          if (!isMounted) return;
+
+          if (res.data.success) {
+            if (
+              res.data.permissions === null ||
+              !Array.isArray(res.data.permissions) ||
+              res.data.permissions.length === 0
+            ) {
+              setCanRead(true);
+            } else {
+              const modulePermission = findUserPackageModule(res.data.permissions);
+              if (modulePermission) {
+                setCanRead(canReadFromActions(modulePermission.actions || {}));
+              } else {
+                setCanRead(true);
+              }
+            }
+          } else {
+            setCanRead(true);
+          }
+        } catch (err) {
+          console.error('Error fetching clinic sidebar permissions:', err);
+          if (isMounted) setCanRead(true);
+        } finally {
+          if (isMounted) setPermissionsLoaded(true);
+        }
+      };
+
+      fetchClinicPermissions();
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    const agentStaffToken = getStoredToken();
+    if (!agentStaffToken) {
+      setCanRead(false);
+      setPermissionsLoaded(true);
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    if (
+      agentToken ||
+      staffToken ||
+      userToken ||
+      userRole === 'agent' ||
+      userRole === 'doctorStaff' ||
+      userRole === 'staff'
+    ) {
+      const fetchAgentPermissions = async () => {
+        try {
+          setPermissionsLoaded(false);
+          let permissionToken = agentStaffToken;
+          if (userRole === 'agent') {
+            permissionToken = agentToken || agentStaffToken;
+          } else if (userRole === 'doctorStaff' || userRole === 'staff') {
+            permissionToken = userToken || staffToken || agentStaffToken;
+          }
+
+          const res = await axios.get('/api/agent/get-module-permissions', {
+            params: { moduleKey: USER_PACKAGE_MODULE_KEY },
+            headers: { Authorization: `Bearer ${permissionToken}` },
+          });
+
+          if (!isMounted) return;
+
+          if (
+            !res.data?.permissions &&
+            res.data?.error?.includes('not found in agent permissions')
+          ) {
+            setCanRead(true);
+            return;
+          }
+
+          if (res.data?.success && res.data?.permissions) {
+            setCanRead(canReadFromActions(res.data.permissions.actions || {}));
+          } else {
+            setCanRead(false);
+          }
+        } catch (err) {
+          console.error('Error fetching agent permissions:', err);
+          if (isMounted) setCanRead(false);
+        } finally {
+          if (isMounted) setPermissionsLoaded(true);
+        }
+      };
+
+      fetchAgentPermissions();
+    } else {
+      setCanRead(true);
+      setPermissionsLoaded(true);
+    }
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   useEffect(() => {
+    if (!permissionsLoaded || !canRead) return;
+    fetchAllPackages();
+  }, [permissionsLoaded, canRead]);
+
+  useEffect(() => {
+    if (!permissionsLoaded || !canRead) return;
     // Only fetch active tab packages if we need to refresh (like search query changes after initial load)
     if (searchQuery) {
       fetchPackages();
     }
-  }, [activeTab, searchQuery]);
+  }, [activeTab, searchQuery, permissionsLoaded, canRead]);
 
   // Fetch clinic currency preference
   useEffect(() => {
+    if (!permissionsLoaded || !canRead) return;
     const fetchClinicCurrency = async () => {
       try {
         const authHeaders = getAuthHeaders();
@@ -120,7 +330,19 @@ const UserPackagesPage: NextPageWithLayout = () => {
       }
     };
     fetchClinicCurrency();
-  }, []);
+  }, [permissionsLoaded, canRead]);
+
+  useEffect(() => {
+    if (!permissionsLoaded) return;
+    if (!canRead) {
+      setPendingPackages([]);
+      setApprovedPackages([]);
+      setLoading(false);
+      setError(null);
+      setShowModal(false);
+      setSelectedPackage(null);
+    }
+  }, [permissionsLoaded, canRead]);
 
   const fetchAllPackages = async () => {
     try {
@@ -245,6 +467,40 @@ const UserPackagesPage: NextPageWithLayout = () => {
   };
 
   const currentPackages = activeTab === 'pending' ? pendingPackages : approvedPackages;
+
+  if (!permissionsLoaded) {
+    return (
+      <>
+        <Head>
+          <title>User Packages | Zeva360</title>
+        </Head>
+        <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 flex items-center justify-center p-4">
+          <Loader />
+        </div>
+      </>
+    );
+  }
+
+  if (!canRead) {
+    return (
+      <>
+        <Head>
+          <title>User Packages | Zeva360</title>
+        </Head>
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-8 text-center max-w-md">
+            <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Package className="w-8 h-8 text-yellow-600" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Access Denied</h3>
+            <p className="text-sm text-gray-700">
+              You do not have permission to view user packages. Please contact your administrator.
+            </p>
+          </div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
