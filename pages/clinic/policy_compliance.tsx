@@ -5,6 +5,36 @@ import { ShieldCheck, FileText, BookOpenCheck, ClipboardList, Plus, Search, Uplo
 import ClinicLayout from "../../components/ClinicLayout";
 import withClinicAuth from "../../components/withClinicAuth";
 import type { NextPageWithLayout } from "../_app";
+import Loader from "../../components/Loader";
+import axios from "axios";
+
+const TOKEN_PRIORITY = ["clinicToken", "doctorToken", "agentToken", "staffToken", "userToken", "adminToken"];
+const COMPLIANCE_MODULE_KEY = "clinic_compliance";
+
+const isTruthy = (val: unknown) =>
+  val === true || val === "true" || String(val || "").toLowerCase() === "true";
+
+const findComplianceModule = (permissionsList: any[]) =>
+  permissionsList.find((p: any) => {
+    if (!p?.module) return false;
+    const mod = String(p.module).toLowerCase();
+    return (
+      mod === "clinic_compliance" ||
+      mod === "clinic_policy_compliance" ||
+      mod === "policy_compliance" ||
+      mod === "compliance"
+    );
+  });
+
+const parsePermissionActions = (actions: Record<string, unknown> = {}) => {
+  const moduleAll = isTruthy(actions.all);
+  return {
+    canRead: moduleAll || isTruthy(actions.read),
+    canCreate: moduleAll || isTruthy(actions.create),
+    canUpdate: moduleAll || isTruthy(actions.update),
+    canDelete: moduleAll || isTruthy(actions.delete),
+  };
+};
 
 type Sop = {
   _id: string;
@@ -158,6 +188,15 @@ function PolicyCompliance() {
   const [departments, setDepartments] = useState<Array<{ _id: string; name: string }>>([]);
   const [currentAck, setCurrentAck] = useState<AckItem | null>(null);
   const [hideAckTabForStaff, setHideAckTabForStaff] = useState(false);
+
+  // Permission states
+  const [permissions, setPermissions] = useState({
+    canRead: false,
+    canCreate: false,
+    canUpdate: false,
+    canDelete: false,
+  });
+  const [permissionsLoaded, setPermissionsLoaded] = useState(false);
 
 
   const openViewer = (url?: string, title?: string, ack?: AckItem | null) => {
@@ -365,14 +404,12 @@ function PolicyCompliance() {
 
   const getAuthToken = () => {
     if (typeof window === "undefined") return null;
-    return (
-      localStorage.getItem("clinicToken") ||
-      sessionStorage.getItem("clinicToken") ||
-      localStorage.getItem("agentToken") ||
-      sessionStorage.getItem("agentToken") ||
-      localStorage.getItem("userToken") ||
-      sessionStorage.getItem("userToken")
-    );
+    for (const key of TOKEN_PRIORITY) {
+      const value =
+        localStorage.getItem(key) || sessionStorage.getItem(key);
+      if (value) return value;
+    }
+    return null;
   };
 
   useEffect(() => {
@@ -410,15 +447,17 @@ function PolicyCompliance() {
   };
 
   useEffect(() => {
+    if (!permissionsLoaded || !permissions.canRead) return;
     const loadOverview = async () => {
       const res = await fetch("/api/clinic/policy_compliance", { headers: getAuthHeaders() });
       const json = await res.json();
       if (json.success && json.overview) setOverview(json.overview);
     };
     loadOverview();
-  }, []);
+  }, [permissionsLoaded, permissions.canRead]);
 
   useEffect(() => {
+    if (!permissionsLoaded || (!permissions.canRead && !permissions.canCreate)) return;
     const loadTypes = async () => {
       try {
         const res = await fetch("/api/compliance/policy_types", { headers: getAuthHeaders() });
@@ -430,9 +469,10 @@ function PolicyCompliance() {
       } catch { }
     };
     loadTypes();
-  }, []);
+  }, [permissionsLoaded, permissions.canRead, permissions.canCreate]);
 
   useEffect(() => {
+    if (!permissionsLoaded || (!permissions.canRead && !permissions.canCreate)) return;
     const loadCategories = async () => {
       try {
         const res = await fetch("/api/compliance/sop_categories", { headers: getAuthHeaders() });
@@ -444,8 +484,9 @@ function PolicyCompliance() {
       } catch { }
     };
     loadCategories();
-  }, []);
+  }, [permissionsLoaded, permissions.canRead, permissions.canCreate]);
   useEffect(() => {
+    if (!permissionsLoaded || !permissions.canRead) return;
     const load = async () => {
       const res = await fetch(`/api/clinic/policy_compliance?type=${activeTab}`, { headers: getAuthHeaders() });
       const json = await res.json();
@@ -455,9 +496,10 @@ function PolicyCompliance() {
       if (activeTab === "playbooks") setPlaybooks(json.items || []);
     };
     if (activeTab !== "ack") load();
-  }, [activeTab]);
+  }, [activeTab, permissionsLoaded, permissions.canRead]);
 
   useEffect(() => {
+    if (!permissionsLoaded || !permissions.canRead) return;
     const loadAck = async () => {
       const params = new URLSearchParams();
       if (search) params.set("q", search);
@@ -475,7 +517,7 @@ function PolicyCompliance() {
       setAckItems(normalized);
     };
     if (activeTab === "ack") loadAck();
-  }, [activeTab, search, ackStatusFilter, ackTypeFilter]);
+  }, [activeTab, search, ackStatusFilter, ackTypeFilter, permissionsLoaded, permissions.canRead]);
 
   const filteredSops = useMemo(() => {
     return sops.filter(i => (!search || i.name.toLowerCase().includes(search.toLowerCase())) && (!departmentFilter || i.department === departmentFilter) && (!statusFilter || i.status === statusFilter) && (!riskFilter || i.riskLevel === riskFilter));
@@ -506,6 +548,221 @@ function PolicyCompliance() {
   const ackOverdue = filteredAckItems.filter(i => i.status === "Overdue").length;
   const ackComplianceRate = filteredAckItems.length ? Math.round((ackCompleted / filteredAckItems.length) * 100) : 0;
 
+  // Helper function to get user info from token
+  const getUserInfo = (): { role: string | null; id: string | null } => {
+    if (typeof window === "undefined") return { role: null, id: null };
+    try {
+      const token = getAuthToken();
+      if (!token) return { role: null, id: null };
+      const base64Url = token.split(".")[1];
+      const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+      const jsonPayload = decodeURIComponent(
+        atob(base64)
+          .split("")
+          .map(
+            (c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2)
+          )
+          .join("")
+      );
+      const decoded = JSON.parse(jsonPayload);
+      return {
+        role: decoded.role || decoded.userRole || null,
+        id: decoded.userId || decoded.id || null,
+      };
+    } catch (error) {
+      console.error("Error getting user info:", error);
+    }
+    return { role: null, id: null };
+  };
+
+  // Helper function to get stored token for agent/staff
+  const getStoredToken = (): string | null => {
+    if (typeof window === "undefined") return null;
+    for (const key of TOKEN_PRIORITY) {
+      const value =
+        localStorage.getItem(key) || sessionStorage.getItem(key);
+      if (value) return value;
+    }
+    return null;
+  };
+
+  const getUserRole = (): string | null => getUserInfo().role;
+
+  // Handle permissions - two-level: clinic level + agent/doctorStaff level
+  useEffect(() => {
+    let isMounted = true;
+
+    const clinicToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("clinicToken") || sessionStorage.getItem("clinicToken")
+        : null;
+    const doctorToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("doctorToken") || sessionStorage.getItem("doctorToken")
+        : null;
+    const agentToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("agentToken") || sessionStorage.getItem("agentToken")
+        : null;
+    const staffToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("staffToken") || sessionStorage.getItem("staffToken")
+        : null;
+    const userToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("userToken") || sessionStorage.getItem("userToken")
+        : null;
+
+    const userRole = getUserRole();
+    const authToken = getStoredToken();
+
+    if (userRole === "admin") {
+      if (!isMounted) return;
+      setPermissions({ canRead: true, canCreate: true, canUpdate: true, canDelete: true });
+      setPermissionsLoaded(true);
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    if (userRole === "clinic" || userRole === "doctor") {
+      const fetchClinicPermissions = async () => {
+        try {
+          const clinicAuthToken = clinicToken || doctorToken || authToken;
+          if (!clinicAuthToken) {
+            if (!isMounted) return;
+            setPermissions({ canRead: false, canCreate: false, canUpdate: false, canDelete: false });
+            return;
+          }
+
+          const res = await axios.get("/api/clinic/sidebar-permissions", {
+            headers: { Authorization: `Bearer ${clinicAuthToken}` },
+          });
+
+          if (!isMounted) return;
+
+          if (res.data.success) {
+            if (
+              res.data.permissions === null ||
+              !Array.isArray(res.data.permissions) ||
+              res.data.permissions.length === 0
+            ) {
+              setPermissions({ canRead: true, canCreate: true, canUpdate: true, canDelete: true });
+            } else {
+              const modulePermission = findComplianceModule(res.data.permissions);
+              if (modulePermission) {
+                setPermissions(parsePermissionActions(modulePermission.actions || {}));
+              } else {
+                setPermissions({ canRead: true, canCreate: false, canUpdate: false, canDelete: false });
+              }
+            }
+          } else {
+            setPermissions({ canRead: true, canCreate: true, canUpdate: true, canDelete: true });
+          }
+        } catch (err: any) {
+          console.error("Error fetching clinic sidebar permissions:", err);
+          if (isMounted) {
+            setPermissions({ canRead: true, canCreate: true, canUpdate: true, canDelete: true });
+          }
+        } finally {
+          if (isMounted) setPermissionsLoaded(true);
+        }
+      };
+
+      fetchClinicPermissions();
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    const agentStaffToken = getStoredToken();
+    if (!agentStaffToken) {
+      setPermissions({ canRead: false, canCreate: false, canUpdate: false, canDelete: false });
+      setPermissionsLoaded(true);
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    if (
+      agentToken ||
+      staffToken ||
+      userToken ||
+      userRole === "agent" ||
+      userRole === "doctorStaff" ||
+      userRole === "staff"
+    ) {
+      const fetchAgentPermissions = async () => {
+        try {
+          setPermissionsLoaded(false);
+          let permissionToken = agentStaffToken;
+          if (userRole === "agent") {
+            permissionToken = agentToken || agentStaffToken;
+          } else if (userRole === "doctorStaff" || userRole === "staff") {
+            permissionToken = userToken || staffToken || agentStaffToken;
+          }
+
+          const res = await axios.get("/api/agent/get-module-permissions", {
+            params: { moduleKey: COMPLIANCE_MODULE_KEY },
+            headers: { Authorization: `Bearer ${permissionToken}` },
+          });
+
+          if (!isMounted) return;
+
+          if (
+            !res.data?.permissions &&
+            res.data?.error?.includes("not found in agent permissions")
+          ) {
+            setPermissions({ canRead: true, canCreate: true, canUpdate: true, canDelete: true });
+            return;
+          }
+
+          if (res.data?.success && res.data?.permissions) {
+            setPermissions(parsePermissionActions(res.data.permissions.actions || {}));
+          } else {
+            setPermissions({ canRead: false, canCreate: false, canUpdate: false, canDelete: false });
+          }
+        } catch (err: any) {
+          console.error("Error fetching agent permissions:", err);
+          if (isMounted) {
+            setPermissions({ canRead: false, canCreate: false, canUpdate: false, canDelete: false });
+          }
+        } finally {
+          if (isMounted) setPermissionsLoaded(true);
+        }
+      };
+
+      fetchAgentPermissions();
+    } else {
+      setPermissions({ canRead: true, canCreate: true, canUpdate: true, canDelete: true });
+      setPermissionsLoaded(true);
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!permissionsLoaded) return;
+    if (!permissions.canRead) {
+      setSops([]);
+      setPolicies([]);
+      setPlaybooks([]);
+      setAckItems([]);
+      setOverview(null);
+      setShowCreate(false);
+      setShowTypeModal(false);
+      setShowCategoryModal(false);
+    }
+  }, [permissionsLoaded, permissions.canRead]);
+
+  const canViewData = permissions.canRead;
+  const canCreateActions = permissions.canCreate;
+  const canUpdateActions = permissions.canRead && permissions.canUpdate;
+  const canDeleteActions = permissions.canRead && permissions.canDelete;
+
+
   const handleRowView = async (type: TabKey, id: string, title: string, ack?: AckItem | null) => {
     try {
       if (type === "policies") {
@@ -524,6 +781,7 @@ function PolicyCompliance() {
   };
 
   const handleRowEdit = (type: TabKey, item: any) => {
+    if (!canUpdateActions) return;
     setEditingType(type);
     setEditingItem(item);
     setShowCreate(true);
@@ -531,6 +789,7 @@ function PolicyCompliance() {
   };
 
   const handleRowDelete = async (type: TabKey, id: string) => {
+    if (!canDeleteActions) return;
     try {
       const endpoint =
         type === "sops"
@@ -555,6 +814,8 @@ function PolicyCompliance() {
   }, [playbooks]);
 
   const handleCreate = async (formData: Record<string, any>) => {
+    if (editingType && !canUpdateActions) return;
+    if (!editingType && !permissions.canCreate) return;
     const type = editingType || activeTab;
     if (type === "sops") {
       const url = editingType ? `/api/compliance/sops?id=${encodeURIComponent(editingItem?._id)}` : "/api/compliance/sops";
@@ -1949,6 +2210,10 @@ function PolicyCompliance() {
     );
   };
 
+  if (!permissionsLoaded) {
+    return <Loader />;
+  }
+
   return (
     <>
       <Head>
@@ -1959,6 +2224,19 @@ function PolicyCompliance() {
           <div className="rounded-2xl border bg-white p-4">
             <div className="mt-1 text-lg font-bold text-gray-900">Process & Compliance</div>
             <div className="mt-1 text-xs text-gray-600">Manage SOPs, policies, playbooks, and track compliance across your organization</div>
+
+            {!canViewData && (
+              <div className="mt-4 rounded-xl border border-yellow-200 bg-yellow-50 p-4 text-center">
+                <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-yellow-100">
+                  <ShieldCheck className="h-5 w-5 text-yellow-600" />
+                </div>
+                <h3 className="text-sm font-bold text-gray-900">Access Denied</h3>
+                <p className="mt-1 text-xs text-gray-700">
+                  You do not have permission to view policy compliance data. Please contact your administrator.
+                </p>
+              </div>
+            )}
+
             <div className="mt-4 flex flex-wrap gap-2 sm:gap-3">
               <button onClick={() => setActiveTab("sops")} className={`rounded-lg px-3 py-1.5 text-xs ${activeTab === "sops" ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-800"}`}>SOP Library</button>
               <button onClick={() => setActiveTab("policies")} className={`rounded-lg px-3 py-1.5 text-xs ${activeTab === "policies" ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-800"}`}>Policy Center</button>
@@ -1975,7 +2253,7 @@ function PolicyCompliance() {
             )}
             </div>
 
-            {activeTab === "playbooks" && (
+            {canViewData && activeTab === "playbooks" && (
               <div className="mt-6 grid gap-4 sm:grid-cols-3">
                 <StatCard
                   title="Total Playbooks"
@@ -2001,7 +2279,7 @@ function PolicyCompliance() {
               </div>
             )}
 
-            {activeTab === "ack" && !hideAckTabForStaff && (
+            {canViewData && activeTab === "ack" && !hideAckTabForStaff && (
               <div className="mt-6 grid gap-3 sm:grid-cols-4">
                 <div className="rounded-xl border bg-blue-50 p-4">
                   <div className="flex items-center justify-between">
@@ -2038,6 +2316,7 @@ function PolicyCompliance() {
               </div>
             )}
 
+            {canViewData && (
             <div className="mt-4 flex flex-wrap items-center gap-2">
               <div className="flex flex-1 items-center rounded-lg border bg-white px-2 py-1.5">
                 <Search className="h-3.5 w-3.5 text-gray-400" />
@@ -2062,9 +2341,6 @@ function PolicyCompliance() {
                       <option key={r.key} value={r.key}>{r.label}</option>
                     ))}
                   </select>
-                  <button onClick={() => setShowTypeModal(true)} className="inline-flex items-center rounded-lg bg-gray-900 px-3 py-1.5 text-xs text-white">
-                    <Plus className="h-4 w-4 mr-1" /> Create Type
-                  </button>
                 </>
               ) : activeTab === "playbooks" ? (
                 <>
@@ -2115,28 +2391,39 @@ function PolicyCompliance() {
                     <option value="High">High</option>
                     <option value="Critical">Critical</option>
                   </select>
+                </>
+              )}
+            </div>
+            )}
+
+            {canCreateActions && (
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                {activeTab === "sops" && (
                   <button onClick={() => setShowCategoryModal(true)} className="inline-flex items-center rounded-lg bg-gray-900 px-3 py-1.5 text-xs text-white">
                     <Plus className="h-4 w-4 mr-1" /> Create Categories
                   </button>
-                </>
-              )}
-              {activeTab !== "ack" ? (
-                <button onClick={() => {
-                  setEditingType(null);
-                  setEditingItem(null);
-                  setShowCreate(true);
-                }} className="inline-flex items-center gap-2 rounded-lg bg-gray-900 px-3 py-1.5 text-xs text-white">
-                  <Plus className="h-4 w-4" /> {activeTab === "sops" ? "Add SOP" : activeTab === "policies" ? "Add Policy" : "Add Playbook"}
-                </button>
-              ) : (
-                // <button onClick={() => setAckModalOpen(true)} className="inline-flex items-center gap-2 rounded-lg bg-gray-900 px-3 py-2 text-sm text-white">
-                //   <Plus className="h-4 w-4" /> Add Staff
-                // </button>
-                null
-              )}
-            </div>
+                )}
+                {activeTab === "policies" && (
+                  <button onClick={() => setShowTypeModal(true)} className="inline-flex items-center rounded-lg bg-gray-900 px-3 py-1.5 text-xs text-white">
+                    <Plus className="h-4 w-4 mr-1" /> Create Type
+                  </button>
+                )}
+                {activeTab !== "ack" && (
+                  <button
+                    onClick={() => {
+                      setEditingType(null);
+                      setEditingItem(null);
+                      setShowCreate(true);
+                    }}
+                    className="inline-flex items-center gap-2 rounded-lg bg-gray-900 px-3 py-1.5 text-xs text-white"
+                  >
+                    <Plus className="h-4 w-4" /> {activeTab === "sops" ? "Add SOP" : activeTab === "policies" ? "Add Policy" : "Add Playbook"}
+                  </button>
+                )}
+              </div>
+            )}
 
-            {activeTab === "sops" && (
+            {canViewData && activeTab === "sops" && (
               <div className="mt-4 overflow-x-auto">
                 <div className="mb-2 text-xs text-gray-600">{filteredSops.length} SOPs found</div>
                 <table className="min-w-max w-full border-collapse">
@@ -2201,8 +2488,12 @@ function PolicyCompliance() {
                           {rowMenuId === i._id && (
                             <div className="absolute right-2 top-9 z-10 w-32 rounded-lg border bg-white shadow">
                               <button className="w-full px-2.5 py-1.5 text-left text-xs hover:bg-gray-50" onClick={() => handleRowView("sops", i._id, i.name)}>View</button>
-                              <button className="w-full px-2.5 py-1.5 text-left text-xs hover:bg-gray-50" onClick={() => handleRowEdit("sops", i)}>Edit</button>
-                              <button className="w-full px-2.5 py-1.5 text-left text-xs text-red-600 hover:bg-gray-50" onClick={() => handleRowDelete("sops", i._id)}>Delete</button>
+                              {canUpdateActions && (
+                                <button className="w-full px-2.5 py-1.5 text-left text-xs hover:bg-gray-50" onClick={() => handleRowEdit("sops", i)}>Edit</button>
+                              )}
+                              {canDeleteActions && (
+                                <button className="w-full px-2.5 py-1.5 text-left text-xs text-red-600 hover:bg-gray-50" onClick={() => handleRowDelete("sops", i._id)}>Delete</button>
+                              )}
                             </div>
                           )}
                         </td>
@@ -2213,7 +2504,7 @@ function PolicyCompliance() {
               </div>
             )}
 
-            {activeTab === "policies" && (
+            {canViewData && activeTab === "policies" && (
               <div className="mt-4 overflow-x-auto">
                 <div className="mb-2 text-xs text-gray-600">{filteredPolicies.length} policies found</div>
                 <table className="min-w-max w-full border-collapse">
@@ -2272,8 +2563,12 @@ function PolicyCompliance() {
                           {rowMenuId === i._id && (
                             <div className="absolute right-2 top-9 z-10 w-32 rounded-lg border bg-white shadow">
                               <button className="w-full px-2.5 py-1.5 text-left text-xs hover:bg-gray-50" onClick={() => handleRowView("policies", i._id, i.name)}>View</button>
-                              <button className="w-full px-2.5 py-1.5 text-left text-xs hover:bg-gray-50" onClick={() => handleRowEdit("policies", i)}>Edit</button>
-                              <button className="w-full px-2.5 py-1.5 text-left text-xs text-red-600 hover:bg-gray-50" onClick={() => handleRowDelete("policies", i._id)}>Delete</button>
+                              {canUpdateActions && (
+                                <button className="w-full px-2.5 py-1.5 text-left text-xs hover:bg-gray-50" onClick={() => handleRowEdit("policies", i)}>Edit</button>
+                              )}
+                              {canDeleteActions && (
+                                <button className="w-full px-2.5 py-1.5 text-left text-xs text-red-600 hover:bg-gray-50" onClick={() => handleRowDelete("policies", i._id)}>Delete</button>
+                              )}
                             </div>
                           )}
                         </td>
@@ -2284,7 +2579,7 @@ function PolicyCompliance() {
               </div>
             )}
 
-            {activeTab === "playbooks" && (
+            {canViewData && activeTab === "playbooks" && (
               <div className="mt-4 overflow-x-auto">
                 <table className="min-w-max w-full border-collapse">
                   <thead>
@@ -2344,8 +2639,12 @@ function PolicyCompliance() {
                           {rowMenuId === i._id && (
                             <div className="absolute right-2 top-9 z-10 w-32 rounded-lg border bg-white shadow">
                               <button className="w-full px-2.5 py-1.5 text-left text-xs hover:bg-gray-50" onClick={() => handleRowView("playbooks", i._id, i.scenarioName)}>View</button>
-                              <button className="w-full px-2.5 py-1.5 text-left text-xs hover:bg-gray-50" onClick={() => handleRowEdit("playbooks", i)}>Edit</button>
-                              <button className="w-full px-2.5 py-1.5 text-left text-xs text-red-600 hover:bg-gray-50" onClick={() => handleRowDelete("playbooks", i._id)}>Delete</button>
+                              {canUpdateActions && (
+                                <button className="w-full px-2.5 py-1.5 text-left text-xs hover:bg-gray-50" onClick={() => handleRowEdit("playbooks", i)}>Edit</button>
+                              )}
+                              {canDeleteActions && (
+                                <button className="w-full px-2.5 py-1.5 text-left text-xs text-red-600 hover:bg-gray-50" onClick={() => handleRowDelete("playbooks", i._id)}>Delete</button>
+                              )}
                             </div>
                           )}
                         </td>
@@ -2356,7 +2655,7 @@ function PolicyCompliance() {
               </div>
             )}
 
-            {activeTab === "ack" && (
+            {canViewData && activeTab === "ack" && (
               <div className="mt-4 overflow-x-auto">
                 <div className="mb-2 text-xs text-gray-600">{filteredAckItems.length} records found</div>
                 <table className="min-w-max w-full border-collapse">
@@ -2435,10 +2734,12 @@ function PolicyCompliance() {
                                 const t = (i as any).documentType === "SOP" ? "sops" : (i as any).documentType === "Policy" ? "policies" : "playbooks";
                                 handleRowView(t as TabKey, (i as any).documentId || i._id, i.documentName, i as any);
                               }}>View</button>
-                              <button className="w-full px-2.5 py-1.5 text-left text-xs hover:bg-gray-50" onClick={() => {
-                                const t = (i as any).documentType === "SOP" ? "sops" : (i as any).documentType === "Policy" ? "policies" : "playbooks";
-                                handleRowEdit(t as TabKey, i);
-                              }}>Edit</button>
+                              {canUpdateActions && (
+                                <button className="w-full px-2.5 py-1.5 text-left text-xs hover:bg-gray-50" onClick={() => {
+                                  const t = (i as any).documentType === "SOP" ? "sops" : (i as any).documentType === "Policy" ? "policies" : "playbooks";
+                                  handleRowEdit(t as TabKey, i);
+                                }}>Edit</button>
+                              )}
                               <button className="w-full px-2.5 py-1.5 text-left text-xs hover:bg-gray-50" onClick={() => {
                                 fetch(`/api/compliance/acknowledgments`, {
                                   method: "POST",
@@ -2470,8 +2771,8 @@ function PolicyCompliance() {
           </div>
         </div>
       </div>
-      {showCreate && <CreateModal />}
-      {ackModalOpen && <AckModal onClose={() => setAckModalOpen(false)} />}
+      {showCreate && (permissions.canCreate || (editingType && canUpdateActions)) && <CreateModal />}
+      {ackModalOpen && canCreateActions && <AckModal onClose={() => setAckModalOpen(false)} />}
       {viewerOpen && viewerUrl && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="w-full max-w-5xl bg-white rounded-xl shadow-xl overflow-hidden max-h-[90vh] flex flex-col">
@@ -2504,7 +2805,7 @@ function PolicyCompliance() {
           </div>
         </div>
       )}
-      {showTypeModal && (
+      {showTypeModal && canCreateActions && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="w-full max-w-md rounded-2xl bg-white p-6">
             <div className="flex items-center justify-between">
@@ -2559,7 +2860,7 @@ function PolicyCompliance() {
           </div>
         </div>
       )}
-      {showCategoryModal && (
+      {showCategoryModal && canCreateActions && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="w-full max-w-md rounded-2xl bg-white p-6">
             <div className="flex items-center justify-between">

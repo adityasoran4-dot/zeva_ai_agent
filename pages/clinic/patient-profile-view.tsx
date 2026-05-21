@@ -1321,6 +1321,8 @@ const [loadingCreatedPackages, setLoadingCreatedPackages] = useState(false);
             paidAmount: paidAmount,
             paymentStatus: actualPaymentStatus,
             paymentMethod: paymentMethod,
+            advanceBalanceUsed: pkgAdvanceUsedAmount,
+            claimAmountUsed: pkgClaimUsedAmount,
           }, { headers });
 
           // Step 3: Create billing record if balance was used or payment was made

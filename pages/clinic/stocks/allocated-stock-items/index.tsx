@@ -13,6 +13,7 @@ import {
   CheckCircleIcon,
   XCircleIcon,
   ArrowPathRoundedSquareIcon,
+  PlusIcon,
 } from "@heroicons/react/24/outline";
 import AddAllocationModal from "./_components/AddAllocationModal";
 import ViewAllocationModal from "./_components/ViewAllocationModal";
@@ -20,6 +21,45 @@ import EditAllocationModal from "./_components/EditAllocationModal";
 import DeleteAllocationModal from "./_components/DeleteAllocationModal";
 import axios from "axios";
 import { getAuthHeaders } from "@/lib/helper";
+
+const TOKEN_PRIORITY = [
+  "clinicToken",
+  "doctorToken",
+  "agentToken",
+  "staffToken",
+  "userToken",
+  "adminToken",
+];
+const getStoredToken = () => {
+  if (typeof window === "undefined") return null;
+  for (const key of TOKEN_PRIORITY) {
+    const value = window.localStorage.getItem(key) || window.sessionStorage.getItem(key);
+    if (value) return value;
+  }
+  return null;
+};
+const getUserInfo = (): { role: string | null; id: string | null } => {
+  if (typeof window === "undefined") return { role: null, id: null };
+  try {
+    for (const key of TOKEN_PRIORITY) {
+      const token = window.localStorage.getItem(key) || window.sessionStorage.getItem(key);
+      if (!token) continue;
+      const base64Url = token.split(".")[1];
+      if (!base64Url) continue;
+      const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+      const jsonPayload = decodeURIComponent(
+        atob(base64).split("").map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2)).join(""),
+      );
+      const decoded = JSON.parse(jsonPayload);
+      return { role: decoded.role || decoded.userRole || null, id: decoded.userId || decoded.id || null };
+    }
+  } catch (error) {
+    console.error("Error getting user info:", error);
+  }
+  return { role: null, id: null };
+};
+const getUserRole = (): string | null => getUserInfo().role;
+const MODULE_KEY = "clinic_stock_allocated_stock_items";
 
 type AllocStatus =
   | "Allocated"
@@ -142,8 +182,17 @@ const AllocatedStockItemsPage: NextPageWithLayout = () => {
     usedToday: 0,
     expiringSoon: 0,
   });
+  // Permission state
+  const [permissions, setPermissions] = useState({
+    canRead: false,
+    canCreate: false,
+    canUpdate: false,
+    canDelete: false,
+  });
+  const [_permissionsLoaded, setPermissionsLoaded] = useState(false);
 
   const headers = useMemo(() => getAuthHeaders() || {}, []);
+
 
   const fetchAllocated = async (pageNum = 1) => {
     try {
@@ -207,13 +256,136 @@ const AllocatedStockItemsPage: NextPageWithLayout = () => {
       // ignore
     }
   };
-
+  // Permission handling useEffect
   useEffect(() => {
-    fetchAllocated(1);
-    fetchAnalytics();
+    let isMounted = true;
+    const userRole = getUserRole();
+    const clinicToken = typeof window !== "undefined" ? localStorage.getItem("clinicToken") || sessionStorage.getItem("clinicToken") : null;
+    const doctorToken = typeof window !== "undefined" ? localStorage.getItem("doctorToken") || sessionStorage.getItem("doctorToken") : null;
+    const agentToken = typeof window !== "undefined" ? localStorage.getItem("agentToken") || sessionStorage.getItem("agentToken") : null;
+    const staffToken = typeof window !== "undefined" ? localStorage.getItem("staffToken") || sessionStorage.getItem("staffToken") : null;
+    const userToken = typeof window !== "undefined" ? localStorage.getItem("userToken") || sessionStorage.getItem("userToken") : null;
+    const authToken = clinicToken || doctorToken || agentToken || staffToken || userToken;
+    if (userRole === "admin") {
+      if (!isMounted) return;
+      setPermissions({ canRead: true, canCreate: true, canUpdate: true, canDelete: true });
+      setPermissionsLoaded(true);
+      return;
+    }
+    if (userRole === "clinic" || userRole === "doctor") {
+      const fetchClinicPermissions = async () => {
+        try {
+          if (!authToken) {
+            if (!isMounted) return;
+            setPermissions({ canRead: false, canCreate: false, canUpdate: false, canDelete: false });
+            setPermissionsLoaded(true);
+            return;
+          }
+          const res = await axios.get("/api/clinic/sidebar-permissions", {
+            headers: { Authorization: `Bearer ${authToken}` },
+          });
+          if (!isMounted) return;
+          if (res.data.success) {
+            if (res.data.permissions === null || !Array.isArray(res.data.permissions) || res.data.permissions.length === 0) {
+              setPermissions({ canRead: true, canCreate: true, canUpdate: true, canDelete: true });
+            } else {
+              let modulePermission = res.data.permissions.find((p: any) => {
+                if (!p?.module) return false;
+                if (p.module === "clinic_stock_allocated_stock_items") return true;
+                if (p.module === "allocated_stock_items") return true;
+                if (p.module === "stock_allocated_items") return true;
+                return false;
+              });
+              if (!modulePermission) {
+                const parentStockModule = res.data.permissions.find((p: any) =>
+                  p?.module === "clinic_stock" && Array.isArray(p.subModules)
+                );
+                if (parentStockModule) {
+                  modulePermission = parentStockModule.subModules.find((sm: any) =>
+                    sm?.moduleKey === "clinic_stock_allocated_stock_items"
+                  );
+                }
+              }
+              if (modulePermission) {
+                const actions = modulePermission.actions || {};
+                const moduleAll = actions.all === true || actions.all === "true" || String(actions.all).toLowerCase() === "true";
+                const moduleCreate = actions.create === true || actions.create === "true" || String(actions.create).toLowerCase() === "true";
+                const moduleRead = actions.read === true || actions.read === "true" || String(actions.read).toLowerCase() === "true";
+                const moduleUpdate = actions.update === true || actions.update === "true" || String(actions.update).toLowerCase() === "true";
+                const moduleDelete = actions.delete === true || actions.delete === "true" || String(actions.delete).toLowerCase() === "true";
+                setPermissions({
+                  canRead: moduleAll || moduleRead,
+                  canCreate: moduleAll || moduleCreate,
+                  canUpdate: moduleAll || moduleUpdate,
+                  canDelete: moduleAll || moduleDelete,
+                });
+              } else {
+                setPermissions({ canRead: true, canCreate: false, canUpdate: false, canDelete: false });
+              }
+            }
+          } else {
+            setPermissions({ canRead: true, canCreate: true, canUpdate: true, canDelete: true });
+          }
+        } catch (err) {
+          console.error("Error fetching clinic sidebar permissions:", err);
+          if (isMounted) setPermissions({ canRead: true, canCreate: true, canUpdate: true, canDelete: true });
+        } finally {
+          if (isMounted) setPermissionsLoaded(true);
+        }
+      };
+      fetchClinicPermissions();
+      return;
+    }
+    const agentStaffToken = getStoredToken();
+    if (!agentStaffToken) {
+      setPermissions({ canRead: false, canCreate: false, canUpdate: false, canDelete: false });
+      setPermissionsLoaded(true);
+      return;
+    }
+    if (agentToken || staffToken || userToken) {
+      const fetchPermissions = async () => {
+        try {
+          setPermissionsLoaded(false);
+          const res = await axios.get("/api/agent/get-module-permissions", {
+            params: { moduleKey: MODULE_KEY },
+            headers: { Authorization: `Bearer ${agentStaffToken}` },
+          });
+          const data = res.data;
+          if (!isMounted) return;
+          if (!data?.permissions && data?.error?.includes("not found in agent permissions")) {
+            setPermissions({ canRead: true, canCreate: true, canUpdate: true, canDelete: true });
+            return;
+          }
+          const actions = data?.permissions?.actions || data?.data?.moduleActions || {};
+          const isTrue = (val: any) => val === true || val === "true" || String(val || "").toLowerCase() === "true";
+          const canAll = isTrue(actions.all);
+          setPermissions({
+            canRead: canAll || isTrue(actions.read),
+            canCreate: canAll || isTrue(actions.create),
+            canUpdate: canAll || isTrue(actions.update),
+            canDelete: canAll || isTrue(actions.delete),
+          });
+        } catch (err) {
+          console.error("Error fetching agent permissions:", err);
+          setPermissions({ canRead: false, canCreate: false, canUpdate: false, canDelete: false });
+        } finally {
+          if (isMounted) setPermissionsLoaded(true);
+        }
+      };
+      fetchPermissions();
+    } else {
+      setPermissions({ canRead: true, canCreate: true, canUpdate: true, canDelete: true });
+      setPermissionsLoaded(true);
+    }
+    return () => { isMounted = false; };
+  }, []);
+  useEffect(() => {
+    if (_permissionsLoaded) {
+      fetchAllocated(1);
+      fetchAnalytics();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter, searchTerm, limit]);
-
+  }, [_permissionsLoaded, statusFilter, searchTerm, limit]);
   const statuses = [
     "All",
     "Allocated",
@@ -226,7 +398,45 @@ const AllocatedStockItemsPage: NextPageWithLayout = () => {
     "Deleted",
   ];
 
+
   // analytics now loaded from backend
+
+  // Show access denied message if no read permission (but still allow create if permitted)
+  if (!permissions.canRead) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-8 text-center max-w-md">
+          <div className="w-16 h-16 bg-yellow-100 dark:bg-yellow-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+          </div>
+          <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-2">
+            Access Denied
+          </h3>
+          <p className="text-sm text-gray-700 dark:text-gray-400 mb-4">
+            You do not have permission to view allocated stock items. Please contact your administrator.
+          </p>
+          {permissions.canCreate && (
+            <button
+              className="cursor-pointer inline-flex items-center justify-center gap-1.5 bg-gray-800 hover:bg-gray-900 text-white px-3 py-2 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 text-xs sm:text-sm font-medium mt-4"
+              onClick={() => setIsOpenAddModal(true)}
+            >
+              <PlusIcon className="h-5 w-5 mr-2" />
+              New Allocation
+            </button>
+          )}
+        </div>
+        <AddAllocationModal
+          isOpen={isOpenAddModal}
+          onClose={() => setIsOpenAddModal(false)}
+          onSuccess={() => {
+            setIsOpenAddModal(false);
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
@@ -247,13 +457,15 @@ const AllocatedStockItemsPage: NextPageWithLayout = () => {
                 <FunnelIcon className="w-4 h-4 mr-2" />
                 Export
               </button> */}
-              <button
-                onClick={() => setIsOpenAddModal(true)}
-                className="px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg text-sm font-medium hover:from-blue-700 hover:to-blue-800 transition-all shadow-md hover:shadow-lg flex items-center justify-center sm:justify-start"
-              >
-                <BeakerIcon className="w-4 h-4 mr-2" />
-                New Allocation
-              </button>
+              {permissions.canCreate && (
+                <button
+                  onClick={() => setIsOpenAddModal(true)}
+                  className="px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg text-sm font-medium hover:from-blue-700 hover:to-blue-800 transition-all shadow-md hover:shadow-lg flex items-center justify-center sm:justify-start"
+                >
+                  <BeakerIcon className="w-4 h-4 mr-2" />
+                  New Allocation
+                </button>
+              )}
             </div>
           </div>
 
@@ -536,52 +748,56 @@ const AllocatedStockItemsPage: NextPageWithLayout = () => {
                       </button>
 
                       {/* Edit Button */}
-                      <button
-                        onClick={() => {
-                          setSelectedAllocatedItem(item);
-                          setIsOpenEditModal(true);
-                        }}
-                        className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-all group-hover:scale-105"
-                        title="Edit Allocation"
-                      >
-                        <svg
-                          className="w-4 h-4"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
+                      {permissions.canUpdate && (
+                        <button
+                          onClick={() => {
+                            setSelectedAllocatedItem(item);
+                            setIsOpenEditModal(true);
+                          }}
+                          className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-all group-hover:scale-105"
+                          title="Edit Allocation"
                         >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth="2"
-                            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                          />
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="2"
+                              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                            />
                         </svg>
                       </button>
+                      )}
 
                       {/* Delete Button */}
-                      <button
-                        onClick={() => {
-                          setSelectedAllocatedItem(item);
-                          setIsOpenDeleteModal(true);
-                        }}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-all group-hover:scale-105"
-                        title="Delete Allocation"
-                      >
-                        <svg
-                          className="w-4 h-4"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
+                      {permissions.canDelete && (
+                        <button
+                          onClick={() => {
+                            setSelectedAllocatedItem(item);
+                            setIsOpenDeleteModal(true);
+                          }}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-all group-hover:scale-105"
+                          title="Delete Allocation"
                         >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth="2"
-                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                          />
-                        </svg>
-                      </button>
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="2"
+                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                            />
+                          </svg>
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>

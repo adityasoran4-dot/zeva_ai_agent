@@ -3,9 +3,11 @@ import { useEffect, useState, useMemo } from "react";
 import axios from "axios";
 import withClinicAuth from "../../components/withClinicAuth";
 import ClinicLayout from "../../components/ClinicLayout";
-import { Search, CheckCircle, XCircle, Eye, FileText, AlertCircle, Shield, X, Activity, Clock, User, Calendar, Paperclip } from "lucide-react";
+import Loader from "../../components/Loader";
+import { Search, CheckCircle, XCircle, Eye, FileText, AlertCircle, Shield, X, Activity, Clock, User, Paperclip } from "lucide-react";
 
 const TOKEN_PRIORITY = ["clinicToken", "doctorToken", "agentToken", "staffToken", "userToken", "adminToken"];
+const CLAIM_MODULE_KEY = "clinic_claim";
 
 const getStoredToken = () => {
   if (typeof window === "undefined") return null;
@@ -25,9 +27,74 @@ const getAuthHeaders = () => {
   return token ? { Authorization: `Bearer ${token}` } : null;
 };
 
+const getUserInfo = () => {
+  if (typeof window === "undefined") return { role: null, id: null };
+  try {
+    for (const key of TOKEN_PRIORITY) {
+      const token =
+        localStorage.getItem(key) || sessionStorage.getItem(key);
+      if (!token) continue;
+      try {
+        const base64Url = token.split(".")[1];
+        const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+        const jsonPayload = decodeURIComponent(
+          atob(base64)
+            .split("")
+            .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+            .join("")
+        );
+        const decoded = JSON.parse(jsonPayload);
+        return {
+          role: decoded.role || decoded.userRole || null,
+          id: decoded.userId || decoded.id || null,
+        };
+      } catch {
+        continue;
+      }
+    }
+  } catch (error) {
+    console.error("Error getting user info:", error);
+  }
+  return { role: null, id: null };
+};
+
+const getUserRole = () => getUserInfo().role;
+
+const isTruthy = (val) =>
+  val === true || val === "true" || String(val || "").toLowerCase() === "true";
+
+const findClaimModule = (permissionsList) =>
+  permissionsList.find((p) => {
+    if (!p?.module) return false;
+    const mod = String(p.module).toLowerCase();
+    return (
+      mod === "clinic_claim" ||
+      mod === "clinic_claims" ||
+      mod === "claim" ||
+      mod === "pass_claims"
+    );
+  });
+
+const parsePermissionActions = (actions = {}) => {
+  const moduleAll = isTruthy(actions.all);
+  return {
+    canRead: moduleAll || isTruthy(actions.read),
+    canCreate: moduleAll || isTruthy(actions.create),
+    canUpdate: moduleAll || isTruthy(actions.update),
+    canDelete: moduleAll || isTruthy(actions.delete),
+  };
+};
+
 const ITEMS_PER_PAGE = 12;
 
 function PassClaimsPage() {
+  const [permissions, setPermissions] = useState({
+    canRead: false,
+    canCreate: false,
+    canUpdate: false,
+    canDelete: false,
+  });
+  const [permissionsLoaded, setPermissionsLoaded] = useState(false);
   const [claims, setClaims] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("Approved");
@@ -43,9 +110,224 @@ function PassClaimsPage() {
   const [successMsg, setSuccessMsg] = useState("");
   const [previewFile, setPreviewFile] = useState(null);
 
+  // Clinic-level (sidebar-permissions) + agent/doctorStaff-level (get-module-permissions)
   useEffect(() => {
-    fetchClaims();
+    let isMounted = true;
+
+    const userRole = getUserRole();
+    const authToken = getStoredToken();
+    const clinicToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("clinicToken") || sessionStorage.getItem("clinicToken")
+        : null;
+    const doctorToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("doctorToken") || sessionStorage.getItem("doctorToken")
+        : null;
+    const agentToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("agentToken") || sessionStorage.getItem("agentToken")
+        : null;
+    const staffToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("staffToken") || sessionStorage.getItem("staffToken")
+        : null;
+    const userToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("userToken") || sessionStorage.getItem("userToken")
+        : null;
+
+    if (userRole === "admin") {
+      if (!isMounted) return;
+      setPermissions({
+        canRead: true,
+        canCreate: true,
+        canUpdate: true,
+        canDelete: true,
+      });
+      setPermissionsLoaded(true);
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    if (userRole === "clinic" || userRole === "doctor") {
+      const fetchClinicPermissions = async () => {
+        try {
+          const clinicAuthToken = clinicToken || doctorToken || authToken;
+          if (!clinicAuthToken) {
+            if (!isMounted) return;
+            setPermissions({
+              canRead: false,
+              canCreate: false,
+              canUpdate: false,
+              canDelete: false,
+            });
+            return;
+          }
+
+          const res = await axios.get("/api/clinic/sidebar-permissions", {
+            headers: { Authorization: `Bearer ${clinicAuthToken}` },
+          });
+
+          if (!isMounted) return;
+
+          if (res.data.success) {
+            if (
+              res.data.permissions === null ||
+              !Array.isArray(res.data.permissions) ||
+              res.data.permissions.length === 0
+            ) {
+              setPermissions({
+                canRead: true,
+                canCreate: true,
+                canUpdate: true,
+                canDelete: true,
+              });
+            } else {
+              const modulePermission = findClaimModule(res.data.permissions);
+
+              if (modulePermission) {
+                setPermissions(parsePermissionActions(modulePermission.actions || {}));
+              } else {
+                setPermissions({
+                  canRead: true,
+                  canCreate: false,
+                  canUpdate: false,
+                  canDelete: false,
+                });
+              }
+            }
+          } else {
+            setPermissions({
+              canRead: true,
+              canCreate: true,
+              canUpdate: true,
+              canDelete: true,
+            });
+          }
+        } catch (err) {
+          console.error("Error fetching clinic sidebar permissions:", err);
+          if (isMounted) {
+            setPermissions({
+              canRead: true,
+              canCreate: true,
+              canUpdate: true,
+              canDelete: true,
+            });
+          }
+        } finally {
+          if (isMounted) setPermissionsLoaded(true);
+        }
+      };
+
+      fetchClinicPermissions();
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    const agentStaffToken = getStoredToken();
+    if (!agentStaffToken) {
+      setPermissions({
+        canRead: false,
+        canCreate: false,
+        canUpdate: false,
+        canDelete: false,
+      });
+      setPermissionsLoaded(true);
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    if (
+      agentToken ||
+      staffToken ||
+      userToken ||
+      userRole === "agent" ||
+      userRole === "doctorStaff" ||
+      userRole === "staff"
+    ) {
+      const fetchAgentPermissions = async () => {
+        try {
+          setPermissionsLoaded(false);
+          let permissionToken = agentStaffToken;
+          if (userRole === "agent") {
+            permissionToken = agentToken || agentStaffToken;
+          } else if (userRole === "doctorStaff" || userRole === "staff") {
+            permissionToken = userToken || staffToken || agentStaffToken;
+          }
+          const res = await axios.get("/api/agent/get-module-permissions", {
+            params: { moduleKey: CLAIM_MODULE_KEY },
+            headers: { Authorization: `Bearer ${permissionToken}` },
+          });
+
+          if (!isMounted) return;
+
+          if (
+            !res.data?.permissions &&
+            res.data?.error?.includes("not found in agent permissions")
+          ) {
+            setPermissions({
+              canRead: true,
+              canCreate: true,
+              canUpdate: true,
+              canDelete: true,
+            });
+            return;
+          }
+
+          if (res.data?.success && res.data?.permissions) {
+            setPermissions(parsePermissionActions(res.data.permissions.actions || {}));
+          } else {
+            setPermissions({
+              canRead: false,
+              canCreate: false,
+              canUpdate: false,
+              canDelete: false,
+            });
+          }
+        } catch (err) {
+          console.error("Error fetching agent permissions:", err);
+          if (isMounted) {
+            setPermissions({
+              canRead: false,
+              canCreate: false,
+              canUpdate: false,
+              canDelete: false,
+            });
+          }
+        } finally {
+          if (isMounted) setPermissionsLoaded(true);
+        }
+      };
+
+      fetchAgentPermissions();
+    } else {
+      setPermissions({
+        canRead: true,
+        canCreate: true,
+        canUpdate: true,
+        canDelete: true,
+      });
+      setPermissionsLoaded(true);
+    }
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
+
+  useEffect(() => {
+    if (!permissionsLoaded) return;
+    if (!permissions.canRead) {
+      setClaims([]);
+      setLoading(false);
+      return;
+    }
+    fetchClaims();
+  }, [permissionsLoaded, permissions.canRead]);
 
   const fetchClaims = async () => {
     setLoading(true);
@@ -117,6 +399,7 @@ function PassClaimsPage() {
   };
 
   const handleRelease = async (claimId) => {
+    if (!permissions.canCreate) return;
     setActionLoading(true);
     try {
       const headers = getAuthHeaders();
@@ -138,6 +421,7 @@ function PassClaimsPage() {
   };
 
   const handleReject = async () => {
+    if (!permissions.canDelete) return;
     if (!rejectionNote.trim()) {
       alert("Please provide a rejection note");
       return;
@@ -191,6 +475,27 @@ function PassClaimsPage() {
       minute: "2-digit",
     });
   };
+
+  if (!permissionsLoaded) {
+    return <Loader />;
+  }
+
+  if (!permissions.canRead) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-8 text-center max-w-md">
+          <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Shield className="w-8 h-8 text-yellow-600" />
+          </div>
+          <h3 className="text-lg font-bold text-gray-900 mb-2">Access Denied</h3>
+          <p className="text-sm text-gray-700">
+            You do not have permission to view pass claims. Please contact your
+            administrator.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -406,22 +711,26 @@ function PassClaimsPage() {
                       </button>
                       {claim.status === "Approved" && (
                         <>
-                          <button
-                            onClick={() => handleRelease(claim._id)}
-                            disabled={actionLoading}
-                            className="flex items-center gap-1.5 px-3 py-2 bg-teal-600 text-white text-[11px] font-bold rounded-lg hover:bg-teal-700 transition-all shadow-sm disabled:opacity-50 uppercase tracking-tight"
-                          >
-                            <CheckCircle className="w-3.5 h-3.5" />
-                            Release
-                          </button>
-                          <button
-                            onClick={() => setRejectModal(claim)}
-                            disabled={actionLoading}
-                            className="p-2 bg-white text-red-600 hover:bg-red-50 border border-red-100 rounded-lg transition-all shadow-sm disabled:opacity-50"
-                            title="Reject Back to Doctor"
-                          >
-                            <XCircle className="w-4 h-4" />
-                          </button>
+                          {permissions.canCreate && (
+                            <button
+                              onClick={() => handleRelease(claim._id)}
+                              disabled={actionLoading}
+                              className="flex items-center gap-1.5 px-3 py-2 bg-teal-600 text-white text-[11px] font-bold rounded-lg hover:bg-teal-700 transition-all shadow-sm disabled:opacity-50 uppercase tracking-tight"
+                            >
+                              <CheckCircle className="w-3.5 h-3.5" />
+                              Release
+                            </button>
+                          )}
+                          {permissions.canDelete && (
+                            <button
+                              onClick={() => setRejectModal(claim)}
+                              disabled={actionLoading}
+                              className="p-2 bg-white text-red-600 hover:bg-red-50 border border-red-100 rounded-lg transition-all shadow-sm disabled:opacity-50"
+                              title="Reject Back to Doctor"
+                            >
+                              <XCircle className="w-4 h-4" />
+                            </button>
+                          )}
                         </>
                       )}
                     </div>
