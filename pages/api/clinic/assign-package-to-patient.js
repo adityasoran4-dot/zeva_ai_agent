@@ -27,7 +27,7 @@ export default async function handler(req, res) {
     return res.status(403).json({ success: false, message: clinicError || "Unable to determine clinic" });
   }
 
-  const { patientId, packageId, validityInMonths, startDate, endDate, totalPrice, paidAmount, paymentStatus, paymentMethod } = req.body;
+  const { patientId, packageId, validityInMonths, startDate, endDate, totalPrice, paidAmount, paymentStatus, paymentMethod, advanceBalanceUsed, claimAmountUsed } = req.body;
   if (!patientId || !packageId) {
     return res.status(400).json({ success: false, message: "patientId and packageId are required" });
   }
@@ -57,6 +57,8 @@ export default async function handler(req, res) {
       paidAmount: paidAmount !== undefined ? parseFloat(paidAmount) : 0,
       paymentStatus: paymentStatus || "Unpaid",
       paymentMethod: paymentMethod || "",
+      advanceBalanceUsed: advanceBalanceUsed !== undefined ? parseFloat(advanceBalanceUsed) : 0,
+      claimAmountUsed: claimAmountUsed !== undefined ? parseFloat(claimAmountUsed) : 0,
     };
 
     // Push package to patient's packages array

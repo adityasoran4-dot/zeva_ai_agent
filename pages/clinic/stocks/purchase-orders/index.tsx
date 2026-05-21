@@ -19,7 +19,49 @@ import EditPurchaseOrderModal from "./_components/EditPurchaseOrderModal";
 import PurchaseOrderDetailModal from "./_components/PurchaseOrderDetailModal";
 import ConvertPurchaseRequestModal from "./_components/ConvertPurchaseRequestModal";
 import FilterModal from "./_components/FilterModal";
+
 // import AddStockItemModal from "@/components/shared/AddStockItemModal";
+
+const TOKEN_PRIORITY = [
+  "clinicToken",
+  "doctorToken",
+  "agentToken",
+  "staffToken",
+  "userToken",
+  "adminToken",
+];
+
+const getStoredToken = () => {
+  if (typeof window === "undefined") return null;
+  for (const key of TOKEN_PRIORITY) {
+    const value = window.localStorage.getItem(key) || window.sessionStorage.getItem(key);
+    if (value) return value;
+  }
+  return null;
+};
+
+const getUserInfo = (): { role: string | null; id: string | null } => {
+  if (typeof window === "undefined") return { role: null, id: null };
+  try {
+    for (const key of TOKEN_PRIORITY) {
+      const token = window.localStorage.getItem(key) || window.sessionStorage.getItem(key);
+      if (!token) continue;
+      const base64Url = token.split(".")[1];
+      if (!base64Url) continue;
+      const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+      const jsonPayload = decodeURIComponent(
+        atob(base64).split("").map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2)).join(""),
+      );
+      const decoded = JSON.parse(jsonPayload);
+      return { role: decoded.role || decoded.userRole || null, id: decoded.userId || decoded.id || null };
+    }
+  } catch (error) {
+    console.error("Error getting user info:", error);
+  }
+  return { role: null, id: null };
+};
+
+const getUserRole = (): string | null => getUserInfo().role;
 
 const PurchaseOrdersPage: NextPageWithLayout = () => {
   const token = getTokenByPath();
@@ -65,6 +107,15 @@ const PurchaseOrdersPage: NextPageWithLayout = () => {
     toDate: new Date().toISOString().split("T")[0],
     status: "",
   });
+
+  // Permission state
+  const [permissions, setPermissions] = useState({
+    canRead: false,
+    canCreate: false,
+    canUpdate: false,
+    canDelete: false,
+  });
+  const [_permissionsLoaded, setPermissionsLoaded] = useState(false);
 
   // Fetch purchase orders with proper error handling
   const fetchPurchaseOrders = useCallback(
@@ -131,10 +182,12 @@ const PurchaseOrdersPage: NextPageWithLayout = () => {
     [pagination.limit],
   );
 
-  // Initial fetch on mount
+  // Initial fetch on mount - only after permissions are loaded
   useEffect(() => {
-    fetchPurchaseOrders(1, "", filterData);
-  }, []);
+    if (_permissionsLoaded) {
+      fetchPurchaseOrders(1, "", filterData);
+    }
+  }, [_permissionsLoaded, filterData]);
 
   // Handle page change
   const handlePageChange = useCallback(
@@ -145,8 +198,10 @@ const PurchaseOrdersPage: NextPageWithLayout = () => {
   );
 
   useEffect(() => {
-    fetchPurchaseOrders(1, searchTerm, filterData);
-  }, [searchTerm, filterData]);
+    if (_permissionsLoaded) {
+      fetchPurchaseOrders(1, searchTerm, filterData);
+    }
+  }, [searchTerm, filterData, _permissionsLoaded]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -168,6 +223,287 @@ const PurchaseOrdersPage: NextPageWithLayout = () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
+
+  // Check which tokens exist
+  const clinicToken =
+    typeof window !== "undefined"
+      ? window.localStorage.getItem("clinicToken") ||
+        window.sessionStorage.getItem("clinicToken")
+      : null;
+  const doctorToken =
+    typeof window !== "undefined"
+      ? window.localStorage.getItem("doctorToken") ||
+        window.sessionStorage.getItem("doctorToken")
+      : null;
+  const agentToken =
+    typeof window !== "undefined"
+      ? window.localStorage.getItem("agentToken") ||
+        window.sessionStorage.getItem("agentToken")
+      : null;
+  const staffToken =
+    typeof window !== "undefined"
+      ? window.localStorage.getItem("staffToken") ||
+        window.sessionStorage.getItem("staffToken")
+      : null;
+  const userToken =
+    typeof window !== "undefined"
+      ? window.localStorage.getItem("userToken") ||
+        window.sessionStorage.getItem("userToken")
+      : null;
+
+  // Handle clinic permissions - clinic, doctor have admin-level permissions; agent/doctorStaff need checks
+  useEffect(() => {
+    let isMounted = true;
+    const userRole = getUserRole();
+    const authToken =
+      clinicToken || doctorToken || agentToken || staffToken || userToken;
+
+    // For admin role, grant full access (bypass permission checks)
+    if (userRole === "admin") {
+      if (!isMounted) return;
+      setPermissions({
+        canRead: true,
+        canCreate: true,
+        canUpdate: true,
+        canDelete: true,
+      });
+      setPermissionsLoaded(true);
+      return;
+    }
+
+    // For clinic and doctor roles, fetch admin-level permissions from /api/clinic/sidebar-permissions
+    if (userRole === "clinic" || userRole === "doctor") {
+      const fetchClinicPermissions = async () => {
+        try {
+          if (!authToken) {
+            if (!isMounted) return;
+            setPermissions({
+              canRead: false,
+              canCreate: false,
+              canUpdate: false,
+              canDelete: false,
+            });
+            setPermissionsLoaded(true);
+            return;
+          }
+
+          const res = await axios.get("/api/clinic/sidebar-permissions", {
+            headers: { Authorization: `Bearer ${authToken}` },
+          });
+
+          if (!isMounted) return;
+
+          if (res.data.success) {
+            // Check if permissions array exists and is not null
+            // If permissions is null, admin hasn't set any restrictions yet - allow full access (backward compatibility)
+            if (
+              res.data.permissions === null ||
+              !Array.isArray(res.data.permissions) ||
+              res.data.permissions.length === 0
+            ) {
+              // No admin restrictions set yet - default to full access for backward compatibility
+              setPermissions({
+                canRead: true,
+                canCreate: true,
+                canUpdate: true,
+                canDelete: true,
+              });
+            } else {
+              // Admin has set permissions - check the clinic_stock_purchase_orders module
+              // First check for the specific module key
+              let modulePermission = res.data.permissions.find((p: any) => {
+                if (!p?.module) return false;
+                if (p.module === "clinic_stock_purchase_orders") return true;
+                if (p.module === "clinic_stock_Purchase_Orders") return true;
+                if (p.module === "purchase_orders") return true;
+                if (p.module === "stock_purchase_orders") return true;
+                return false;
+              });
+
+              // If not found as direct module, check parent clinic_stock module's subModules
+              if (!modulePermission) {
+                const parentStockModule = res.data.permissions.find((p: any) =>
+                  p?.module === "clinic_stock" && Array.isArray(p.subModules)
+                );
+                if (parentStockModule) {
+                  modulePermission = parentStockModule.subModules.find((sm: any) =>
+                    sm?.moduleKey === "clinic_stock_purchase_orders"
+                  );
+                }
+              }
+
+              if (modulePermission) {
+                const actions = modulePermission.actions || {};
+
+                // Check if "all" is true, which grants all permissions
+                const moduleAll =
+                  actions.all === true ||
+                  actions.all === "true" ||
+                  String(actions.all).toLowerCase() === "true";
+                const moduleCreate =
+                  actions.create === true ||
+                  actions.create === "true" ||
+                  String(actions.create).toLowerCase() === "true";
+                const moduleRead =
+                  actions.read === true ||
+                  actions.read === "true" ||
+                  String(actions.read).toLowerCase() === "true";
+                const moduleUpdate =
+                  actions.update === true ||
+                  actions.update === "true" ||
+                  String(actions.update).toLowerCase() === "true";
+                const moduleDelete =
+                  actions.delete === true ||
+                  actions.delete === "true" ||
+                  String(actions.delete).toLowerCase() === "true";
+
+                setPermissions({
+                  canRead: moduleAll || moduleRead,
+                  canCreate: moduleAll || moduleCreate,
+                  canUpdate: moduleAll || moduleUpdate,
+                  canDelete: moduleAll || moduleDelete,
+                });
+              } else {
+                // Module permission not found in the permissions array - default to read-only
+                setPermissions({
+                  canRead: true, // Clinic/doctor can always read their own data
+                  canCreate: false,
+                  canUpdate: false,
+                  canDelete: false,
+                });
+              }
+            }
+          } else {
+            // API response doesn't have permissions, default to full access (backward compatibility)
+            setPermissions({
+              canRead: true,
+              canCreate: true,
+              canUpdate: true,
+              canDelete: true,
+            });
+          }
+        } catch (err: any) {
+          console.error("Error fetching clinic sidebar permissions:", err);
+          // On error, default to full access (backward compatibility)
+          if (isMounted) {
+            setPermissions({
+              canRead: true,
+              canCreate: true,
+              canUpdate: true,
+              canDelete: true,
+            });
+          }
+        } finally {
+          if (isMounted) {
+            setPermissionsLoaded(true);
+          }
+        }
+      };
+
+      fetchClinicPermissions();
+      return;
+    }
+
+    // For agent/doctorStaff tokens, check permissions using agent permissions API
+    const agentStaffToken = getStoredToken();
+    if (!agentStaffToken) {
+      setPermissions({
+        canRead: false,
+        canCreate: false,
+        canUpdate: false,
+        canDelete: false,
+      });
+      setPermissionsLoaded(true);
+      return;
+    }
+
+    // Only check permissions for agent/doctorStaff roles
+    if (agentToken || staffToken || userToken) {
+      const fetchPermissions = async () => {
+        try {
+          console.log(
+            "Fetching Agent/Staff Permissions for clinic_stock_purchase_orders...",
+          );
+          setPermissionsLoaded(false);
+          // Use agent permissions API for agent/doctorStaff
+          const res = await axios.get("/api/agent/get-module-permissions", {
+            params: { moduleKey: "clinic_stock_purchase_orders" },
+            headers: { Authorization: `Bearer ${agentStaffToken}` },
+          });
+          const data = res.data;
+          console.log("Agent Permissions API Response:", data);
+
+          if (!isMounted) return;
+
+
+          // Default to true if module not found in permissions (matches backend logic)
+          if (
+            !data?.permissions &&
+            data?.error?.includes("not found in agent permissions")
+          ) {
+            console.log(
+              "Module not found in permissions, granting full access by default",
+            );
+            setPermissions({
+              canRead: true,
+              canCreate: true,
+              canUpdate: true,
+              canDelete: true,
+            });
+            return;
+          }
+
+          const actions =
+            data?.permissions?.actions || data?.data?.moduleActions || {};
+          const isTrue = (val: any) =>
+            val === true ||
+            val === "true" ||
+            String(val || "").toLowerCase() === "true";
+
+          const canAll = isTrue(actions.all);
+
+          const newPerms = {
+            canRead: canAll || isTrue(actions.read),
+            canCreate: canAll || isTrue(actions.create),
+            canUpdate: canAll || isTrue(actions.update),
+            canDelete: canAll || isTrue(actions.delete),
+          };
+
+          console.log("Final Agent/Staff Permissions:", newPerms);
+          setPermissions(newPerms);
+        } catch (err: any) {
+          console.error("Error fetching agent permissions:", err);
+          // Swallow agent permission errors; they will just result in no extra access
+          setPermissions({
+            canRead: false,
+            canCreate: false,
+            canUpdate: false,
+            canDelete: false,
+          });
+        } finally {
+          if (isMounted) {
+            setPermissionsLoaded(true);
+          }
+        }
+      };
+
+      fetchPermissions();
+    } else {
+      // Unknown token type - default to full access (likely clinic/doctor)
+      if (!isMounted) return;
+      setPermissions({
+        canRead: true,
+        canCreate: true,
+        canUpdate: true,
+        canDelete: true,
+      });
+      setPermissionsLoaded(true);
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [clinicToken, doctorToken, agentToken, staffToken, userToken]);
 
   // Toggle row expansion for showing items
   const toggleRowExpansion = (id: string) => {
@@ -256,6 +592,64 @@ const PurchaseOrdersPage: NextPageWithLayout = () => {
     setPurchaseOrderForDetail(null);
   }, []);
 
+  // Show access denied message if no read permission (but still allow create if permitted)
+  if (!permissions.canRead) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-8 text-center max-w-md">
+          <div className="w-16 h-16 bg-yellow-100 dark:bg-yellow-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+          </div>
+          <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-2">
+            Access Denied
+          </h3>
+          <p className="text-sm text-gray-700 dark:text-gray-400 mb-4">
+            You do not have permission to view purchase orders. Please contact your administrator.
+          </p>
+          {/* Show create buttons even if read is denied but create is allowed */}
+          {permissions.canCreate && (
+            <div className="flex flex-col gap-2 mt-4">
+              <button
+                className="cursor-pointer inline-flex items-center justify-center gap-1.5 bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 text-xs sm:text-sm font-medium"
+                onClick={handleConvertPurchaseRequest}
+              >
+                <FileText className="h-5 w-5" />
+                Convert Purchase Request
+              </button>
+              <button
+                className="cursor-pointer inline-flex items-center justify-center gap-1.5 bg-gray-800 hover:bg-gray-900 text-white px-3 py-2 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 text-xs sm:text-sm font-medium"
+                onClick={handleAddPurchaseOrder}
+              >
+                <PlusIcon className="h-5 w-5 mr-2" />
+                Add Purchase Order
+              </button>
+            </div>
+          )}
+        </div>
+        {/* Modals for create functionality even when read is denied */}
+        <ConvertPurchaseRequestModal
+          token={token || ""}
+          isOpen={isConvertModalOpen}
+          onClose={() => setIsConvertModalOpen(false)}
+          onSuccess={(purchaseOrderData: PurchaseRecord) => {
+            setIsConvertModalOpen(false);
+          }}
+        />
+        <AddPurchaseOrderModal
+          token={token || ""}
+          isOpen={isAddModalOpen}
+          onClose={() => setIsAddModalOpen(false)}
+          onSuccess={(purchaseOrderData: PurchaseRecord) => {
+            setIsAddModalOpen(false);
+          }}
+        />
+      </div>
+    );
+  }
+
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-6">
       {/* Header Section */}
@@ -278,20 +672,24 @@ const PurchaseOrdersPage: NextPageWithLayout = () => {
                 <Filter className="h-5 w-5" />
                 Advanced Filter
               </button>
-              <button
-                className="cursor-pointer inline-flex items-center justify-center gap-1.5 bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 text-xs sm:text-sm font-medium"
-                onClick={handleConvertPurchaseRequest}
-              >
-                <FileText className="h-5 w-5" />
-                Convert Purchase Request
-              </button>
-              <button
-                className="cursor-pointer inline-flex items-center justify-center gap-1.5 bg-gray-800 hover:bg-gray-900 text-white px-3 py-2 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 text-xs sm:text-sm font-medium"
-                onClick={handleAddPurchaseOrder}
-              >
-                <PlusIcon className="h-5 w-5 mr-2" />
-                Add Purchase Order
-              </button>
+              {permissions.canCreate && (
+                <>
+                  <button
+                    className="cursor-pointer inline-flex items-center justify-center gap-1.5 bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 text-xs sm:text-sm font-medium"
+                    onClick={handleConvertPurchaseRequest}
+                  >
+                    <FileText className="h-5 w-5" />
+                    Convert Purchase Request
+                  </button>
+                  <button
+                    className="cursor-pointer inline-flex items-center justify-center gap-1.5 bg-gray-800 hover:bg-gray-900 text-white px-3 py-2 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 text-xs sm:text-sm font-medium"
+                    onClick={handleAddPurchaseOrder}
+                  >
+                    <PlusIcon className="h-5 w-5 mr-2" />
+                    Add Purchase Order
+                  </button>
+                </>
+              )}
             </div>
 
             {/* Convert Purchase Request Modal */}
@@ -610,6 +1008,8 @@ const PurchaseOrdersPage: NextPageWithLayout = () => {
               <button
                 onClick={handleAddPurchaseOrder}
                 className="cursor-pointer inline-flex items-center justify-center gap-2 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white px-4 py-2.5 rounded-xl shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200 text-sm font-semibold"
+                disabled={!permissions.canCreate}
+                title={!permissions.canCreate ? "You do not have permission to add purchase orders" : ""}
               >
                 <ShoppingCart className="h-5 w-5" />
                 Add First Order
@@ -932,25 +1332,27 @@ const PurchaseOrdersPage: NextPageWithLayout = () => {
                                       : "Show Items"}
                                   </div>
                                 </button>
-                                <button
-                                  onClick={() => {
-                                    handleDeleteClick(order);
-                                    // Close the dropdown after clicking
-                                    const menuEl = document.getElementById(
-                                      `menu-${order._id}`,
-                                    );
-                                    if (menuEl) {
-                                      menuEl.classList.remove("block");
-                                      menuEl.classList.add("hidden");
-                                    }
-                                  }}
-                                  className="block w-full px-4 py-2 text-left text-sm text-red-700 hover:bg-red-50"
-                                >
-                                  <div className="flex items-center">
-                                    <TrashIcon className="h-4 w-4 mr-2" />
-                                    Delete
-                                  </div>
-                                </button>
+                                {permissions.canDelete && (
+                                  <button
+                                    onClick={() => {
+                                      handleDeleteClick(order);
+                                      // Close the dropdown after clicking
+                                      const menuEl = document.getElementById(
+                                        `menu-${order._id}`,
+                                      );
+                                      if (menuEl) {
+                                        menuEl.classList.remove("block");
+                                        menuEl.classList.add("hidden");
+                                      }
+                                    }}
+                                    className="block w-full px-4 py-2 text-left text-sm text-red-700 hover:bg-red-50"
+                                  >
+                                    <div className="flex items-center">
+                                      <TrashIcon className="h-4 w-4 mr-2" />
+                                      Delete
+                                    </div>
+                                  </button>
+                                )}
                               </div>
                             </div>
                           </div>

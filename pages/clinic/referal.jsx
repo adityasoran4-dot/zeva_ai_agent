@@ -23,6 +23,7 @@ function ClinicReferralPage() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [migrating, setMigrating] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({
     firstName: "",
@@ -516,6 +517,29 @@ function ClinicReferralPage() {
     setShowModal(true);
   };
 
+  const handleMigrate = async () => {
+    const headers = getAuthHeaders();
+    if (!headers) {
+      showToast("Authentication required", "error");
+      return;
+    }
+    setMigrating(true);
+    try {
+      const res = await axios.post("/api/clinic/migrate-patient-clinicid", {}, { headers });
+      console.log("Migration API response:", res.data);
+      if (res.data.success) {
+        showToast(res.data.message, "success");
+      } else {
+        showToast(res.data.message || "Migration failed", "error");
+      }
+    } catch (err) {
+      console.error("Migration error:", err);
+      showToast("Network error during migration", "error");
+    } finally {
+      setMigrating(false);
+    }
+  };
+
   const handleDelete = async (id) => {
     const headers = getAuthHeaders();
     if (!headers) {
@@ -576,20 +600,29 @@ function ClinicReferralPage() {
               <h2 className="text-sm sm:text-base font-bold text-teal-900">Referral Management</h2>
               <p className="text-[10px] sm:text-xs text-teal-700">Create, update, and delete referral contacts</p>
             </div>
-            <button
-              className={`px-3 py-1.5 text-white text-xs rounded-md flex items-center gap-1 ${permissions.canCreate ? "bg-teal-600 hover:bg-teal-700" : "bg-gray-400 cursor-not-allowed"}`}
-              onClick={() => {
-                console.log("New button clicked, canCreate:", permissions.canCreate);
-                if (!permissions.canCreate) return;
-                resetForm();
-                setShowModal(true);
-              }}
-              disabled={!permissions.canCreate}
-              title={!permissions.canCreate ? "No permission to create referral" : ""}
-            >
-              <Plus className="w-4 h-4" />
-              New
-            </button>
+            <div className="flex gap-2">
+              <button
+                className={`px-3 py-1.5 text-white text-xs rounded-md flex items-center gap-1 ${migrating ? "bg-gray-500 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"}`}
+                onClick={handleMigrate}
+                disabled={migrating}
+              >
+                {migrating ? "Migrating..." : "Migrate Clinic ID"}
+              </button>
+              <button
+                className={`px-3 py-1.5 text-white text-xs rounded-md flex items-center gap-1 ${permissions.canCreate ? "bg-teal-600 hover:bg-teal-700" : "bg-gray-400 cursor-not-allowed"}`}
+                onClick={() => {
+                  console.log("New button clicked, canCreate:", permissions.canCreate);
+                  if (!permissions.canCreate) return;
+                  resetForm();
+                  setShowModal(true);
+                }}
+                disabled={!permissions.canCreate}
+                title={!permissions.canCreate ? "No permission to create referral" : ""}
+              >
+                <Plus className="w-4 h-4" />
+                New
+              </button>
+            </div>
           </div>
 
           <div>

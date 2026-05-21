@@ -18,6 +18,45 @@ import DeleteConsumptionModal from "./_components/DeleteConsumptionModal";
 import FilterModal from "./_components/FilterModal";
 import ConsumptionDetailModal from "./_components/ConsumptionDetailModal";
 
+const TOKEN_PRIORITY = [
+  "clinicToken",
+  "doctorToken",
+  "agentToken",
+  "staffToken",
+  "userToken",
+  "adminToken",
+];
+const getStoredToken = () => {
+  if (typeof window === "undefined") return null;
+  for (const key of TOKEN_PRIORITY) {
+    const value = window.localStorage.getItem(key) || window.sessionStorage.getItem(key);
+    if (value) return value;
+  }
+  return null;
+};
+const getUserInfo = (): { role: string | null; id: string | null } => {
+  if (typeof window === "undefined") return { role: null, id: null };
+  try {
+    for (const key of TOKEN_PRIORITY) {
+      const token = window.localStorage.getItem(key) || window.sessionStorage.getItem(key);
+      if (!token) continue;
+      const base64Url = token.split(".")[1];
+      if (!base64Url) continue;
+      const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+      const jsonPayload = decodeURIComponent(
+        atob(base64).split("").map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2)).join(""),
+      );
+      const decoded = JSON.parse(jsonPayload);
+      return { role: decoded.role || decoded.userRole || null, id: decoded.userId || decoded.id || null };
+    }
+  } catch (error) {
+    console.error("Error getting user info:", error);
+  }
+  return { role: null, id: null };
+};
+const getUserRole = (): string | null => getUserInfo().role;
+const MODULE_KEY = "clinic_stock_material_consumptions";
+
 const MaterialConsumptionPage: NextPageWithLayout = () => {
   const [records, setRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -56,6 +95,15 @@ const MaterialConsumptionPage: NextPageWithLayout = () => {
     toDate: "",
     status: "",
   });
+
+  // Permission state
+  const [permissions, setPermissions] = useState({
+    canRead: false,
+    canCreate: false,
+    canUpdate: false,
+    canDelete: false,
+  });
+  const [_permissionsLoaded, setPermissionsLoaded] = useState(false);
 
   const fetchRecords = useCallback(
     debounce(async (page = 1, search = "", filters: any = {}) => {
@@ -110,13 +158,134 @@ const MaterialConsumptionPage: NextPageWithLayout = () => {
     }, 300),
     [pagination.limit],
   );
-
+  // Permission handling useEffect
   useEffect(() => {
-    fetchRecords(1, searchTerm, filterData);
-  }, [searchTerm, filterData, fetchRecords]);
+    let isMounted = true;
+    const userRole = getUserRole();
+    const clinicToken = typeof window !== "undefined" ? localStorage.getItem("clinicToken") || sessionStorage.getItem("clinicToken") : null;
+    const doctorToken = typeof window !== "undefined" ? localStorage.getItem("doctorToken") || sessionStorage.getItem("doctorToken") : null;
+    const agentToken = typeof window !== "undefined" ? localStorage.getItem("agentToken") || sessionStorage.getItem("agentToken") : null;
+    const staffToken = typeof window !== "undefined" ? localStorage.getItem("staffToken") || sessionStorage.getItem("staffToken") : null;
+    const userToken = typeof window !== "undefined" ? localStorage.getItem("userToken") || sessionStorage.getItem("userToken") : null;
+    const authToken = clinicToken || doctorToken || agentToken || staffToken || userToken;
+    if (userRole === "admin") {
+      if (!isMounted) return;
+      setPermissions({ canRead: true, canCreate: true, canUpdate: true, canDelete: true });
+      setPermissionsLoaded(true);
+      return;
+    }
+    if (userRole === "clinic" || userRole === "doctor") {
+      const fetchClinicPermissions = async () => {
+        try {
+          if (!authToken) {
+            if (!isMounted) return;
+            setPermissions({ canRead: false, canCreate: false, canUpdate: false, canDelete: false });
+            setPermissionsLoaded(true);
+            return;
+          }
+          const res = await axios.get("/api/clinic/sidebar-permissions", {
+            headers: { Authorization: `Bearer ${authToken}` },
+          });
+          if (!isMounted) return;
+          if (res.data.success) {
+            if (res.data.permissions === null || !Array.isArray(res.data.permissions) || res.data.permissions.length === 0) {
+              setPermissions({ canRead: true, canCreate: true, canUpdate: true, canDelete: true });
+            } else {
+              let modulePermission = res.data.permissions.find((p: any) => {
+                if (!p?.module) return false;
+                if (p.module === "clinic_stock_material_consumptions") return true;
+                if (p.module === "material_consumptions") return true;
+                if (p.module === "stock_material_consumptions") return true;
+                return false;
+              });
+              if (!modulePermission) {
+                const parentStockModule = res.data.permissions.find((p: any) =>
+                  p?.module === "clinic_stock" && Array.isArray(p.subModules)
+                );
+                if (parentStockModule) {
+                  modulePermission = parentStockModule.subModules.find((sm: any) =>
+                    sm?.moduleKey === "clinic_stock_material_consumptions"
+                  );
+                }
+              }
+              if (modulePermission) {
+                const actions = modulePermission.actions || {};
+                const moduleAll = actions.all === true || actions.all === "true" || String(actions.all).toLowerCase() === "true";
+                const moduleCreate = actions.create === true || actions.create === "true" || String(actions.create).toLowerCase() === "true";
+                const moduleRead = actions.read === true || actions.read === "true" || String(actions.read).toLowerCase() === "true";
+                const moduleUpdate = actions.update === true || actions.update === "true" || String(actions.update).toLowerCase() === "true";
+                const moduleDelete = actions.delete === true || actions.delete === "true" || String(actions.delete).toLowerCase() === "true";
+                setPermissions({
+                  canRead: moduleAll || moduleRead,
+                  canCreate: moduleAll || moduleCreate,
+                  canUpdate: moduleAll || moduleUpdate,
+                  canDelete: moduleAll || moduleDelete,
+                });
+              } else {
+                setPermissions({ canRead: true, canCreate: false, canUpdate: false, canDelete: false });
+              }
+            }
+          } else {
+            setPermissions({ canRead: true, canCreate: true, canUpdate: true, canDelete: true });
+          }
+        } catch (err) {
+          console.error("Error fetching clinic sidebar permissions:", err);
+          if (isMounted) setPermissions({ canRead: true, canCreate: true, canUpdate: true, canDelete: true });
+        } finally {
+          if (isMounted) setPermissionsLoaded(true);
+        }
+      };
+      fetchClinicPermissions();
+      return;
+    }
+    const agentStaffToken = getStoredToken();
+    if (!agentStaffToken) {
+      setPermissions({ canRead: false, canCreate: false, canUpdate: false, canDelete: false });
+      setPermissionsLoaded(true);
+      return;
+    }
+    if (agentToken || staffToken || userToken) {
+      const fetchPermissions = async () => {
+        try {
+          setPermissionsLoaded(false);
+          const res = await axios.get("/api/agent/get-module-permissions", {
+            params: { moduleKey: MODULE_KEY },
+            headers: { Authorization: `Bearer ${agentStaffToken}` },
+          });
+          const data = res.data;
+          if (!isMounted) return;
+          if (!data?.permissions && data?.error?.includes("not found in agent permissions")) {
+            setPermissions({ canRead: true, canCreate: true, canUpdate: true, canDelete: true });
+            return;
+          }
+          const actions = data?.permissions?.actions || data?.data?.moduleActions || {};
+          const isTrue = (val: any) => val === true || val === "true" || String(val || "").toLowerCase() === "true";
+          const canAll = isTrue(actions.all);
+          setPermissions({
+            canRead: canAll || isTrue(actions.read),
+            canCreate: canAll || isTrue(actions.create),
+            canUpdate: canAll || isTrue(actions.update),
+            canDelete: canAll || isTrue(actions.delete),
+          });
+        } catch (err) {
+          console.error("Error fetching agent permissions:", err);
+          setPermissions({ canRead: false, canCreate: false, canUpdate: false, canDelete: false });
+        } finally {
+          if (isMounted) setPermissionsLoaded(true);
+        }
+      };
+      fetchPermissions();
+    } else {
+      setPermissions({ canRead: true, canCreate: true, canUpdate: true, canDelete: true });
+      setPermissionsLoaded(true);
+    }
+    return () => { isMounted = false; };
+  }, []);
+  useEffect(() => {
+    if (_permissionsLoaded) fetchRecords(1, searchTerm, filterData);
+  }, [_permissionsLoaded, searchTerm, filterData, fetchRecords]);
 
   const displayData = records.slice(0, pagination.limit || 10);
-
   const handlePageChange = (newPage: number) => {
     if (newPage >= 1 && newPage <= pagination.totalPages) {
       fetchRecords(newPage, searchTerm, filterData);
@@ -172,6 +341,43 @@ const MaterialConsumptionPage: NextPageWithLayout = () => {
     }));
   };
 
+  // Show access denied message if no read permission (but still allow create if permitted)
+  if (!permissions.canRead) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-8 text-center max-w-md">
+          <div className="w-16 h-16 bg-yellow-100 dark:bg-yellow-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+          </div>
+          <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-2">
+            Access Denied
+          </h3>
+          <p className="text-sm text-gray-700 dark:text-gray-400 mb-4">
+            You do not have permission to view material consumptions. Please contact your administrator.
+          </p>
+          {permissions.canCreate && (
+            <button
+              className="cursor-pointer inline-flex items-center justify-center gap-1.5 bg-gray-800 hover:bg-gray-900 text-white px-3 py-2 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 text-xs sm:text-sm font-medium mt-4"
+              onClick={handleAdd}
+            >
+              <PlusIcon className="h-5 w-5 mr-2" />
+              New Consumption
+            </button>
+          )}
+        </div>
+        <AddConsumptionModal
+          isOpen={isAddOpen}
+          onClose={() => setIsAddOpen(false)}
+          onSuccess={() => {
+            setIsAddOpen(false);
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="bg-gradient-to-r from-indigo-500 to-indigo-600 px-4 py-8 sm:px-6 lg:px-8">
@@ -192,15 +398,15 @@ const MaterialConsumptionPage: NextPageWithLayout = () => {
               <Filter className="h-4 w-4" />
               Filter
             </button>
-
-            <button
-              onClick={handleAdd}
-              className="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-indigo-600 hover:bg-gray-50 rounded-lg font-medium transition-colors"
-            >
-              <PlusIcon className="h-5 w-5" />
-              New Consumption
-            </button>
-
+            {permissions.canCreate && (
+              <button
+                onClick={handleAdd}
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-indigo-600 hover:bg-gray-50 rounded-lg font-medium transition-colors"
+              >
+                <PlusIcon className="h-5 w-5" />
+                New Consumption
+              </button>
+            )}
             <AddConsumptionModal
               isOpen={isAddOpen}
               onClose={() => setIsAddOpen(false)}
@@ -535,24 +741,26 @@ const MaterialConsumptionPage: NextPageWithLayout = () => {
                               className={`hidden absolute ${idx >= displayData?.length - 2 ? "bottom-0 right-0" : "right-0"} z-10 mt-2 w-48 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-gray-200 ring-opacity-5 focus:outline-none`}
                             >
                               <div className="py-1" role="none">
-                                <button
-                                  onClick={() => {
-                                    handleEdit(r);
-                                    const menuEl = document.getElementById(
-                                      `menu-${r._id}`,
-                                    );
-                                    if (menuEl) {
-                                      menuEl.classList.remove("block");
-                                      menuEl.classList.add("hidden");
-                                    }
-                                  }}
-                                  className="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"
-                                >
-                                  <div className="flex items-center">
-                                    <PencilIcon className="h-4 w-4 mr-2" />
-                                    Edit
-                                  </div>
-                                </button>
+                                {permissions.canUpdate && (
+                                  <button
+                                    onClick={() => {
+                                      handleEdit(r);
+                                      const menuEl = document.getElementById(
+                                        `menu-${r._id}`,
+                                      );
+                                      if (menuEl) {
+                                        menuEl.classList.remove("block");
+                                        menuEl.classList.add("hidden");
+                                      }
+                                    }}
+                                    className="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"
+                                  >
+                                    <div className="flex items-center">
+                                      <PencilIcon className="h-4 w-4 mr-2" />
+                                      Edit
+                                    </div>
+                                  </button>
+                                )}
                                 <button
                                   onClick={() => {
                                     // Open print page in new tab
@@ -646,24 +854,26 @@ const MaterialConsumptionPage: NextPageWithLayout = () => {
                                     Details
                                   </div>
                                 </button>
-                                <button
-                                  onClick={() => {
-                                    handleDelete(r);
-                                    const menuEl = document.getElementById(
-                                      `menu-${r._id}`,
-                                    );
-                                    if (menuEl) {
-                                      menuEl.classList.remove("block");
-                                      menuEl.classList.add("hidden");
-                                    }
-                                  }}
-                                  className="block w-full px-4 py-2 text-left text-sm text-red-700 hover:bg-red-50"
-                                >
-                                  <div className="flex items-center">
-                                    <TrashIcon className="h-4 w-4 mr-2" />
-                                    Delete
-                                  </div>
-                                </button>
+                                {permissions.canDelete && (
+                                  <button
+                                    onClick={() => {
+                                      handleDelete(r);
+                                      const menuEl = document.getElementById(
+                                        `menu-${r._id}`,
+                                      );
+                                      if (menuEl) {
+                                        menuEl.classList.remove("block");
+                                        menuEl.classList.add("hidden");
+                                      }
+                                    }}
+                                    className="block w-full px-4 py-2 text-left text-sm text-red-700 hover:bg-red-50"
+                                  >
+                                    <div className="flex items-center">
+                                      <TrashIcon className="h-4 w-4 mr-2" />
+                                      Delete
+                                    </div>
+                                  </button>
+                                )}
                               </div>
                             </div>
                           </div>
