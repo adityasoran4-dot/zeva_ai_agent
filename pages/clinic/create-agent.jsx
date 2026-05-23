@@ -1333,26 +1333,30 @@ const ManageAgentsPage = () => {
                                 }}
                               />
                               <div className="absolute right-0 mt-1 w-40 bg-white border border-gray-200 rounded-md shadow-lg z-20">
-                            <button
-                              className="w-full text-left px-3 py-2 text-[11px] hover:bg-gray-50 text-teal-700 transition-colors"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setMenuAgentId(null);
-                                openView(agent);
-                              }}
-                            >
-                              View
-                            </button>
-                                <button
-                                  className="w-full text-left px-3 py-2 text-[11px] hover:bg-gray-50 text-teal-700 transition-colors border-t border-gray-200"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setMenuAgentId(null);
-                                    openProfile(agent);
-                                  }}
-                                >
-                                  Profile
-                                </button>
+                            {canRead === true && (
+                              <button
+                                className="w-full text-left px-3 py-2 text-[11px] hover:bg-gray-50 text-teal-700 transition-colors"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setMenuAgentId(null);
+                                  openView(agent);
+                                }}
+                              >
+                                View
+                              </button>
+                            )}
+                                {canUpdate === true && (
+                                  <button
+                                    className="w-full text-left px-3 py-2 text-[11px] hover:bg-gray-50 text-teal-700 transition-colors border-t border-gray-200"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setMenuAgentId(null);
+                                      openProfile(agent);
+                                    }}
+                                  >
+                                    Profile
+                                  </button>
+                                )}
                                 {canUpdate === true && (
                                   <>
                                     <button

@@ -32,8 +32,7 @@ const GRNPage: NextPageWithLayout = () => {
     canDelete: true,
   });
   const [permissionsLoaded, setPermissionsLoaded] = useState(false);
-  const [isAgentStaff, setIsAgentStaff] = useState(false);
-  const [role, setRole] = useState<string | null>(null);
+  const [_role, setRole] = useState<string | null>(null);
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -243,11 +242,6 @@ const GRNPage: NextPageWithLayout = () => {
         // Decode JWT to get role
         const decoded = JSON.parse(atob(token.split(".")[1]));
         setRole(decoded.role);
-        setIsAgentStaff(
-          decoded.role === "agent" ||
-            decoded.role === "staff" ||
-            decoded.role === "doctorstaff"
-        );
 
         if (
           decoded.role === "agent" ||

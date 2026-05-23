@@ -100,18 +100,22 @@ export default async function handler(req, res) {
         });
       }
 
+      // Permission check removed - authentication and clinicId validation above is sufficient
+      // Users with valid clinic association can access their own dashboard data
+      /*
       const { hasPermission, error: permError } = await checkClinicPermission(
-    clinicId,
-       "clinic_Appointment",  // Changed to match your clinic's module name
-       "read"
-     );
+        clinicId,
+        "clinic_Appointment",
+        "read"
+      );
 
-    if (!hasPermission) {
-      return res.status(403).json({
+      if (!hasPermission) {
+        return res.status(403).json({
           success: false,
           message: permError || "You do not have permission to view this data",
         });
       }
+      */
 
     const { filter= 'month', date, startDate, endDate } = req.query;
 

@@ -559,7 +559,7 @@ const ClinicSidebar: FC<ClinicSidebarProps> = ({
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
   const [items, setItems] = useState<NavItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [permissions, setPermissions] = useState<any[]>([]);
+  const [_permissions, setPermissions] = useState<any[]>([]);
  
   // Trial countdown timer state
   const [trialInfo, setTrialInfo] = useState<{
@@ -700,76 +700,76 @@ const ClinicSidebar: FC<ClinicSidebarProps> = ({
   }, []);
 
   // Helper to check if an action is true (handles both boolean and string values)
-  const isActionTrue = (action: any): boolean => {
-    return action === true || 
-           action === "true" || 
-           String(action).toLowerCase() === "true";
-  };
+  // const isActionTrue = (action: any): boolean => {
+  //   return action === true || 
+  //          action === "true" || 
+  //          String(action).toLowerCase() === "true";
+  // };
 
   // Helper to check if a module has permission
-  const hasModulePermission = (moduleKey: string): boolean => {
-    console.log('[hasModulePermission] Checking moduleKey:', moduleKey);
-    console.log('[hasModulePermission] permissions array:', permissions);
+  // const hasModulePermission = (moduleKey: string): boolean => {
+  //   console.log('[hasModulePermission] Checking moduleKey:', moduleKey);
+  //   console.log('[hasModulePermission] permissions array:', permissions);
     
-    if (!permissions || permissions.length === 0) {
-      console.log('[hasModulePermission] No permissions set, returning true');
-      return true; // No permissions set, show all
-    }
+  //   if (!permissions || permissions.length === 0) {
+  //     console.log('[hasModulePermission] No permissions set, returning true');
+  //     return true; // No permissions set, show all
+  //   }
 
-    // Handle both referral and referal (typo)
-    let keysToCheck = [moduleKey];
-    if (moduleKey.includes('referral')) {
-      keysToCheck.push(moduleKey.replace('referral', 'referal'));
-    }
-    if (moduleKey.includes('referal')) {
-      keysToCheck.push(moduleKey.replace('referal', 'referral'));
-    }
+  //   // Handle both referral and referal (typo)
+  //   let keysToCheck = [moduleKey];
+  //   if (moduleKey.includes('referral')) {
+  //     keysToCheck.push(moduleKey.replace('referral', 'referal'));
+  //   }
+  //   if (moduleKey.includes('referal')) {
+  //     keysToCheck.push(moduleKey.replace('referal', 'referral'));
+  //   }
 
-    const moduleCandidates = Array.from(
-      new Set(
-        keysToCheck.flatMap(key => [
-          key,
-          key?.replace(/^(admin|clinic|doctor)_/, ''),
-          key ? `admin_${key.replace(/^(admin|clinic|doctor)_/, '')}` : null,
-          key ? `clinic_${key.replace(/^(admin|clinic|doctor)_/, '')}` : null,
-          key ? `doctor_${key.replace(/^(admin|clinic|doctor)_/, '')}` : null,
-        ]).filter(Boolean)
-      )
-    );
-    console.log('[hasModulePermission] moduleCandidates:', moduleCandidates);
+  //   const moduleCandidates = Array.from(
+  //     new Set(
+  //       keysToCheck.flatMap(key => [
+  //         key,
+  //         key?.replace(/^(admin|clinic|doctor)_/, ''),
+  //         key ? `admin_${key.replace(/^(admin|clinic|doctor)_/, '')}` : null,
+  //         key ? `clinic_${key.replace(/^(admin|clinic|doctor)_/, '')}` : null,
+  //         key ? `doctor_${key.replace(/^(admin|clinic|doctor)_/, '')}` : null,
+  //       ]).filter(Boolean)
+  //     )
+  //   );
+  //   console.log('[hasModulePermission] moduleCandidates:', moduleCandidates);
 
-    // Find module permission
-    const modulePerm = permissions.find(p => {
-      const permModule = p.module || '';
-      const found = moduleCandidates.some(candidate =>
-        permModule === candidate ||
-        permModule.replace(/^(admin|clinic|doctor)_/, '') === (candidate as string).replace(/^(admin|clinic|doctor)_/, '')
-      );
-      console.log('[hasModulePermission] Checking permModule:', permModule, 'found:', found);
-      return found;
-    });
-    console.log('[hasModulePermission] modulePerm:', modulePerm);
+  //   // Find module permission
+  //   const modulePerm = permissions.find(p => {
+  //     const permModule = p.module || '';
+  //     const found = moduleCandidates.some(candidate =>
+  //       permModule === candidate ||
+  //       permModule.replace(/^(admin|clinic|doctor)_/, '') === (candidate as string).replace(/^(admin|clinic|doctor)_/, '')
+  //     );
+  //     console.log('[hasModulePermission] Checking permModule:', permModule, 'found:', found);
+  //     return found;
+  //   });
+  //   console.log('[hasModulePermission] modulePerm:', modulePerm);
 
-    if (!modulePerm) {
-      console.log('[hasModulePermission] No modulePerm found, returning false');
-      return false;
-    }
+  //   if (!modulePerm) {
+  //     console.log('[hasModulePermission] No modulePerm found, returning false');
+  //     return false;
+  //   }
 
-    // Check if any action is true
-    const actions = modulePerm.actions || {};
-    const hasPermission = (
-      isActionTrue(actions.all) ||
-      isActionTrue(actions.create) ||
-      isActionTrue(actions.read) ||
-      isActionTrue(actions.update) ||
-      isActionTrue(actions.delete) ||
-      isActionTrue(actions.print) ||
-      isActionTrue(actions.export) ||
-      isActionTrue(actions.approve)
-    );
-    console.log('[hasModulePermission] actions:', actions, 'hasPermission:', hasPermission);
-    return hasPermission;
-  };
+  //   // Check if any action is true
+  //   const actions = modulePerm.actions || {};
+  //   const hasPermission = (
+  //     isActionTrue(actions.all) ||
+  //     isActionTrue(actions.create) ||
+  //     isActionTrue(actions.read) ||
+  //     isActionTrue(actions.update) ||
+  //     isActionTrue(actions.delete) ||
+  //     isActionTrue(actions.print) ||
+  //     isActionTrue(actions.export) ||
+  //     isActionTrue(actions.approve)
+  //   );
+  //   console.log('[hasModulePermission] actions:', actions, 'hasPermission:', hasPermission);
+  //   return hasPermission;
+  // };
 
   // Map labels to module keys
   const labelToModuleKey: Record<string, string> = {
@@ -834,58 +834,58 @@ const ClinicSidebar: FC<ClinicSidebarProps> = ({
   };
 
   // Check if item should be shown
-  const shouldShowItem = (item: NavItemChild | NavItem): boolean => {
-    console.log('[shouldShowItem] Checking item:', item);
-    let moduleKey: string | undefined;
-    if ('moduleKey' in item) {
-      moduleKey = item.moduleKey;
-    } else if (item.label in labelToModuleKey) {
-      moduleKey = labelToModuleKey[item.label];
-    }
-    console.log('[shouldShowItem] item label:', item.label, 'moduleKey:', moduleKey);
+  // const shouldShowItem = (item: NavItemChild | NavItem): boolean => {
+  //   console.log('[shouldShowItem] Checking item:', item);
+  //   let moduleKey: string | undefined;
+  //   if ('moduleKey' in item) {
+  //     moduleKey = item.moduleKey;
+  //   } else if (item.label in labelToModuleKey) {
+  //     moduleKey = labelToModuleKey[item.label];
+  //   }
+  //   console.log('[shouldShowItem] item label:', item.label, 'moduleKey:', moduleKey);
 
-    if (!moduleKey) {
-      console.log('[shouldShowItem] No moduleKey, returning true');
-      return true;
-    }
+  //   if (!moduleKey) {
+  //     console.log('[shouldShowItem] No moduleKey, returning true');
+  //     return true;
+  //   }
 
-    // Special cases
-    const label = item.label.toLowerCase();
+  //   // Special cases
+  //   const label = item.label.toLowerCase();
     
-    // Stock modules: check parent first
-    const isStockSubmodule = [
-      'clinic_stock_uom', 'clinic_stock_locations', 'clinic_stock_suppliers',
-      'clinic_stock_purchase_requests', 'clinic_stock_purchase_orders',
-      'clinic_stock_grn', 'clinic_stock_purchase_invoices',
-      'clinic_stock_qty_adjustment', 'clinic_stock_material_consumptions',
-      'clinic_stock_direct_transfer', 'clinic_stock_transfer_requests',
-      'clinic_stock_transfer_on_request', 'clinic_stock_allocated_stock_items',
-      'clinic_stock_purchase_return'
-    ].includes(moduleKey);
+  //   // Stock modules: check parent first
+  //   const isStockSubmodule = [
+  //     'clinic_stock_uom', 'clinic_stock_locations', 'clinic_stock_suppliers',
+  //     'clinic_stock_purchase_requests', 'clinic_stock_purchase_orders',
+  //     'clinic_stock_grn', 'clinic_stock_purchase_invoices',
+  //     'clinic_stock_qty_adjustment', 'clinic_stock_material_consumptions',
+  //     'clinic_stock_direct_transfer', 'clinic_stock_transfer_requests',
+  //     'clinic_stock_transfer_on_request', 'clinic_stock_allocated_stock_items',
+  //     'clinic_stock_purchase_return'
+  //   ].includes(moduleKey);
 
-    if (isStockSubmodule) {
-      const parentAllowed = hasModulePermission('clinic_stock');
-      if (!parentAllowed) {
-        return false;
-      }
-      return hasModulePermission(moduleKey);
-    }
+  //   if (isStockSubmodule) {
+  //     const parentAllowed = hasModulePermission('clinic_stock');
+  //     if (!parentAllowed) {
+  //       return false;
+  //     }
+  //     return hasModulePermission(moduleKey);
+  //   }
 
-    // Marketing modules with parent check
-    const marketingModulesWithParentCheck = ['clinic_inbox', 'clinic_templates', 'clinic_providers', 'clinic_review', 'clinic_enquiry'];
-    if (marketingModulesWithParentCheck.includes(moduleKey)) {
-      const parentAllowed = hasModulePermission('clinic_marketing');
-      if (!parentAllowed) {
-        return false;
-      }
-      return hasModulePermission(moduleKey);
-    }
+  //   // Marketing modules with parent check
+  //   const marketingModulesWithParentCheck = ['clinic_inbox', 'clinic_templates', 'clinic_providers', 'clinic_review', 'clinic_enquiry'];
+  //   if (marketingModulesWithParentCheck.includes(moduleKey)) {
+  //     const parentAllowed = hasModulePermission('clinic_marketing');
+  //     if (!parentAllowed) {
+  //       return false;
+  //     }
+  //     return hasModulePermission(moduleKey);
+  //   }
 
-    // Normal modules
-    const result = hasModulePermission(moduleKey);
-    console.log('[shouldShowItem] Result for', item.label, ':', result);
-    return result;
-  };
+  //   // Normal modules
+  //   const result = hasModulePermission(moduleKey);
+  //   console.log('[shouldShowItem] Result for', item.label, ':', result);
+  //   return result;
+  // };
 
   // Fetch navigation items and permissions
   useEffect(() => {
@@ -1046,7 +1046,7 @@ const ClinicSidebar: FC<ClinicSidebarProps> = ({
                     for (const sm of parentPerm.subModules) {
                       console.log('[localHasModulePermission] parent subModule:', sm.name, 'label:', label);
                     }
-                    const subModule = parentPerm.subModules.find(sm => {
+                    const subModule = parentPerm.subModules.find((sm: { name?: string; actions?: Record<string, boolean> }) => {
                       const smNameTrimmed = sm.name?.trim().toLowerCase() || '';
                       const labelTrimmed = label.trim().toLowerCase();
                       console.log('[localHasModulePermission] Comparing: smNameTrimmed:', smNameTrimmed, 'labelTrimmed:', labelTrimmed);
@@ -1183,7 +1183,7 @@ const ClinicSidebar: FC<ClinicSidebarProps> = ({
             }
 
             return navItem;
-          }).filter(item => localShouldShowItem(item));
+          }).filter((item: NavItem) => localShouldShowItem(item));
 
           // Sort by order
           convertedItems.sort((a, b) => (a.order || 0) - (b.order || 0));

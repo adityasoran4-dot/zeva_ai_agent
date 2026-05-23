@@ -180,7 +180,7 @@ function ClinicEnquiries({ contextOverride = null }: { contextOverride?: "clinic
               });
             } else {
               // Admin has set permissions - check the clinic_enquiry module or as submodule of clinic_marketing
-              let actions = {};
+              let actions: { all?: boolean | string; read?: boolean | string; update?: boolean | string; delete?: boolean | string } = {};
               
               // First, check if clinic_enquiry is a top-level module
               let modulePermission = res.data.permissions.find((p: any) => {
