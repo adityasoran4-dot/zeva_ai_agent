@@ -1,6 +1,6 @@
 // pages/api/admin/navigation/add-stock-purchase-return-submodule.js
-import dbConnect from "../../../lib/database";
-import ClinicNavigationItem from "../../../models/ClinicNavigationItem";
+import dbConnect from "../../../../lib/database";
+import ClinicNavigationItem from "../../../../models/ClinicNavigationItem";
 import { getUserFromReq, requireRole } from "../../lead-ms/auth";
 
 export default async function handler(req, res) {
