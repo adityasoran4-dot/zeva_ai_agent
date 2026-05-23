@@ -753,6 +753,21 @@ function ClinicManagementDashboard(): ReactElement {
     };
   }, []);
 
+  // Auto-switch to an available tab when permissions are loaded
+  useEffect(() => {
+    if (!permissionsLoaded) return;
+    
+    // If user can't read the current tab, switch to an available one
+    const readRestrictedTabs = ["General Info", "Contact", "Listing", "Clinic Timing", "Banks", "Scheduler Link"];
+    
+    if (!permissions.canRead && readRestrictedTabs.includes(activeTab)) {
+      // Switch to Documents or Branches if available
+      if (permissions.canCreate) {
+        setActiveTab("Documents");
+      }
+    }
+  }, [permissionsLoaded, permissions.canRead, permissions.canCreate, activeTab]);
+
   // Fetch clinics
   useEffect(() => {
     if (!permissionsLoaded) return;
@@ -1942,7 +1957,8 @@ function ClinicManagementDashboard(): ReactElement {
 
   if (!permissionsLoaded || loading) return <Loader />;
 
-  if (!permissions.canRead) {
+  // Only show access denied if user has NO permissions at all
+  if (!permissions.canRead && !permissions.canCreate && !permissions.canUpdate && !permissions.canDelete) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-lg shadow-lg border border-red-200 p-8 text-center max-w-md">
@@ -2032,8 +2048,9 @@ function ClinicManagementDashboard(): ReactElement {
         {/* Tabs - Positioned below header */}
         <div className="px-2 sm:px-3 md:px-4 py-2 sm:py-3 md:py-4 max-w-7xl">
           <div className="flex items-center gap-1.5 sm:gap-2 h-9 sm:h-10 rounded-full bg-white/80 border border-gray-200 shadow-sm px-1.5 sm:px-2 overflow-x-auto whitespace-nowrap scrollbar-thin">
-            {(
-              [
+            {(() => {
+              // Determine which tabs to show based on permissions
+              const allTabs = [
                 "General Info",
                 "Contact",
                 "Documents",
@@ -2042,8 +2059,21 @@ function ClinicManagementDashboard(): ReactElement {
                 "Branches",
                 "Banks",
                 "Scheduler Link",
-              ] as const
-            ).map((tab) => (
+              ] as const;
+              
+              // If user can't read, only show tabs that have create permission
+              if (!permissions.canRead) {
+                return allTabs.filter((tab) => {
+                  if (tab === "Documents" || tab === "Branches") {
+                    return permissions.canCreate;
+                  }
+                  return false;
+                });
+              }
+              
+              // If user can read, show all tabs
+              return allTabs;
+            })().map((tab) => (
               <button
                 key={tab}
                 type="button"
@@ -3160,8 +3190,8 @@ function ClinicManagementDashboard(): ReactElement {
                   )}
                 </div>
 
-                {/* Document Grid */}
-                {editForm.documents && editForm.documents.length > 0 ? (
+                {/* Document Grid - Only show if canRead is true */}
+                {permissions.canRead && editForm.documents && editForm.documents.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
                     {(() => {
                       console.log("📋 Rendering documents:", editForm.documents);
@@ -3308,7 +3338,7 @@ function ClinicManagementDashboard(): ReactElement {
                     });
                   })()}
                   </div>
-                ) : (
+                ) : permissions.canRead ? (
                   <div className="bg-gray-50 border border-gray-200 rounded-xl p-8 text-center">
                     <FileText className="w-12 h-12 text-gray-400 mx-auto mb-3" />
                     <h3 className="text-lg font-semibold text-gray-900">
@@ -3323,7 +3353,7 @@ function ClinicManagementDashboard(): ReactElement {
                       </p>
                     )}
                   </div>
-                )}
+                ) : null}
 
                 {/* Drag & Drop Upload Area */}
                 {permissions.canCreate && (
@@ -4216,7 +4246,8 @@ function ClinicManagementDashboard(): ReactElement {
                   )}
                 </div>
 
-                {/* Branch Cards */}
+                {/* Branch Cards - Only show if canRead is true */}
+                {permissions.canRead && (
                 <div className="space-y-4 mb-6">
                   {/* Main Branch - Primary (from form) */}
                   <div className="bg-white border-2 border-teal-200 rounded-xl p-5 shadow-sm relative">
@@ -4248,6 +4279,7 @@ function ClinicManagementDashboard(): ReactElement {
                           <Edit3 className="w-4 h-4" />
                         </button>
                         )}
+                        {permissions.canDelete && (
                         <button
                           disabled
                           className="p-2 text-red-400 bg-gray-100 rounded-lg cursor-not-allowed"
@@ -4255,6 +4287,7 @@ function ClinicManagementDashboard(): ReactElement {
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
+                        )}
                       </div>
                     </div>
                     <div className="space-y-3">
@@ -4400,6 +4433,7 @@ function ClinicManagementDashboard(): ReactElement {
                       </div>
                     ))}
                 </div>
+                )}
 
                 {/* Add Another Branch */}
                 {permissions.canCreate && (
@@ -5441,15 +5475,15 @@ function ClinicManagementDashboard(): ReactElement {
           </div>
         ) : (
           <div className="w-full">
-            {/* Show permission denied message if no read permission (only for agent/doctorStaff, not clinic/doctor) */}
+            {/* Show permission denied message if no permissions at all (only for agent/doctorStaff, not clinic/doctor) */}
             {(() => {
               const userRole = getUserRole() as "clinic" | "staff" | "agent" | "doctor" | "user" | "admin" | "doctorStaff" | null;
               // Clinic and doctor roles always have access - don't show access denied
               if (userRole === "clinic" || userRole === "doctor") {
                 return null;
               }
-              // For other roles, check permissions
-              if (!permissions.canRead) {
+              // For other roles, check if they have ANY permission
+              if (!permissions.canRead && !permissions.canCreate && !permissions.canUpdate && !permissions.canDelete) {
                 return (
                   <div className="bg-white rounded-lg p-6 sm:p-8 border border-gray-200 shadow-sm">
                     <div className="text-center max-w-md mx-auto">
