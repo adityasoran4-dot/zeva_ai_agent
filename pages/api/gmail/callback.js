@@ -1,7 +1,7 @@
 import { google } from "googleapis";
 import dbConnect from "../../../lib/database";
 import Provider from "../../../models/Provider";
-import { encodeMessageForSmtp } from "../../../services/smtp";
+import { encodeMessage } from "../../../services/gmail";
 
 const oauth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_CLIENT_ID,
@@ -49,7 +49,7 @@ export default async function handler(req, res) {
       }
 
       // Send test email
-      const testRaw = await encodeMessageForSmtp({
+      const testRaw = await encodeMessage({
         to: email,
         from: email,
         senderName: `Test User`,
