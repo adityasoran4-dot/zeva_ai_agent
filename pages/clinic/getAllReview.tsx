@@ -93,9 +93,7 @@ function ClinicReviews() {
 
   // Helper function to get user info from token
   const getUserInfo = (): { role: string | null; id: string | null } => {
-    console.log("[DEBUG] getUserInfo called");
     if (typeof window === "undefined") {
-      console.log("[DEBUG] getUserInfo: window undefined");
       return { role: null, id: null };
     }
     try {
@@ -106,12 +104,10 @@ function ClinicReviews() {
         "staffToken",
         "userToken",
       ];
-      console.log("[DEBUG] getUserInfo: checking tokens in order:", TOKEN_PRIORITY);
       
       for (const key of TOKEN_PRIORITY) {
         const tokenVal =
           localStorage.getItem(key) || sessionStorage.getItem(key);
-        console.log("[DEBUG] getUserInfo: checking token", key, "found:", !!tokenVal);
         
         if (tokenVal) {
           try {
@@ -126,14 +122,12 @@ function ClinicReviews() {
                 .join(""),
             );
             const decoded = JSON.parse(jsonPayload);
-            console.log("[DEBUG] getUserInfo: decoded token:", decoded);
             
             return {
               role: decoded.role || decoded.userRole || null,
               id: decoded.userId || decoded.id || null,
             };
           } catch (e) {
-            console.error("[DEBUG] getUserInfo: error decoding token", key, e);
             continue;
           }
         }
@@ -141,15 +135,12 @@ function ClinicReviews() {
     } catch (error) {
       console.error("Error getting user info:", error);
     }
-    console.log("[DEBUG] getUserInfo: no valid token found");
     return { role: null, id: null };
   };
 
   // Helper function to get user role from token
   const getUserRole = (): string | null => {
-    const userInfo = getUserInfo();
-    console.log("[DEBUG] getUserRole returning:", userInfo.role);
-    return userInfo.role;
+    return getUserInfo().role;
   };
 
   // Helper function to get stored token
@@ -221,11 +212,8 @@ function ClinicReviews() {
     const authToken =
       clinicToken || doctorToken || agentToken || staffToken || userToken;
 
-    console.log("[DEBUG] userRole:", userRole);
-
     // For admin role, grant full access (bypass permission checks)
     if (userRole === "admin") {
-      console.log("[DEBUG] userRole is admin, granting full access");
       if (!isMountedFlag) return;
       setPermissions({
         canRead: true,
@@ -238,7 +226,6 @@ function ClinicReviews() {
 
     // For clinic and doctor roles, fetch admin-level permissions from /api/clinic/sidebar-permissions
     if (userRole === "clinic" || userRole === "doctor") {
-      console.log("[DEBUG] userRole is clinic/doctor, fetching sidebar permissions");
       const fetchClinicPermissions = async () => {
         try {
           if (!authToken) {
@@ -381,9 +368,6 @@ function ClinicReviews() {
     if (agentToken || staffToken || userToken) {
       const fetchPermissions = async () => {
         try {
-          console.log(
-            "Fetching Agent/Staff Permissions for", REVIEW_MODULE_KEY, "...",
-          );
           setPermissionsLoaded(false);
           // Use agent permissions API for agent/doctorStaff
           const res = await axios.get("/api/agent/get-module-permissions", {
@@ -391,9 +375,6 @@ function ClinicReviews() {
             headers: { Authorization: `Bearer ${agentStaffToken}` },
           });
           const data = res.data;
-          console.log("Agent Permissions API Response:", data);
-          console.log("Agent Permissions API - permissions object:", data?.permissions);
-          console.log("Agent Permissions API - actions:", data?.permissions?.actions);
 
           if (!isMountedFlag) return;
 
@@ -402,9 +383,6 @@ function ClinicReviews() {
             !data?.permissions &&
             data?.error?.includes("not found in agent permissions")
           ) {
-            console.log(
-              "Module not found in permissions, granting full access by default",
-            );
             setPermissions({
               canRead: true,
               canUpdate: true,
@@ -415,18 +393,14 @@ function ClinicReviews() {
 
           const actions =
             data?.permissions?.actions || data?.data?.moduleActions || {};
-          console.log("Parsed actions:", actions);
           
           const isTrue = (val: any) => {
-            const result = val === true ||
+            return val === true ||
               val === "true" ||
               String(val || "").toLowerCase() === "true";
-            console.log("isTrue check:", { val, result });
-            return result;
           };
 
           const canAll = isTrue(actions.all);
-          console.log("canAll:", canAll);
 
           const newPerms = {
             canRead: canAll || isTrue(actions.read),
@@ -434,7 +408,6 @@ function ClinicReviews() {
             canDelete: canAll || isTrue(actions.delete),
           };
 
-          console.log("Final Agent/Staff Permissions:", newPerms);
           setPermissions(newPerms);
         } catch (err: any) {
           console.error("Error fetching agent permissions:", err);

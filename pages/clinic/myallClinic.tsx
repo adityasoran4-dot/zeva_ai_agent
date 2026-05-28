@@ -1172,7 +1172,7 @@ function ClinicManagementDashboard(): ReactElement {
     });
   };
 
-  // Fetch dashboard stats
+  // Fetch dashboard stats - only after permissions are loaded
   useEffect(() => {
     const fetchDashboardStats = async () => {
       try {
@@ -1196,40 +1196,41 @@ function ClinicManagementDashboard(): ReactElement {
           );
         }
       } catch (error: any) {
-        console.error("Error fetching dashboard stats:", error);
+        // Only log errors if not a 403 (which is expected when no permission)
+        if (error.response?.status !== 403) {
+          console.error("Error fetching dashboard stats:", error);
+        }
         
         // Handle 403 permission errors gracefully
         if (error.response?.status === 403) {
           console.warn("Dashboard stats access denied - user lacks clinic_dashboard:read permission");
-          // Set empty stats to prevent UI errors
-          setDashboardStats({
-            totalReviews: 0,
-            totalEnquiries: 0,
-            totalAppointments: 0,
-            totalLeads: 0,
-            totalTreatments: 0,
-            totalRooms: 0,
-            totalDepartments: 0,
-            totalPackages: 0,
-            totalOffers: 0,
-            totalPatients: 0,
-            totalJobs: 0,
-            appointmentStatusBreakdown: {},
-            leadStatusBreakdown: {},
-            offerStatusBreakdown: {},
-          });
-        } else if (error.response?.status === 401) {
-          console.error("Authentication required for dashboard stats");
-        } else {
-          console.error("Unexpected error fetching dashboard stats:", error.message);
         }
+        // Set empty stats to prevent UI errors
+        setDashboardStats({
+          totalReviews: 0,
+          totalEnquiries: 0,
+          totalAppointments: 0,
+          totalLeads: 0,
+          totalTreatments: 0,
+          totalRooms: 0,
+          totalDepartments: 0,
+          totalPackages: 0,
+          totalOffers: 0,
+          totalPatients: 0,
+          totalJobs: 0,
+          appointmentStatusBreakdown: {},
+          leadStatusBreakdown: {},
+          offerStatusBreakdown: {},
+        });
       } finally {
         setStatsLoading(false);
       }
     };
 
-    fetchDashboardStats();
-  }, []);
+    if (permissionsLoaded) {
+      fetchDashboardStats();
+    }
+  }, [permissionsLoaded]);
 
   // Fetch reviews data
   useEffect(() => {
