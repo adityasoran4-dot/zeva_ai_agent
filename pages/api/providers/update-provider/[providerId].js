@@ -67,34 +67,6 @@ export default async function handler(req, res) {
     const { providerId } = req.query;
     const { name, label, phone, email, status, type, secrets } = req.body;
 
-    // Validation
-    if (!name || !name.trim()) {
-      return res.status(400).json({
-        success: false,
-        message: "Name is required",
-      });
-    }
-
-    if (type?.includes("email") && !email) {
-      return res.status(400).json({
-        success: false,
-        message: "Email is required for email providers",
-      });
-    }
-    if ((type?.includes("sms") || type?.includes("whatsapp")) && !phone) {
-      return res.status(400).json({
-        success: false,
-        message: "Phone is required for sms/whatsapp providers",
-      });
-    }
-
-    if (!secrets || Object.keys(secrets).length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Secrets are required for provider configuration",
-      });
-    }
-
     const provider = await Provider.findById(providerId);
     if (!provider) {
       return res.status(404).json({

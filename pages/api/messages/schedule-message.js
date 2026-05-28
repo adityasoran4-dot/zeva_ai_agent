@@ -301,7 +301,7 @@ export default async function handler(req, res) {
     const delay = calculateBullMQDelay(
       scheduledDate,
       scheduledTime,
-      scheduledTimezone
+      scheduledTimezone,
     );
     // console.log("Scheduled message delay in ms: ", { delay });
 
@@ -312,7 +312,7 @@ export default async function handler(req, res) {
       },
       {
         delay: delay > 0 ? delay : 0,
-      }
+      },
     );
 
     // if scheduled successfully then update message status

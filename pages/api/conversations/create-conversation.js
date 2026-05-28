@@ -71,7 +71,7 @@ export default async function handler(req, res) {
       clinicId,
     }).populate({
       path: "leadId",
-      select: "_id name phone createdAt", // Specify the fields you want to select
+      select: "_id name phone email createdAt", // Specify the fields you want to select
       model: "Lead", // Make sure the correct model is being populated
     });
 
@@ -92,7 +92,7 @@ export default async function handler(req, res) {
 
     const findConv = await Conversation.findById(newConversation._id).populate({
       path: "leadId",
-      select: "_id name phone createdAt", // Specify the fields you want to select
+      select: "_id name phone email createdAt", // Specify the fields you want to select
       model: "Lead", // Make sure the correct model is being populated
     });
 

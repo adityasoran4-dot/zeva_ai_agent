@@ -53,6 +53,8 @@ import Users from "../models/Users.js";
 import "./queue.js";
 import Campaign from "../models/Campaign.js";
 import { sendBatchWhatsappMessageQueue } from "./queue.js";
+import { sendEmailViaGmailMultiple } from "../services/gmail.js";
+import { sendEmailViaSmtpMultiple } from "../services/smtp.js";
 
 // --- Helper to add listeners to all workers ---
 const addWorkerListeners = (worker, queueName) => {
@@ -383,7 +385,7 @@ const whatsappTemplateWorker = new Worker(
 const scheduleMessageWorker = new Worker(
   "scheduleMessageQueue",
   async (job) => {
-    console.log("Processing schedule message worker job: ", job.data);
+    console.log("Processing schedule message worker job: ");
     const { msgData } = job.data;
 
     try {
@@ -392,20 +394,59 @@ const scheduleMessageWorker = new Worker(
         // resData = await handleSendS
       } else if (msgData?.channel === "whatsapp") {
         resData = await handleWhatsappSendMessage(msgData);
-      }
 
-      if (resData && msgData?.clientMessageId) {
-        const message = await Message.findById(msgData?.clientMessageId);
-        console.log({ message });
-        if (message) {
-          message.status = "queued";
-          message.providerMessageId = resData?.messages?.[0]?.id || "";
-          await message.save();
+        if (resData && msgData?.clientMessageId) {
+          const message = await Message.findById(msgData?.clientMessageId);
+          console.log({ message });
+          if (message) {
+            message.status = "queued";
+            message.providerMessageId = resData?.messages?.[0]?.id || "";
+            await message.save();
+          }
         }
-      }
 
-      console.log("Schedule message response: ", resData);
-      return resData;
+        console.log("Schedule message response: ", resData);
+      } else if (msgData?.channel === "email") {
+        let emailSent = false;
+        const message = await Message.findById(msgData?.messageId);
+        if (msgData?.emailProviderType === "gmail") {
+          const emailResponse = await sendEmailViaGmailMultiple(msgData);
+          if (emailResponse.id && emailResponse.threadId) {
+            // If the email is sent successfully, update the message status
+            emailSent = true;
+            message.providerMessageId = emailResponse.id;
+            message.threadId = emailResponse.threadId;
+            await message.save();
+            console.log(`Email sent to ${toEmail}`);
+          } else {
+            console.error(`Failed to send email to ${toEmail}`);
+          }
+
+          console.log("Schedule message response: ", emailResponse);
+        } else if (msgData?.emailProviderType === "other") {
+          const emailResponse = await sendEmailViaSmtpMultiple(msgData);
+
+          if (emailResponse?.messageId) {
+            const providerMsgId = emailResponse?.messageId;
+            emailSent = true;
+            message.providerMessageId = providerMsgId;
+            await message.save();
+            console.log(`Email sent to ${toEmail}`);
+          } else {
+            console.error(`Failed to send email to ${toEmail}`);
+          }
+
+          console.log("Schedule email message response: ", emailResponse);
+        }
+
+        // Update the message status based on whether the email was successfully sent
+        if (emailSent) {
+          message.status = "sent";
+        } else {
+          message.status = "failed";
+        }
+        await message.save();
+      }
     } catch (error) {
       console.log("Error in send schedule message worker: ", error?.message);
     }

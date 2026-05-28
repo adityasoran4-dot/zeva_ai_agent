@@ -410,6 +410,7 @@ export default async function handler(req, res) {
     const findMessage = await Message.findById(newMessage._id)
       .populate("senderId", "name email phone")
       .populate("recipientId", "name email phone")
+      .populate("provider", "name label email phone")
       .populate({
         path: "replyToMessageId",
         select: "content mediaType mediaUrl channel direction", // Fields of the reply message

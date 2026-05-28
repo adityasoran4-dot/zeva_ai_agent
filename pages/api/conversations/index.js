@@ -175,7 +175,7 @@ export default async function handler(req, res) {
       let conversations = await Conversation.find(query)
         .populate({
           path: "leadId",
-          select: "_id name phone patientId createdAt",
+          select: "_id name phone email patientId createdAt",
           model: "Lead",
         })
         .populate(

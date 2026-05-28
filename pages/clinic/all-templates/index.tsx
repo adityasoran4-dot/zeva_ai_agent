@@ -31,7 +31,6 @@ import Loader from "@/components/Loader";
 
 const TEMPLATE_MODULE_KEY = "clinic_templates";
 
-
 const TemplatesPage: NextPageWithLayout = () => {
   const router = useRouter();
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -41,7 +40,6 @@ const TemplatesPage: NextPageWithLayout = () => {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [isMounted, setIsMounted] = useState(false);
-
 
   const [permissions, setPermissions] = useState({
     canCreate: false,
@@ -72,7 +70,8 @@ const TemplatesPage: NextPageWithLayout = () => {
   const token = getTokenByPath();
 
   // Check if on agent route
-  const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
+  const currentPath =
+    typeof window !== "undefined" ? window.location.pathname : "";
   const isAgentRoute = currentPath.startsWith("/agent/");
 
   // Use agent permissions hook for agent routes
@@ -87,7 +86,6 @@ const TemplatesPage: NextPageWithLayout = () => {
     canAll: false,
   };
   const agentPermissionsLoading = agentPermissionsHook?.loading || false;
-
 
   // Handle agent permissions
   useEffect(() => {
@@ -148,7 +146,6 @@ const TemplatesPage: NextPageWithLayout = () => {
     return { role: null, id: null };
   };
 
-
   // Helper function to get user role from token
   const getUserRole = (): string | null => {
     return getUserInfo().role;
@@ -173,7 +170,6 @@ const TemplatesPage: NextPageWithLayout = () => {
     if (isAgentRoute) return;
     if (!isMounted) return;
     let isMountedFlag = true;
-
 
     // Check which token type is being used
     const clinicToken =
@@ -205,7 +201,6 @@ const TemplatesPage: NextPageWithLayout = () => {
     const userRole = getUserRole();
     const authToken =
       clinicToken || doctorToken || agentToken || staffToken || userToken;
-
 
     // For admin role, grant full access (bypass permission checks)
     if (userRole === "admin") {
@@ -242,9 +237,7 @@ const TemplatesPage: NextPageWithLayout = () => {
             headers: { Authorization: `Bearer ${authToken}` },
           });
 
-
           if (!isMountedFlag) return;
-
 
           if (res.data.success) {
             // Check if permissions array exists and is not null
@@ -280,13 +273,18 @@ const TemplatesPage: NextPageWithLayout = () => {
               // If not found at top level, check in subModules of parent modules
               if (!modulePermission) {
                 for (const parentModule of res.data.permissions) {
-                  if (parentModule.subModules && parentModule.subModules.length > 0) {
-                    const foundInSubModule = parentModule.subModules.find((sm: any) => {
-                      if (sm.moduleKey === "clinic_templates") return true;
-                      if (sm.moduleKey === "clinic_Templates") return true;
-                      if (sm.moduleKey === "templates") return true;
-                      return false;
-                    });
+                  if (
+                    parentModule.subModules &&
+                    parentModule.subModules.length > 0
+                  ) {
+                    const foundInSubModule = parentModule.subModules.find(
+                      (sm: any) => {
+                        if (sm.moduleKey === "clinic_templates") return true;
+                        if (sm.moduleKey === "clinic_Templates") return true;
+                        if (sm.moduleKey === "templates") return true;
+                        return false;
+                      },
+                    );
                     if (foundInSubModule) {
                       modulePermission = { actions: foundInSubModule.actions };
                       break;
@@ -297,7 +295,6 @@ const TemplatesPage: NextPageWithLayout = () => {
 
               if (modulePermission) {
                 const actions = modulePermission.actions || {};
-
 
                 // Check if "all" is true, which grants all permissions
                 const moduleAll =
@@ -368,7 +365,6 @@ const TemplatesPage: NextPageWithLayout = () => {
         }
       };
 
-
       fetchClinicPermissions();
       return;
     }
@@ -392,7 +388,9 @@ const TemplatesPage: NextPageWithLayout = () => {
       const fetchPermissions = async () => {
         try {
           console.log(
-            "Fetching Agent/Staff Permissions for", TEMPLATE_MODULE_KEY, "...",
+            "Fetching Agent/Staff Permissions for",
+            TEMPLATE_MODULE_KEY,
+            "...",
           );
           setPermissionsLoaded(false);
           // Use agent permissions API for agent/doctorStaff
@@ -403,9 +401,7 @@ const TemplatesPage: NextPageWithLayout = () => {
           const data = res.data;
           console.log("Agent Permissions API Response:", data);
 
-
           if (!isMountedFlag) return;
-
 
           // Default to true if module not found in permissions (matches backend logic)
           if (
@@ -442,7 +438,6 @@ const TemplatesPage: NextPageWithLayout = () => {
             canAssign: canAll,
           };
 
-
           console.log("Final Agent/Staff Permissions:", newPerms);
           setPermissions(newPerms);
         } catch (err: any) {
@@ -462,7 +457,6 @@ const TemplatesPage: NextPageWithLayout = () => {
         }
       };
 
-
       fetchPermissions();
     } else {
       // Unknown token type - default to full access (likely clinic/doctor)
@@ -481,7 +475,6 @@ const TemplatesPage: NextPageWithLayout = () => {
       isMountedFlag = false;
     };
   }, [isAgentRoute, isMounted]);
-
 
   // Set mounted flag
   useEffect(() => {
@@ -614,6 +607,7 @@ const TemplatesPage: NextPageWithLayout = () => {
 
   // Get category badge
   const getCategoryBadge = (category: string) => {
+    if (category === "undefined") return null;
     const colors: Record<string, string> = {
       Healthcare: "bg-purple-50 text-purple-700 border-purple-100",
       Onboarding: "bg-blue-50 text-blue-700 border-blue-100",
@@ -705,7 +699,6 @@ const TemplatesPage: NextPageWithLayout = () => {
     permissions.canRead,
     fetchTemplates,
   ]);
-
 
   // Show loading while permissions are being fetched
   if (!permissionsLoaded) {
@@ -941,9 +934,11 @@ const TemplatesPage: NextPageWithLayout = () => {
                   {/* Category and Language */}
                   <div className="flex items-center gap-2 mt-3">
                     {template.category && getCategoryBadge(template.category)}
-                    <span className="text-xs text-gray-500 px-2 py-1 bg-gray-50 rounded">
-                      {template.language.toUpperCase()}
-                    </span>
+                    {template?.language && (
+                      <span className="text-xs text-gray-500 px-2 py-1 bg-gray-50 rounded">
+                        {template.language.toUpperCase()}
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -1009,7 +1004,9 @@ const TemplatesPage: NextPageWithLayout = () => {
                   <div className="flex items-center gap-2">
                     {permissions.canUpdate && (
                       <button
-                        onClick={() => handleTemplateAction("edit", template._id)}
+                        onClick={() =>
+                          handleTemplateAction("edit", template._id)
+                        }
                         className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
                         title="Edit"
                       >

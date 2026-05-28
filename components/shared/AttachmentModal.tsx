@@ -105,10 +105,14 @@ export default function AttachmentModal({
   const [open, setOpen] = useState(false);
   const [previews, setPreviews] = useState<Record<string, string>>({});
   const [files, setFiles] = useState<File[]>(
-    attachedFiles || (attachedFile ? [attachedFile] : [])
+    attachedFiles || (attachedFile ? [attachedFile] : []),
   );
   const inputRef = useRef<HTMLInputElement | null>(null);
   const dropRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    setFiles(attachedFiles || (attachedFile ? [attachedFile] : []));
+  }, [attachedFiles, attachedFile]);
 
   useEffect(() => {
     // build previews for image files

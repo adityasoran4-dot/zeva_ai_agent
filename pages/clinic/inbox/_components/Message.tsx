@@ -31,15 +31,70 @@ const Message: React.FC<IProps> = ({
   onSelectMessage,
   onMessageUpdate,
 }) => {
-  const linkify = (text: string) => {
+  // Function to check if content is HTML
+  const isHtmlContent = (content: string): boolean => {
+    if (!content) return false;
+    const htmlRegex =
+      /<([a-z][a-z0-9]*)\b[^>]*>.*?<\/\1>|<([a-z][a-z0-9]*)\b[^>]*\/?>/i;
+    return htmlRegex.test(content);
+  };
+
+  // Function to linkify only URLs, not HTML
+  const linkifyTextOnly = (text: string) => {
     if (!text) return "";
     const urlRegex = /(https?:\/\/[^\s<]+|www\.[^\s<]+)/gi;
     const html = text.replace(urlRegex, (match) => {
       const href = match.startsWith("http") ? match : `http://${match}`;
       return `<a href="${href}" target="_blank" rel="noopener noreferrer" class="text-blue-600 underline hover:text-blue-700">${match}</a>`;
     });
-    return html.replace(/\n/g, "<br />");
+    return html;
   };
+
+  // Function to render message content based on channel and content type
+  const renderMessageContent = () => {
+    const content = message?.content || "";
+
+    // For email channel with HTML content
+    if (message?.channel === "email" && isHtmlContent(content)) {
+      const cleanHtml = DOMPurify.sanitize(content, {
+        ADD_TAGS: ["style", "link", "meta", "head", "body", "html"],
+        ADD_ATTR: ["target", "rel", "class", "id", "style"],
+        FORBID_TAGS: ["script", "iframe", "object", "embed"],
+        FORBID_ATTR: ["onerror", "onload", "onclick", "onmouseover"],
+      });
+
+      return (
+        <div className="email-content prose prose-sm max-w-none">
+          <div
+            dangerouslySetInnerHTML={{ __html: cleanHtml }}
+            className="text-gray-800"
+            style={{
+              fontFamily: "Arial, Helvetica, sans-serif",
+              lineHeight: "1.5",
+            }}
+          />
+        </div>
+      );
+    }
+
+    // For non-HTML content or other channels
+    if (message?.metadata?.type !== "location") {
+      const linkedContent = linkifyTextOnly(content);
+      return (
+        <div
+          className="text-sm text-gray-800 leading-relaxed break-words"
+          dangerouslySetInnerHTML={{
+            __html: DOMPurify.sanitize(linkedContent, {
+              ADD_ATTR: ["target", "rel", "class"],
+            }),
+          }}
+        />
+      );
+    }
+
+    return null;
+  };
+
   const token =
     typeof window !== "undefined" ? localStorage.getItem("clinicToken") : null;
 
@@ -78,7 +133,7 @@ const Message: React.FC<IProps> = ({
   };
 
   const handleReactWithEmoji = async (message: MessageType, emoji: string) => {
-    if (isReacting) return; // Prevent multiple clicks
+    if (isReacting) return;
 
     try {
       setIsReacting(true);
@@ -107,7 +162,6 @@ const Message: React.FC<IProps> = ({
           position: "top-right",
         });
 
-        // Update parent component if callback provided
         if (onMessageUpdate) {
           onMessageUpdate(response.data.data);
         }
@@ -122,29 +176,25 @@ const Message: React.FC<IProps> = ({
       setIsReacting(false);
     }
   };
-  // Add emoji display logic
+
   const displayEmojis = () => {
-    // Combine message emojis with temporary selected emoji
     const allEmojis = [...(message.emojis || [])];
     const currentUserId = message?.senderId?._id;
 
     if (selectedEmoji) {
-      // Check if user already reacted
       const userReactionIndex = allEmojis.findIndex(
         (e) => e?.user === currentUserId,
       );
 
       if (userReactionIndex > -1) {
-        // Update existing reaction in display
         allEmojis[userReactionIndex] = {
           ...allEmojis[userReactionIndex],
           emoji: selectedEmoji,
         };
       } else {
-        // Add temporary reaction
         allEmojis.push({
           emoji: selectedEmoji,
-          user: { _id: currentUserId }, // Temporary user object
+          user: { _id: currentUserId },
           lead: {},
           addedAt: new Date().toISOString(),
         });
@@ -154,7 +204,6 @@ const Message: React.FC<IProps> = ({
     return allEmojis;
   };
 
-  // Get grouped emojis for display
   const groupedEmojis = () => {
     const reactions = displayEmojis();
     const grouped: { [key: string]: number } = {};
@@ -168,7 +217,6 @@ const Message: React.FC<IProps> = ({
     return grouped;
   };
 
-  // Render emoji reactions
   const renderEmojiReactions = () => {
     const grouped = groupedEmojis();
     const emojiArray = Object.entries(grouped);
@@ -191,12 +239,10 @@ const Message: React.FC<IProps> = ({
             )}
           </div>
         ))}
-        <span className="text-sm text-gray-600 mt-0.5">
-          {emojiArray?.length > 1 ? emojiArray?.length : ""}
-        </span>
       </div>
     );
   };
+
   const getSenderName = () => {
     const name = message?.senderId?.name || "Customer Support";
     return name?.length > 20 ? name.slice(0, 20) + "..." : name;
@@ -211,6 +257,8 @@ const Message: React.FC<IProps> = ({
   const isOutgoing = message?.direction === "outgoing";
   const channel = message?.channel as keyof typeof channelColors;
   const channelColor = getChannelColor(channel);
+  const isEmailHtml =
+    message?.channel === "email" && isHtmlContent(message?.content || "");
 
   return (
     <div
@@ -221,17 +269,16 @@ const Message: React.FC<IProps> = ({
         <div className="flex items-start space-x-3 max-w-full sm:max-w-[85%]">
           {/* Avatar */}
           <div className="flex-shrink-0">
-            <AvatarComponent
-              name={message?.recipientId?.name}
-              // className="h-10 w-10 ring-2 ring-white shadow-md"
-            />
+            <AvatarComponent name={message?.recipientId?.name} />
           </div>
 
           {/* Message Bubble */}
           <div className="relative group">
             {/* Message Content */}
             <div
-              className={`relative bg-white rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm border border-gray-100 max-w-[600px]`}
+              className={`relative bg-white rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm border border-gray-100 max-w-[600px] ${
+                isEmailHtml ? "overflow-x-auto" : ""
+              }`}
             >
               {/* Top Bar */}
               <div className="flex items-center justify-between mb-2">
@@ -246,12 +293,15 @@ const Message: React.FC<IProps> = ({
                   <span className="w-1 h-1 bg-gray-400 rounded-full"></span>
                   <span className="text-xs text-gray-500">{formatedTime}</span>
                 </div>
-                <button
-                  onClick={() => openHtmlInPopup(message?.content || "")}
-                  className="p-1.5 hover:bg-gray-100 rounded-full transition-colors duration-200"
-                >
-                  <Eye size={16} className="text-gray-500" />
-                </button>
+                {isEmailHtml && (
+                  <button
+                    onClick={() => openHtmlInPopup(message?.content || "")}
+                    className="p-1.5 hover:bg-gray-100 rounded-full transition-colors duration-200"
+                    title="View as HTML"
+                  >
+                    <Eye size={16} className="text-gray-500" />
+                  </button>
+                )}
               </div>
 
               {/* Reply Preview */}
@@ -402,20 +452,8 @@ const Message: React.FC<IProps> = ({
                 </div>
               )}
 
-              {/* Message Text */}
-              {message?.metadata?.type !== "location" && (
-                <div
-                  className="text-sm text-gray-800 leading-relaxed break-words"
-                  dangerouslySetInnerHTML={{
-                    __html: DOMPurify.sanitize(
-                      linkify(message?.content || ""),
-                      {
-                        ADD_ATTR: ["target", "rel", "class"],
-                      },
-                    ),
-                  }}
-                />
-              )}
+              {/* Message Text - Using the new render function */}
+              {renderMessageContent()}
 
               {/* WhatsApp Footer */}
               {message?.footerText && (
@@ -495,13 +533,6 @@ const Message: React.FC<IProps> = ({
             </div>
 
             {/* Reaction Emoji */}
-            {/* {(message?.emoji || selectedEmoji) && (
-              <div className="absolute -bottom-3 left-4 bg-white rounded-full px-2 py-1 shadow-sm border border-gray-200">
-                <span className="text-sm">
-                  {message?.emoji || selectedEmoji}
-                </span>
-              </div>
-            )} */}
             {renderEmojiReactions()}
 
             {/* Reply and Emoji Buttons */}
@@ -567,10 +598,12 @@ const Message: React.FC<IProps> = ({
           <div className="relative group">
             {/* Message Content */}
             <div
-              className={`relative bg-gradient-to-r from-${channelColor}-50 to-white rounded-2xl rounded-tr-sm px-4 py-3 shadow-sm border border-${channelColor}-100 max-w-[600px]`}
+              className={`relative bg-gradient-to-r from-${channelColor}-50 to-white rounded-2xl rounded-tr-sm px-4 py-3 shadow-sm border border-${channelColor}-100 max-w-[600px] ${
+                isEmailHtml ? "overflow-x-auto" : ""
+              }`}
             >
               {/* Top Bar */}
-              <div className="flex items-center mb-2">
+              <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center space-x-2">
                   <span className="text-sm font-semibold text-gray-800">
                     {getSenderName()}
@@ -582,6 +615,15 @@ const Message: React.FC<IProps> = ({
                   <span className="w-1 h-1 bg-gray-400 rounded-full"></span>
                   <span className="text-xs text-gray-500">{formatedTime}</span>
                 </div>
+                {isEmailHtml && (
+                  <button
+                    onClick={() => openHtmlInPopup(message?.content || "")}
+                    className="p-1.5 hover:bg-gray-100 rounded-full transition-colors duration-200"
+                    title="View as HTML"
+                  >
+                    <Eye size={16} className="text-gray-500" />
+                  </button>
+                )}
               </div>
 
               {/* Reply Preview */}
@@ -672,19 +714,17 @@ const Message: React.FC<IProps> = ({
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium text-gray-800 truncate">
-                          {message.attachments?.[0]?.fileName ||
-                            (message.mediaUrl || "file")
-                              .split("/")
-                              .pop()
-                              ?.split("?")[0]
-                              ?.slice(0, 60)}
+                          {message.attachments?.[0]?.fileName?.length > 30
+                            ? message.attachments?.[0]?.fileName?.slice(0, 30) +
+                              "..."
+                            : (message.mediaUrl || "file")
+                                .split("/")
+                                .pop()
+                                ?.split("?")[0]
+                                ?.slice(0, 60)}
                         </div>
                         <div className="text-xs text-gray-500 mt-0.5">
-                          {message.attachments?.[0]?.fileSize
-                            ? `${(
-                                Number(message.attachments[0].fileSize) / 1024
-                              ).toFixed(2)} KB`
-                            : "Document"}
+                          {message.attachments?.[0]?.fileSize}
                         </div>
                       </div>
                       <div className="flex-shrink-0 ml-3">
@@ -699,7 +739,7 @@ const Message: React.FC<IProps> = ({
               {message?.channel === "email" && (
                 <div className="mb-3 p-3 bg-white/80 rounded-lg border border-gray-200">
                   <div className="space-y-1.5">
-                    <div className="flex items-center text-sm">
+                    <div className="flex items-center gap-2 text-sm">
                       <span className="font-medium text-gray-700 w-14">
                         To:
                       </span>
@@ -707,15 +747,16 @@ const Message: React.FC<IProps> = ({
                         {message?.recipientId?.email}
                       </span>
                     </div>
-                    <div className="flex items-center text-sm">
+                    <div className="flex items-center gap-2 text-sm">
                       <span className="font-medium text-gray-700 w-14">
                         From:
                       </span>
                       <span className="text-gray-600">
                         {/* Add your provider email here */}
+                        {message?.provider?.email}
                       </span>
                     </div>
-                    <div className="flex items-center text-sm">
+                    <div className="flex items-center gap-2 text-sm">
                       <span className="font-medium text-gray-700 w-14">
                         Subject:
                       </span>
@@ -732,20 +773,8 @@ const Message: React.FC<IProps> = ({
                 </div>
               )}
 
-              {/* Message Text */}
-              {message?.metadata?.type !== "location" && (
-                <div
-                  className="text-sm text-gray-800 leading-relaxed break-words"
-                  dangerouslySetInnerHTML={{
-                    __html: DOMPurify.sanitize(
-                      linkify(message?.content || ""),
-                      {
-                        ADD_ATTR: ["target", "rel", "class"],
-                      },
-                    ),
-                  }}
-                />
-              )}
+              {/* Message Text - Using the new render function */}
+              {renderMessageContent()}
 
               {/* WhatsApp Footer */}
               {message?.footerText && (
@@ -832,13 +861,6 @@ const Message: React.FC<IProps> = ({
             </div>
 
             {/* Reaction Emoji */}
-            {/* {(message?.emoji || selectedEmoji) && (
-              <div className="absolute -bottom-3 right-4 bg-white rounded-full px-2 py-1 shadow-sm border border-gray-200">
-                <span className="text-sm">
-                  {message?.emoji || selectedEmoji}
-                </span>
-              </div>
-            )} */}
             {renderEmojiReactions()}
 
             {/* Reply and Emoji Buttons */}

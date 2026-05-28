@@ -11,7 +11,6 @@ import useTemplate from "./useTemplate";
 import toast from "react-hot-toast";
 import {
   formatFileSize,
-  getMediaTypeFromFile,
   getMediaTypeFromMime,
   getTokenByPath,
   handleError,
@@ -154,6 +153,107 @@ const useInbox = () => {
     useState<boolean>(false);
 
   const [isAddingTag, setIsAddingTag] = useState<boolean>(false);
+
+  // Lead Editing State
+  const [editingField, setEditingField] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState<string>("");
+  const [isUpdatingLead, setIsUpdatingLead] = useState<boolean>(false);
+
+  const handleEditLead = (field: string, value: string) => {
+    setEditingField(field);
+    setEditValue(value || "");
+  };
+
+  const cancelEditLead = () => {
+    setEditingField(null);
+    setEditValue("");
+  };
+
+  const handleUpdateLead = async () => {
+    if (!selectedConversation?.leadId?._id || !editingField) return;
+    setIsUpdatingLead(true);
+    try {
+      const fieldName =
+        editingField === "name"
+          ? "name"
+          : editingField === "email"
+            ? "email"
+            : "phone";
+      const { data } = await axios.put(
+        `/api/lead-ms/update-lead`,
+        { leadId: selectedConversation.leadId._id, [fieldName]: editValue },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+
+      if (data.success) {
+        toast.success("Lead updated successfully");
+        // Update local state
+        const updatedLead = {
+          ...selectedConversation.leadId,
+          [fieldName]: editValue,
+        };
+        const updatedConversation = {
+          ...selectedConversation,
+          leadId: updatedLead,
+        };
+        setSelectedConversation(updatedConversation);
+
+        // Also update in the conversations list
+        setConversations((prev) =>
+          prev.map((conv) =>
+            conv._id === selectedConversation._id
+              ? { ...conv, leadId: updatedLead }
+              : conv,
+          ),
+        );
+
+        cancelEditLead();
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to update lead");
+    } finally {
+      setIsUpdatingLead(false);
+    }
+  };
+
+  const canSend = (() => {
+    if (!selectedConversation || !selectedProvider) return false;
+
+    // Check provider-specific requirements
+    if (selectedProvider?.type?.includes("email")) {
+      if (!selectedConversation?.leadId?.email || !subject) return false;
+    } else if (selectedProvider?.type?.includes("whatsapp")) {
+      if (!selectedConversation?.leadId?.phone) return false;
+    }
+
+    // Check message content
+    const hasContent =
+      message.trim().length > 0 ||
+      attachedFile ||
+      (attachedFiles && attachedFiles.length > 0);
+
+    return hasContent;
+  })();
+
+  const canSchedule = (() => {
+    if (!selectedConversation || !selectedProvider) return false;
+
+    // Check provider-specific requirements
+    if (selectedProvider?.type?.includes("email")) {
+      if (!selectedConversation?.leadId?.email || !subject) return false;
+    } else if (selectedProvider?.type?.includes("whatsapp")) {
+      if (!selectedConversation?.leadId?.phone) return false;
+    }
+
+    // Schedule usually requires at least some text message
+    // Check message content
+    const hasContent =
+      message.trim().length > 0 ||
+      attachedFile ||
+      (attachedFiles && attachedFiles.length > 0);
+
+    return hasContent;
+  })();
 
   // Conversation assignment logic
   const [selectedAgent, setSelectedAgent] = useState<User | null>(null);
@@ -375,26 +475,30 @@ const useInbox = () => {
     console.log("Attachments to use:", attachmentsFilesToUse);
     setSendMsgLoading(true);
 
+    let attachments: any[] = [];
     // for attachments upload
-    if (attachedFile) {
-      const resData = await handleUpload(attachedFile);
-      if (resData && resData?.success) {
-        mediaFileUrl = resData?.url;
-        mediaFileType = getMediaTypeFromFile(attachedFile);
-        setMediaUrl(resData?.url);
+    if (attachmentsFilesToUse.length > 0) {
+      for (const file of attachmentsFilesToUse) {
+        const resData = await handleUpload(file);
+        if (resData && resData?.success) {
+          attachments.push({
+            fileName: file?.name,
+            fileSize: formatFileSize(file?.size),
+            mimeType: file?.type,
+            mediaUrl: resData?.url,
+            mediaType: getMediaTypeFromMime(file?.type),
+          });
+
+          // For legacy compatibility/single file logic
+          if (!mediaFileUrl) {
+            mediaFileUrl = resData?.url;
+            mediaFileType = getMediaTypeFromMime(file?.type);
+            setMediaUrl(resData?.url);
+          }
+        }
       }
     }
 
-    let attachments: any[] = [];
-    if (mediaUrl && attachmentsFilesToUse.length) {
-      attachments = attachmentsFilesToUse.map((f) => ({
-        fileName: f?.name,
-        fileSize: f?.size.toString(),
-        mimeType: f?.type,
-        mediaUrl: mediaFileUrl,
-        mediaType: getMediaTypeFromMime(f?.type),
-      }));
-    }
     const tempMessageId = Date.now()?.toString(); // Ensure a unique identifier
     const dateString = new Date().toISOString().split("T")[0];
     const tempMessage = {
@@ -407,7 +511,14 @@ const useInbox = () => {
       direction: "outgoing",
       subject: subject,
       content: textAreaRef?.current?.value,
-      provider: selectedProvider?._id,
+      provider: {
+        _id: selectedProvider?._id,
+        emailProviderType: selectedProvider?.emailProviderType,
+        type: selectedProvider?.type,
+        label: selectedProvider?.label,
+        phone: selectedProvider?.phone,
+        email: selectedProvider?.email,
+      },
       status: "sending", // Temporary status
       mediaUrl: mediaFileUrl,
       mediaType: mediaFileType,
@@ -448,6 +559,7 @@ const useInbox = () => {
     setMediaType("");
     setMediaUrl("");
     setAttachedFile(null);
+    setAttachedFiles([]);
     setSubject("");
 
     try {
@@ -484,21 +596,11 @@ const useInbox = () => {
           providerId: selectedProvider?._id,
           replyToMessageId: tempMessage?.replyToMessageId?._id,
           quotedMessageId: tempMessage?.replyToMessageId?.providerMessageId,
-          attachments: attachmentFile
-            ? [
-                {
-                  fileName: attachmentFile?.name,
-                  fileSize: formatFileSize(attachmentFile?.size),
-                  mimeType: attachmentFile?.type,
-                  mediaUrl,
-                  mediaType: getMediaTypeFromMime(attachmentFile?.type),
-                },
-              ]
-            : [],
+          attachments: attachmentFile ? attachments : [],
         };
 
         const response = await axios.post(
-          "/api/messages/sendEmailMessage",
+          "/api/messages/send-email-message",
           payload,
           {
             headers: {
@@ -635,26 +737,30 @@ const useInbox = () => {
     console.log("Attachments to use:", attachmentsFilesToUse);
     setSendMsgLoading(true);
 
+    let attachments: any[] = [];
     // for attachments upload
-    if (attachedFile) {
-      const resData = await handleUpload(attachedFile);
-      if (resData && resData?.success) {
-        mediaFileUrl = resData?.url;
-        mediaFileType = getMediaTypeFromFile(attachedFile);
-        setMediaUrl(resData?.url);
+    if (attachmentsFilesToUse.length > 0) {
+      for (const file of attachmentsFilesToUse) {
+        const resData = await handleUpload(file);
+        if (resData && resData?.success) {
+          attachments.push({
+            fileName: file?.name,
+            fileSize: formatFileSize(file?.size),
+            mimeType: file?.type,
+            mediaUrl: resData?.url,
+            mediaType: getMediaTypeFromMime(file?.type),
+          });
+
+          // For legacy compatibility/single file logic
+          if (!mediaFileUrl) {
+            mediaFileUrl = resData?.url;
+            mediaFileType = getMediaTypeFromMime(file?.type);
+            setMediaUrl(resData?.url);
+          }
+        }
       }
     }
 
-    let attachments: any[] = [];
-    if (mediaUrl && attachmentsFilesToUse.length) {
-      attachments = attachmentsFilesToUse.map((f) => ({
-        fileName: f?.name,
-        fileSize: f?.size.toString(),
-        mimeType: f?.type,
-        mediaUrl: mediaFileUrl,
-        mediaType: getMediaTypeFromMime(f?.type),
-      }));
-    }
     const tempMessageId = Date.now()?.toString(); // Ensure a unique identifier
     const dateString = new Date().toISOString().split("T")[0];
     const tempMessage = {
@@ -708,6 +814,7 @@ const useInbox = () => {
     setMediaType("");
     setMediaUrl("");
     setAttachedFile(null);
+    setAttachedFiles([]);
     setSubject("");
 
     try {
@@ -744,21 +851,12 @@ const useInbox = () => {
           providerId: selectedProvider?._id,
           replyToMessageId: tempMessage?.replyToMessageId?._id,
           quotedMessageId: tempMessage?.replyToMessageId?.providerMessageId,
-          attachments: attachmentFile
-            ? [
-                {
-                  fileName: attachmentFile?.name,
-                  fileSize: formatFileSize(attachmentFile?.size),
-                  mimeType: attachmentFile?.type,
-                  mediaUrl,
-                  mediaType: getMediaTypeFromMime(attachmentFile?.type),
-                },
-              ]
-            : [],
+          attachments: attachmentFile ? attachments : [],
+          ...scheduledData,
         };
 
         const response = await axios.post(
-          "/api/messages/sendEmailMessage",
+          "/api/messages/schedule-email-message",
           payload,
           {
             headers: {
@@ -1379,9 +1477,13 @@ const useInbox = () => {
       setMediaType("");
       setMediaUrl("");
     }
-  }, [selectedTemplate]);
 
-  console.log({ selectedConversation });
+    if (selectedTemplate) {
+      setSubject(selectedTemplate?.subject);
+    } else {
+      setSubject("");
+    }
+  }, [selectedTemplate]);
 
   const state = {
     user,
@@ -1431,6 +1533,8 @@ const useInbox = () => {
     isDeleteConversationModalOpen,
     isDeletingConversation,
     isAddingTag,
+    canSend,
+    canSchedule,
     agents,
     selectedAgent,
     agentFetchLoading,
@@ -1446,6 +1550,11 @@ const useInbox = () => {
     // tags
     tags,
     tagsLoading,
+
+    // Lead Editing
+    editingField,
+    editValue,
+    isUpdatingLead,
   };
 
   return {
@@ -1457,6 +1566,7 @@ const useInbox = () => {
     setAttachedFile,
     setAttachedFiles,
     setSelectedTemplate,
+    setSubject,
     setMessage,
     setMediaType,
     setMediaUrl,
@@ -1497,6 +1607,10 @@ const useInbox = () => {
     handleApplyFilters,
     handleScheduleMessage,
     handleRemoveTemplate,
+    handleEditLead,
+    cancelEditLead,
+    handleUpdateLead,
+    setEditValue,
   };
 };
 

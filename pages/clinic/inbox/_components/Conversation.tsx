@@ -59,6 +59,7 @@ const Conversation: React.FC<IProps> = ({
               {(() => {
                 const recent = conversation?.recentMessage || ({} as any);
                 let preview = recent.content || "";
+                if (recent?.channel === "email") return recent?.subject || "";
                 if (!preview || preview.trim() === "") {
                   // try multiple possible media indicators
                   const mediaType =
@@ -66,7 +67,7 @@ const Conversation: React.FC<IProps> = ({
                     recent.attachments?.[0]?.mediaType ||
                     (recent.mediaUrl
                       ? recent.mediaUrl.match(
-                          /\.(jpg|jpeg|png|gif|mp4|mp3|pdf|docx?)$/i
+                          /\.(jpg|jpeg|png|gif|mp4|mp3|pdf|docx?)$/i,
                         )
                         ? "document"
                         : "file"
@@ -87,12 +88,12 @@ const Conversation: React.FC<IProps> = ({
                       mediaType === "image"
                         ? "Image"
                         : mediaType === "video"
-                        ? "Video"
-                        : mediaType === "audio"
-                        ? "Audio"
-                        : mediaType === "document"
-                        ? "Document"
-                        : "File";
+                          ? "Video"
+                          : mediaType === "audio"
+                            ? "Audio"
+                            : mediaType === "document"
+                              ? "Document"
+                              : "File";
 
                     if (filename) {
                       preview = `${typeLabel}: ${filename}`;

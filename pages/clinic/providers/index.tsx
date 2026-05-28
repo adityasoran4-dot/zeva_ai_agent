@@ -40,6 +40,8 @@ import DeleteProviderModal from "./_components/DeleteProviderModal";
 import toast from "react-hot-toast";
 import Loader from "@/components/Loader";
 import { useAgentPermissions } from "@/hooks/useAgentPermissions";
+import AddEmailProvider from "./_components/AddEmailProvider";
+import EditEmailProviderModal from "./_components/EditEmailProviderModal";
 
 const PROVIDER_MODULE_KEY = "clinic_providers";
 
@@ -47,6 +49,7 @@ const ProvidersPage: NextPageWithLayout = () => {
   const token = getTokenByPath();
   const [showAddModal, setShowAddModal] = useState(false);
   const [showWhatsappModal, setShowWhatsappModal] = useState<boolean>(false);
+  const [showEmailModal, setShowEmailModal] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState("all");
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
   const [searchQuery, setSearchQuery] = useState("");
@@ -58,8 +61,9 @@ const ProvidersPage: NextPageWithLayout = () => {
   const [totalProviders, setTotalProviders] = useState<number>(0);
   const [isMounted, setIsMounted] = useState(false);
 
-
   const [isOpenEditWhatsappModal, setIsOpenEditWhatsappModal] =
+    useState<boolean>(false);
+  const [isOpenEditEmailModal, setIsOpenEditEmailModal] =
     useState<boolean>(false);
   const [isOpenDeleteModal, setIsOpenDeleteModal] = useState<boolean>(false);
   const [selectedProvider, setSelectedProvider] = useState<Provider | null>(
@@ -79,7 +83,8 @@ const ProvidersPage: NextPageWithLayout = () => {
   const providersPerPage = 9;
 
   // Check if on agent route
-  const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
+  const currentPath =
+    typeof window !== "undefined" ? window.location.pathname : "";
   const isAgentRoute = currentPath.startsWith("/agent/");
   // Use agent permissions hook for agent routes
   const agentPermissionsHook: any = useAgentPermissions(
@@ -117,8 +122,14 @@ const ProvidersPage: NextPageWithLayout = () => {
     } finally {
       setLoading(false);
     }
-  }, [activeTab, currentPage, selectedType, searchQuery, token, providersPerPage]);
-
+  }, [
+    activeTab,
+    currentPage,
+    selectedType,
+    searchQuery,
+    token,
+    providersPerPage,
+  ]);
 
   // Handle agent permissions
   useEffect(() => {
@@ -132,7 +143,6 @@ const ProvidersPage: NextPageWithLayout = () => {
       canDelete: Boolean(agentPermissions.canAll || agentPermissions.canDelete),
       canAssign: Boolean(agentPermissions.canAll),
     };
-
 
     setPermissions(newPermissions);
     setPermissionsLoaded(true);
@@ -299,13 +309,18 @@ const ProvidersPage: NextPageWithLayout = () => {
               // If not found at top level, check in subModules of parent modules
               if (!modulePermission) {
                 for (const parentModule of res.data.permissions) {
-                  if (parentModule.subModules && parentModule.subModules.length > 0) {
-                    const foundInSubModule = parentModule.subModules.find((sm: any) => {
-                      if (sm.moduleKey === "clinic_providers") return true;
-                      if (sm.moduleKey === "clinic_Providers") return true;
-                      if (sm.moduleKey === "providers") return true;
-                      return false;
-                    });
+                  if (
+                    parentModule.subModules &&
+                    parentModule.subModules.length > 0
+                  ) {
+                    const foundInSubModule = parentModule.subModules.find(
+                      (sm: any) => {
+                        if (sm.moduleKey === "clinic_providers") return true;
+                        if (sm.moduleKey === "clinic_Providers") return true;
+                        if (sm.moduleKey === "providers") return true;
+                        return false;
+                      },
+                    );
                     if (foundInSubModule) {
                       modulePermission = { actions: foundInSubModule.actions };
                       break;
@@ -400,7 +415,9 @@ const ProvidersPage: NextPageWithLayout = () => {
       const fetchPermissions = async () => {
         try {
           console.log(
-            "Fetching Agent/Staff Permissions for", PROVIDER_MODULE_KEY, "...",
+            "Fetching Agent/Staff Permissions for",
+            PROVIDER_MODULE_KEY,
+            "...",
           );
           setPermissionsLoaded(false);
           const res = await axios.get("/api/agent/get-module-permissions", {
@@ -489,8 +506,14 @@ const ProvidersPage: NextPageWithLayout = () => {
       return;
     }
     fetchAllProviders();
-  }, [activeTab, currentPage, selectedType, searchQuery, permissionsLoaded, permissions.canRead]);
-
+  }, [
+    activeTab,
+    currentPage,
+    selectedType,
+    searchQuery,
+    permissionsLoaded,
+    permissions.canRead,
+  ]);
 
   // Show loading while permissions are being fetched
   if (!permissionsLoaded) {
@@ -983,6 +1006,9 @@ const ProvidersPage: NextPageWithLayout = () => {
                               if (provider?.type?.includes("whatsapp")) {
                                 setIsOpenEditWhatsappModal(true);
                                 setSelectedProvider(provider);
+                              } else if (provider?.type?.includes("email")) {
+                                setIsOpenEditEmailModal(true);
+                                setSelectedProvider(provider);
                               }
                             }}
                           >
@@ -1121,6 +1147,11 @@ const ProvidersPage: NextPageWithLayout = () => {
                                   if (provider?.type?.includes("whatsapp")) {
                                     setIsOpenEditWhatsappModal(true);
                                     setSelectedProvider(provider);
+                                  } else if (
+                                    provider?.type?.includes("email")
+                                  ) {
+                                    setIsOpenEditEmailModal(true);
+                                    setSelectedProvider(provider);
                                   }
                                 }}
                               >
@@ -1212,7 +1243,7 @@ const ProvidersPage: NextPageWithLayout = () => {
       {/* Add Provider Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/50 bg-opacity-50 flex items-center justify-center p-3 sm:p-4 z-50 animate-fadeIn backdrop-blur-sm">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden animate-slideUp">
+          <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden animate-slideUp">
             <div className="p-8">
               <div className="flex items-center justify-between mb-8">
                 <div>
@@ -1275,7 +1306,13 @@ const ProvidersPage: NextPageWithLayout = () => {
                 </div>
 
                 {/* Email Card */}
-                <div className="group border-2 border-gray-200 rounded-2xl p-6 hover:border-purple-500 hover:shadow-xl transition-all duration-300 cursor-pointer">
+                <div
+                  onClick={() => {
+                    setShowEmailModal(true);
+                    setShowAddModal(false);
+                  }}
+                  className="group border-2 border-gray-200 rounded-2xl p-6 hover:border-purple-500 hover:shadow-xl transition-all duration-300 cursor-pointer"
+                >
                   <div className="flex flex-col items-center text-center">
                     <div className="p-4 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl mb-4 group-hover:from-purple-100 group-hover:to-pink-100 transition-colors duration-300">
                       <Mail className="w-10 h-10 text-purple-600" />
@@ -1327,6 +1364,28 @@ const ProvidersPage: NextPageWithLayout = () => {
         onUpdate={() => {
           fetchAllProviders();
           setSelectedProvider(null);
+        }}
+        token={token as string}
+      />
+
+      <EditEmailProviderModal
+        providerId={selectedProvider!?._id}
+        isOpen={isOpenEditEmailModal}
+        onClose={() => setIsOpenEditEmailModal(false)}
+        onUpdate={() => {
+          fetchAllProviders();
+          setSelectedProvider(null);
+        }}
+        token={token as string}
+      />
+
+      {/* Add WhatsApp Provider Modal */}
+      <AddEmailProvider
+        isOpen={showEmailModal}
+        onClose={() => setShowEmailModal(false)}
+        onSuccess={() => {
+          fetchAllProviders();
+          setShowEmailModal(false);
         }}
         token={token as string}
       />

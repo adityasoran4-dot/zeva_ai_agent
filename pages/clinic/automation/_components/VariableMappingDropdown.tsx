@@ -5,7 +5,6 @@ import {
   Zap,
   User,
   Building,
-  // Webhook,
   Calendar,
   ChevronRight,
   MessageSquare,
@@ -98,7 +97,6 @@ const appointmentVariables: Variable[] = [
     category: "Appointment",
     icon: User,
   },
-
   // Doctor Information
   {
     label: "Doctor ID",
@@ -142,7 +140,6 @@ const appointmentVariables: Variable[] = [
     category: "Appointment",
     icon: Calendar,
   },
-
   // Room Information
   {
     label: "Room ID",
@@ -156,7 +153,6 @@ const appointmentVariables: Variable[] = [
     category: "Appointment",
     icon: Home,
   },
-
   // Appointment Information
   {
     label: "Appointment ID",
@@ -282,7 +278,6 @@ const variables: Variable[] = [
     category: "Lead",
     icon: Building,
   },
-
   // Patient
   {
     label: "Patient Name",
@@ -344,7 +339,6 @@ const variables: Variable[] = [
     category: "Patient",
     icon: Building,
   },
-
   // Clinic
   {
     label: "Clinic Name",
@@ -364,15 +358,6 @@ const variables: Variable[] = [
     category: "Clinic",
     icon: Building,
   },
-
-  // Webhook (Dynamic Example)
-  // {
-  //   label: "Webhook Payload",
-  //   value: "{{webhook.payload}}",
-  //   category: "Webhook",
-  //   icon: Webhook,
-  // },
-
   // Message
   {
     label: "Message ID",
@@ -440,7 +425,6 @@ const variables: Variable[] = [
     category: "Incoming Message",
     icon: MessageSquare,
   },
-
   // System
   {
     label: "Current Date",
@@ -458,9 +442,12 @@ const variables: Variable[] = [
 
 interface VariableMappingDropdownProps {
   onSelect: (value: string) => void;
-  entity?: string; // Lead, Appointment, etc.
+  entity?: string;
   align?: "left" | "right";
-  nodeId: string; // it can be actionId or conditionId or triggerId
+  nodeId: string;
+  triggerButton?: React.ReactNode;
+  textAreaRef?: React.RefObject<HTMLTextAreaElement>;
+  inputRef?: React.RefObject<HTMLInputElement>;
 }
 
 const VariableMappingDropdown: React.FC<VariableMappingDropdownProps> = ({
@@ -468,6 +455,9 @@ const VariableMappingDropdown: React.FC<VariableMappingDropdownProps> = ({
   entity = "Lead",
   align = "left",
   nodeId,
+  triggerButton,
+  textAreaRef,
+  inputRef,
 }) => {
   const router = useRouter();
   const { workflowId } = router.query;
@@ -489,21 +479,16 @@ const VariableMappingDropdown: React.FC<VariableMappingDropdownProps> = ({
   const restApiVariables = getDynamicRestApiVariables(
     prevRestApiAction?.apiResponse || {},
   );
-
   const aiComposerVariables = getAiComposerVariables(
     prevAiComposerAction?.parameters?.outputKey || "",
   );
 
-  console.log("vari workflowId: ", workflowId);
-  console.log("trigger: ", trigger);
-  console.log("prevRestApiAction: ", prevRestApiAction);
-  console.log("webhookVariables: ", webhookVariables);
-  console.log("restApiVariables: ", restApiVariables);
-  console.log("prevAiComposerAction: ", prevAiComposerAction);
-
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Use textAreaRef or inputRef (prefer textAreaRef)
+  const activeInputRef = textAreaRef || inputRef;
 
   const filteredVariables = [
     ...webhookVariables,
@@ -580,6 +565,49 @@ const VariableMappingDropdown: React.FC<VariableMappingDropdownProps> = ({
     new Set(filteredVariables.map((v) => v.category)),
   );
 
+  // Function to insert text at cursor position
+  const insertAtCursor = (text: string) => {
+    const inputElement = activeInputRef?.current;
+    if (!inputElement) {
+      // Fallback: just call onSelect
+      onSelect(text);
+      return;
+    }
+
+    const element = inputElement;
+    const start = element.selectionStart || 0;
+    const end = element.selectionEnd || 0;
+    const value = element.value || "";
+
+    // Insert the variable at cursor position
+    const newValue = value.substring(0, start) + text + value.substring(end);
+
+    // Update the input/textarea value
+    element.value = newValue;
+
+    // Trigger change event to update React state
+    const changeEvent = new Event("input", { bubbles: true });
+    element.dispatchEvent(changeEvent);
+
+    // Move cursor after the inserted text
+    const newCursorPosition = start + text.length;
+    setTimeout(() => {
+      element.focus();
+      element.setSelectionRange(newCursorPosition, newCursorPosition);
+    }, 0);
+  };
+
+  const handleVariableSelect = (variableValue: string) => {
+    if (activeInputRef?.current) {
+      // If we have a ref, insert at cursor position
+      insertAtCursor(variableValue);
+    } else {
+      // Fallback to the onSelect callback
+      onSelect(variableValue);
+    }
+    setIsOpen(false);
+  };
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -595,21 +623,25 @@ const VariableMappingDropdown: React.FC<VariableMappingDropdownProps> = ({
 
   return (
     <div className="relative" ref={dropdownRef}>
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className={cn(
-          "p-3 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 hover:border-blue-300 transition-all text-gray-400 hover:text-blue-500 shadow-sm flex items-center justify-center",
-          isOpen && "ring-2 ring-blue-100 border-blue-500 text-blue-500",
-        )}
-        title="Insert Variable"
-      >
-        <Braces className="w-4 h-4" />
-      </button>
+      {triggerButton ? (
+        <div onClick={() => setIsOpen(!isOpen)}>{triggerButton}</div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setIsOpen(!isOpen)}
+          className={cn(
+            "p-3 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 hover:border-blue-300 transition-all text-gray-400 hover:text-blue-500 shadow-sm flex items-center justify-center",
+            isOpen && "ring-2 ring-blue-100 border-blue-500 text-blue-500",
+          )}
+          title="Insert Variable"
+        >
+          <Braces className="w-4 h-4" />
+        </button>
+      )}
 
       {isOpen && (
         <div
-          className={`absolute ${align === "left" ? "left-0" : "right-0"} mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-gray-200 z-[110] flex flex-col animate-in zoom-in-95 duration-200 overflow-hidden`}
+          className={`absolute ${align === "left" ? "left-0" : "right-0"} mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-gray-200 z-[110] flex flex-col animate-in zoom-in-95 duration-200 overflow-hidden`}
         >
           {/* Search Header */}
           <div className="p-3 border-b border-gray-100 bg-gray-50/50">
@@ -627,7 +659,7 @@ const VariableMappingDropdown: React.FC<VariableMappingDropdownProps> = ({
           </div>
 
           {/* Variables List */}
-          <div className="flex-1 overflow-y-auto max-h-64 custom-scrollbar">
+          <div className="flex-1 overflow-y-auto max-h-80 custom-scrollbar">
             {categories.length === 0 ? (
               <div className="p-8 text-center">
                 <p className="text-xs text-gray-400 font-medium italic">
@@ -638,6 +670,9 @@ const VariableMappingDropdown: React.FC<VariableMappingDropdownProps> = ({
               categories.map((cat) => (
                 <div key={cat} className="p-2">
                   <h4 className="px-2 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
+                    {cat === "Rest API" && "🔄"}
+                    {cat === "AI Composer" && "✨"}
+                    {cat === "Webhook" && "🌐"}
                     {cat}
                   </h4>
                   <div className="space-y-0.5 mt-1">
@@ -649,10 +684,7 @@ const VariableMappingDropdown: React.FC<VariableMappingDropdownProps> = ({
                           <button
                             key={variable.value}
                             type="button"
-                            onClick={() => {
-                              onSelect(variable.value);
-                              setIsOpen(false);
-                            }}
+                            onClick={() => handleVariableSelect(variable.value)}
                             className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-blue-50 group/var transition-all"
                           >
                             <div className="flex items-center gap-3">
@@ -663,12 +695,12 @@ const VariableMappingDropdown: React.FC<VariableMappingDropdownProps> = ({
                                 <p className="text-xs font-bold text-gray-700 group-hover/var:text-blue-700 leading-none">
                                   {variable.label}
                                 </p>
-                                <p className="text-[10px] text-gray-400 font-mono mt-1 leading-none">
+                                <p className="text-[10px] text-gray-400 font-mono mt-1 leading-none truncate max-w-[180px]">
                                   {variable.value}
                                 </p>
                               </div>
                             </div>
-                            <ChevronRight className="w-3 h-3 text-gray-300 opacity-0 group-hover/var:opacity-100 group-hover/var:text-blue-400 transition-all" />
+                            <ChevronRight className="w-3 h-3 text-gray-300 opacity-0 group-hover/var:opacity-100 group-hover/var:text-blue-400 transition-all flex-shrink-0" />
                           </button>
                         );
                       })}
@@ -681,7 +713,7 @@ const VariableMappingDropdown: React.FC<VariableMappingDropdownProps> = ({
           {/* Footer Info */}
           <div className="p-2 bg-gray-50 border-t border-gray-100">
             <p className="text-[9px] text-center text-gray-400 font-medium">
-              Click a variable to insert it at cursor
+              Click a variable to insert it at cursor position
             </p>
           </div>
         </div>

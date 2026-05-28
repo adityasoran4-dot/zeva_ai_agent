@@ -1,4 +1,4 @@
-import React, { ReactElement, useEffect, useRef } from "react";
+import React, { ReactElement, useEffect, useRef, useState } from "react";
 import { NextPageWithLayout } from "../../_app";
 import ClinicLayout from "@/components/ClinicLayout";
 import withClinicAuth from "@/components/withClinicAuth";
@@ -11,7 +11,28 @@ import useCreateAndEditTemplate, {
   templateHeaderOptions,
   templateTypeOptions,
 } from "@/hooks/useCreateAndEditTemplate";
-import { ArrowLeft, Paperclip, Plus, Smile, X } from "lucide-react";
+import {
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  ArrowLeft,
+  Bold,
+  Code,
+  Edit3,
+  Heading1,
+  Heading2,
+  Heading3,
+  Italic,
+  Link,
+  List,
+  ListOrdered,
+  Paperclip,
+  Plus,
+  Quote,
+  Smile,
+  Underline,
+  X,
+} from "lucide-react";
 import EmojiPickerModal from "@/components/shared/EmojiPickerModal";
 
 export const getUniqueName = (name: string) => {
@@ -74,6 +95,179 @@ const InputField = React.memo(
   ),
 );
 
+const RichTextEditor = ({
+  value,
+  onChange,
+  placeholder = "Write your email content here...",
+}: {
+  value: string;
+  onChange: (html: string) => void;
+  placeholder?: string;
+}) => {
+  const editorRef = useRef<HTMLDivElement>(null);
+  const [activeFormats, setActiveFormats] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (editorRef.current && editorRef.current.innerHTML !== value) {
+      editorRef.current.innerHTML = value || "<p><br></p>";
+    }
+  }, [value]);
+
+  const updateActiveFormats = () => {
+    const formats = new Set<string>();
+    if (document.queryCommandState("bold")) formats.add("bold");
+    if (document.queryCommandState("italic")) formats.add("italic");
+    if (document.queryCommandState("underline")) formats.add("underline");
+    if (document.queryCommandState("insertUnorderedList")) formats.add("ul");
+    if (document.queryCommandState("insertOrderedList")) formats.add("ol");
+
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0) {
+      let parent =
+        selection.getRangeAt(0).commonAncestorContainer.parentElement;
+      while (parent && parent !== editorRef.current) {
+        const tag = parent.tagName.toLowerCase();
+        if (["h1", "h2", "h3", "blockquote", "a"].includes(tag)) {
+          formats.add(tag);
+        }
+        parent = parent.parentElement;
+      }
+    }
+    setActiveFormats(formats);
+  };
+
+  const formatText = (command: string, arg?: string) => {
+    document.execCommand(command, false, arg);
+    if (editorRef.current) {
+      onChange(editorRef.current.innerHTML);
+    }
+    updateActiveFormats();
+  };
+
+  const addLink = () => {
+    const url = prompt("Enter the URL");
+    if (url) {
+      formatText("createLink", url);
+    }
+  };
+
+  return (
+    <div className="border border-gray-300 rounded-lg overflow-hidden bg-white focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all">
+      <div className="flex items-center gap-1 p-2 border-b border-gray-200 bg-gray-50 flex-wrap">
+        <button
+          onClick={() => formatText("bold")}
+          className={`p-1.5 rounded hover:bg-gray-200 transition-colors ${activeFormats.has("bold") ? "bg-blue-100 text-blue-600" : "text-gray-600"}`}
+          title="Bold"
+        >
+          <Bold size={16} />
+        </button>
+        <button
+          onClick={() => formatText("italic")}
+          className={`p-1.5 rounded hover:bg-gray-200 transition-colors ${activeFormats.has("italic") ? "bg-blue-100 text-blue-600" : "text-gray-600"}`}
+          title="Italic"
+        >
+          <Italic size={16} />
+        </button>
+        <button
+          onClick={() => formatText("underline")}
+          className={`p-1.5 rounded hover:bg-gray-200 transition-colors ${activeFormats.has("underline") ? "bg-blue-100 text-blue-600" : "text-gray-600"}`}
+          title="Underline"
+        >
+          <Underline size={16} />
+        </button>
+        <button
+          onClick={addLink}
+          className={`p-1.5 rounded hover:bg-gray-200 transition-colors ${activeFormats.has("a") ? "bg-blue-100 text-blue-600" : "text-gray-600"}`}
+          title="Add Link"
+        >
+          <Link size={16} />
+        </button>
+
+        <div className="w-px h-4 bg-gray-300 mx-1" />
+
+        <button
+          onClick={() => formatText("formatBlock", "h1")}
+          className={`p-1.5 rounded hover:bg-gray-200 transition-colors ${activeFormats.has("h1") ? "bg-blue-100 text-blue-600" : "text-gray-600"}`}
+          title="Heading 1"
+        >
+          <Heading1 size={16} />
+        </button>
+        <button
+          onClick={() => formatText("formatBlock", "h2")}
+          className={`p-1.5 rounded hover:bg-gray-200 transition-colors ${activeFormats.has("h2") ? "bg-blue-100 text-blue-600" : "text-gray-600"}`}
+          title="Heading 2"
+        >
+          <Heading2 size={16} />
+        </button>
+        <button
+          onClick={() => formatText("formatBlock", "h3")}
+          className={`p-1.5 rounded hover:bg-gray-200 transition-colors ${activeFormats.has("h3") ? "bg-blue-100 text-blue-600" : "text-gray-600"}`}
+          title="Heading 3"
+        >
+          <Heading3 size={16} />
+        </button>
+
+        <div className="w-px h-4 bg-gray-300 mx-1" />
+
+        <button
+          onClick={() => formatText("justifyLeft")}
+          className="p-1.5 rounded hover:bg-gray-200 transition-colors text-gray-600"
+          title="Align Left"
+        >
+          <AlignLeft size={16} />
+        </button>
+        <button
+          onClick={() => formatText("justifyCenter")}
+          className="p-1.5 rounded hover:bg-gray-200 transition-colors text-gray-600"
+          title="Align Center"
+        >
+          <AlignCenter size={16} />
+        </button>
+        <button
+          onClick={() => formatText("justifyRight")}
+          className="p-1.5 rounded hover:bg-gray-200 transition-colors text-gray-600"
+          title="Align Right"
+        >
+          <AlignRight size={16} />
+        </button>
+
+        <div className="w-px h-4 bg-gray-300 mx-1" />
+
+        <button
+          onClick={() => formatText("insertUnorderedList")}
+          className={`p-1.5 rounded hover:bg-gray-200 transition-colors ${activeFormats.has("ul") ? "bg-blue-100 text-blue-600" : "text-gray-600"}`}
+          title="Bullet List"
+        >
+          <List size={16} />
+        </button>
+        <button
+          onClick={() => formatText("insertOrderedList")}
+          className={`p-1.5 rounded hover:bg-gray-200 transition-colors ${activeFormats.has("ol") ? "bg-blue-100 text-blue-600" : "text-gray-600"}`}
+          title="Numbered List"
+        >
+          <ListOrdered size={16} />
+        </button>
+        <button
+          onClick={() => formatText("formatBlock", "blockquote")}
+          className={`p-1.5 rounded hover:bg-gray-200 transition-colors ${activeFormats.has("blockquote") ? "bg-blue-100 text-blue-600" : "text-gray-600"}`}
+          title="Quote"
+        >
+          <Quote size={16} />
+        </button>
+      </div>
+      <div
+        ref={editorRef}
+        contentEditable
+        className="p-4 min-h-[200px] text-sm focus:outline-none bg-white prose max-w-none"
+        onInput={(e) => onChange(e.currentTarget.innerHTML)}
+        onKeyUp={updateActiveFormats}
+        onMouseUp={updateActiveFormats}
+        data-placeholder={placeholder}
+      />
+    </div>
+  );
+};
+
 const TemplateCreateAndEditPage: NextPageWithLayout = () => {
   const router = useRouter();
   const { id } = router.query;
@@ -86,7 +280,7 @@ const TemplateCreateAndEditPage: NextPageWithLayout = () => {
     setVariableSampleValues,
     setHeaderVariableSampleValues,
     // setTemplateButtons,
-    // setEditorType,
+    setEditorType,
     setIsAddBtnOpen,
     handleAddVariable,
     handleCreateTemplate,
@@ -115,9 +309,28 @@ const TemplateCreateAndEditPage: NextPageWithLayout = () => {
     headerVariables,
     headerVariableSampleValues,
     template,
-    // editorType,
+    editorType,
     isAddBtnOpen,
   } = state;
+
+  const handleOpenHtmlEditor = async () => {
+    let finalId = id;
+    if (isCreateMode) {
+      // Create first
+      const newId = await handleCreateTemplate("none");
+      if (newId) finalId = newId;
+      else return;
+    } else {
+      // Update first
+      const updatedId = await handleUpdateTemplate(id as string, "none");
+      if (updatedId) finalId = updatedId;
+      else return;
+    }
+
+    if (finalId) {
+      router.push(`/clinic/editors/html-editor/?templateId=${finalId}`);
+    }
+  };
 
   const isCreateMode = id === "new";
 
@@ -390,6 +603,43 @@ const TemplateCreateAndEditPage: NextPageWithLayout = () => {
                   {/* Email Specific Fields */}
                   {values?.templateType === "email" && (
                     <>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-800 mb-2">
+                          Editor Type
+                        </label>
+                        <div className="grid grid-cols-2 gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setEditorType("rich-text-editor")}
+                            className={`flex items-center justify-center gap-2 p-3 rounded-lg border transition-all ${
+                              editorType === "rich-text-editor"
+                                ? "border-blue-500 bg-blue-50 text-blue-700"
+                                : "border-gray-300 hover:border-gray-400 hover:bg-gray-50 text-gray-600"
+                            }`}
+                          >
+                            <Edit3 size={18} />
+                            <span className="font-medium">Rich Text</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleOpenHtmlEditor}
+                            className={`flex items-center justify-center gap-2 p-3 rounded-lg border transition-all ${
+                              editorType === "html-editor"
+                                ? "border-blue-500 bg-blue-50 text-blue-700"
+                                : "border-gray-300 hover:border-gray-400 hover:bg-gray-50 text-gray-600"
+                            }`}
+                          >
+                            <Code size={18} />
+                            <span className="font-medium">HTML Editor</span>
+                          </button>
+                        </div>
+                        <p className="mt-2 text-xs text-gray-500">
+                          {editorType === "html-editor"
+                            ? "Advanced HTML editor for custom email designs."
+                            : "Simple drag-and-drop style rich text editor."}
+                        </p>
+                      </div>
+
                       <div>
                         <label className="block text-sm font-medium text-gray-800 mb-2">
                           Email Template Type
@@ -696,14 +946,21 @@ const TemplateCreateAndEditPage: NextPageWithLayout = () => {
                     <label className="block text-sm font-medium text-gray-800">
                       Body Content
                     </label>
-                    <textarea
-                      ref={textAreaRef}
-                      value={content}
-                      onChange={(e) => setContent(e.target.value)}
-                      placeholder="Write your template content here..."
-                      rows={6}
-                      className="w-full px-4 py-3 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all disabled:bg-gray-100 disabled:cursor-not-allowed bg-white resize-none"
-                    />
+                    {values?.templateType === "email" ? (
+                      <RichTextEditor
+                        value={content}
+                        onChange={(html) => setContent(html)}
+                      />
+                    ) : (
+                      <textarea
+                        ref={textAreaRef}
+                        value={content}
+                        onChange={(e) => setContent(e.target.value)}
+                        placeholder="Write your template content here..."
+                        rows={6}
+                        className="w-full px-4 py-3 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all disabled:bg-gray-100 disabled:cursor-not-allowed bg-white resize-none"
+                      />
+                    )}
                     <div className="flex justify-between text-xs text-gray-500">
                       <div>Use {"{{variable}}"} for dynamic content</div>
                       <div>{content?.length || 0} characters</div>

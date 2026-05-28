@@ -81,6 +81,7 @@ export default async function handler(req, res) {
         .limit(limit)
         .populate("senderId", "name email phone")
         .populate("recipientId", "name email phone")
+        .populate("provider", "name label email phone")
         .populate({
           path: "replyToMessageId",
           select: "content mediaType mediaUrl channel direction",
@@ -142,7 +143,7 @@ export default async function handler(req, res) {
       });
     }
   } catch (error) {
-    // console.error("Get Messages error conversation: ", error);
+    console.error("Get Messages error conversation: ", error);
     return res.status(500).json({
       success: false,
       message: error?.message || "Internal server error",

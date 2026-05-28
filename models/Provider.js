@@ -30,12 +30,44 @@ const ProviderSchema = new mongoose.Schema(
       enum: ["email", "sms", "whatsapp"],
       required: true,
     },
+    // for email provider
+    emailProviderType: {
+      type: String,
+      enum: ["gmail", "other"],
+    },
+    emailType: {
+      type: String,
+      enum: ["personal", "marketing"],
+    },
+    lastSyncedAt: {
+      // for inbox sync
+      type: Date,
+      default: null,
+    },
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+    gmailWatchJobId: {
+      type: String,
+    },
+    gmailWatchJobKey: {
+      type: String,
+    },
+    gmailWatchExpiration: {
+      type: String,
+    },
+    inboxAutomation: {
+      // for making new contact in incoming email
+      type: Boolean,
+      default: false,
+    },
     secrets: {
       type: mongoose.Schema.Types.Mixed,
       default: {}, // Default an empty object
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 // Encryption keys

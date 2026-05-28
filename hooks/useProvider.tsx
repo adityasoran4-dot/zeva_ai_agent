@@ -19,19 +19,23 @@ const useProvider = () => {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (data && data?.success) {
-        const providersData: Provider[] = data?.data;
+        let providersData: Provider[] = data?.data;
         if (providersData?.length > 0) {
+          providersData = providersData?.filter(
+            (p) => p?.status === "approved",
+          );
+
           const smsProviders = providersData?.filter((p) =>
-            p?.type?.includes("sms")
+            p?.type?.includes("sms"),
           );
           const whatsappProviders = providersData?.filter((p) =>
-            p?.type?.includes("whatsapp")
+            p?.type?.includes("whatsapp"),
           );
           const voiceProviders = providersData?.filter((p) =>
-            p?.type?.includes("voice")
+            p?.type?.includes("voice"),
           );
           const emailProviders = providersData?.filter((p) =>
-            p?.type?.includes("email")
+            p?.type?.includes("email"),
           );
           setProviders(providersData);
           setSmsProviders(smsProviders);

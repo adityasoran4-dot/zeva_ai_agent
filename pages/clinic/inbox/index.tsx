@@ -23,6 +23,8 @@ import {
   MessageCircle,
   XCircle,
   Trash2,
+  Edit2,
+  Check,
 } from "lucide-react";
 import CreateNewConversation from "./_components/CreateNewConversation";
 import Conversation from "./_components/Conversation";
@@ -64,6 +66,7 @@ const InboxPage: NextPageWithLayout = () => {
     setAttachedFile,
     setAttachedFiles,
     setSelectedTemplate,
+    setSubject,
     setMessage,
     setMediaType,
     setBodyParameters,
@@ -92,6 +95,10 @@ const InboxPage: NextPageWithLayout = () => {
     handleAgentFilterChange,
     handleApplyFilters,
     handleRemoveTemplate,
+    handleEditLead,
+    cancelEditLead,
+    handleUpdateLead,
+    setEditValue,
   } = useInbox();
   const {
     user,
@@ -132,6 +139,8 @@ const InboxPage: NextPageWithLayout = () => {
     isDeleteConversationModalOpen,
     isDeletingConversation,
     isAddingTag,
+    canSend,
+    canSchedule,
     agents,
     selectedAgent,
     agentFetchLoading,
@@ -148,7 +157,21 @@ const InboxPage: NextPageWithLayout = () => {
     // tags
     tags,
     tagsLoading,
+
+    // Lead Editing
+    editingField,
+    editValue,
+    isUpdatingLead,
   } = state;
+
+  // Auto-expand textarea as user types
+  React.useEffect(() => {
+    if (textAreaRef.current) {
+      textAreaRef.current.style.height = "auto";
+      const newHeight = Math.min(textAreaRef.current.scrollHeight, 300); // Limit max height to 300px
+      textAreaRef.current.style.height = `${newHeight}px`;
+    }
+  }, [message]);
 
   return (
     <div className="flex h-[92vh] bg-gray-50 text-gray-800">
@@ -481,7 +504,9 @@ const InboxPage: NextPageWithLayout = () => {
             {/* Message Input */}
             <div className="border-t border-gray-200 bg-white shadow-lg">
               {selectedMessage && (
-                <div className="m-2.5 p-3 bg-gray-50 border-l-4 border-l-green-500 rounded-lg flex justify-between items-start space-x-4">
+                <div
+                  className={`m-2.5 p-3 bg-gray-50 border-l-4 ${selectedMessage?.channel === "whatsapp" ? "border-l-green-500" : selectedMessage?.channel === "email" ? "border-l-gray-500" : ""} rounded-lg flex justify-between items-start space-x-4`}
+                >
                   <div className="flex-1">
                     <div className="text-sm text-gray-600 mb-1">
                       Replying to{" "}
@@ -490,7 +515,10 @@ const InboxPage: NextPageWithLayout = () => {
                         : selectedMessage?.senderId?.name || "Customer Support"}
                     </div>
                     <div className="text-sm text-gray-800">
-                      {selectedMessage?.content || "Media message"}
+                      {selectedMessage?.content &&
+                      selectedMessage?.content?.length > 90
+                        ? selectedMessage?.content?.substring(0, 90) + "..."
+                        : selectedMessage?.content || "Media message"}
                     </div>
                   </div>
                   <button
@@ -501,14 +529,25 @@ const InboxPage: NextPageWithLayout = () => {
                   </button>
                 </div>
               )}
+
+              {selectedProvider?.type?.includes("email") && (
+                <div className="p-2.5 border-b border-gray-100">
+                  <input
+                    type="text"
+                    value={state.subject}
+                    onChange={(e) => setSubject(e.target.value)}
+                    placeholder="Subject"
+                    className="w-full text-sm font-medium border-none outline-none focus:ring-0 placeholder:text-gray-400"
+                  />
+                </div>
+              )}
               <div className="flex space-x-3 p-2.5">
                 <textarea
                   ref={textAreaRef}
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   placeholder="Type your message here..."
-                  className="flex-1 text-sm border-none outline-none"
-                  rows={3}
+                  className="flex-1 text-sm border-none outline-none resize-none overflow-y-auto min-h-[60px]"
                 />
               </div>
 
@@ -636,12 +675,12 @@ const InboxPage: NextPageWithLayout = () => {
 
                             const getStatusColor = () => {
                               const status = provider.status?.toLowerCase();
-                              if (status === "active")
-                                return "bg-green-100 text-green-800";
-                              if (status === "inactive")
-                                return "bg-red-100 text-red-800";
+                              if (status === "approved")
+                                return "bg-green-100 text-green-700";
+                              if (status === "rejected")
+                                return "bg-red-100 text-red-700";
                               if (status === "pending")
-                                return "bg-yellow-100 text-yellow-800";
+                                return "bg-yellow-100 text-yellow-700";
                               return "bg-gray-100 text-gray-800";
                             };
 
@@ -692,7 +731,7 @@ const InboxPage: NextPageWithLayout = () => {
                                           <span
                                             className={`text-xs px-1.5 py-0.5 rounded-full ${getStatusColor()}`}
                                           >
-                                            {provider.status}
+                                            {capitalize(provider.status)}
                                           </span>
                                         )}
                                         <span className="text-xs text-gray-500">
@@ -829,20 +868,14 @@ const InboxPage: NextPageWithLayout = () => {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => setIsScheduleModalOpen(true)}
-                    disabled={!message.trim() || !selectedProvider}
+                    disabled={!canSchedule}
                     className="bg-white text-gray-700 border border-gray-200 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed p-2.5 rounded-xl font-semibold flex items-center space-x-2 transition-all hover:shadow-md"
                   >
                     <Timer className="h-5 w-5" />
                   </button>
                   <button
                     onClick={() => handleSendMessage()}
-                    disabled={
-                      sendMsgLoading ||
-                      (!message.trim() &&
-                        !attachedFile &&
-                        !(state.attachedFiles && state.attachedFiles.length)) ||
-                      !selectedProvider
-                    }
+                    disabled={sendMsgLoading || !canSend}
                     className="bg-gradient-to-r from-gray-800 to-gray-900 text-white hover:from-gray-700 hover:to-gray-800 disabled:opacity-50 disabled:cursor-not-allowed p-2.5 rounded-xl font-semibold flex items-center space-x-2 transition-all hover:shadow-md"
                   >
                     <Send className="h-5 w-5" />
@@ -882,10 +915,48 @@ const InboxPage: NextPageWithLayout = () => {
                   name={selectedConversation?.leadId?.name || ""}
                   size="lg"
                 />
-                <div>
-                  <div className="font-semibold text-gray-800">
-                    {selectedConversation?.leadId?.name}
-                  </div>
+                <div className="flex-1">
+                  {editingField === "name" ? (
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="text"
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        className="w-full text-sm border border-gray-300 rounded px-2 py-1 focus:ring-1 focus:ring-blue-500 outline-none"
+                        autoFocus
+                      />
+                      <button
+                        onClick={handleUpdateLead}
+                        disabled={isUpdatingLead}
+                        className="p-1 text-green-600 hover:bg-green-50 rounded transition-colors disabled:opacity-50"
+                      >
+                        <Check className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={cancelEditLead}
+                        className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 group">
+                      <div className="font-semibold text-gray-800">
+                        {selectedConversation?.leadId?.name}
+                      </div>
+                      <button
+                        onClick={() =>
+                          handleEditLead(
+                            "name",
+                            selectedConversation?.leadId?.name || "",
+                          )
+                        }
+                        className="p-1 text-gray-400 opacity-0 group-hover:opacity-100 hover:text-blue-600 transition-all"
+                      >
+                        <Edit2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  )}
                   <div
                     style={{
                       userSelect: "none",
@@ -910,48 +981,128 @@ const InboxPage: NextPageWithLayout = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-2">
+              <div className="grid grid-cols-1 gap-4">
                 <div className="flex flex-col text-sm text-gray-500">
-                  <div className="flex items-center gap-2">Phone</div>
-                  <div
-                    style={{
-                      userSelect: "none",
-                      WebkitUserSelect: "none",
-                      MozUserSelect: "none",
-                      msUserSelect: "none",
-                    }}
-                    onCopy={(e) => e.preventDefault()}
-                    onDragStart={(e) => e.preventDefault()}
-                    onContextMenu={(e) => e.preventDefault()}
-                    className="font-medium text-gray-800 select-none"
-                  >
-                    {user?.role === "agent"
-                      ? maskPhoneNumber(selectedConversation?.leadId?.phone)
-                      : selectedConversation?.leadId?.phone || "—"}
+                  <div className="flex items-center gap-2 group">
+                    <div className="flex items-center gap-2">Phone</div>
+                    {editingField !== "phone" && (
+                      <button
+                        onClick={() =>
+                          handleEditLead(
+                            "phone",
+                            selectedConversation?.leadId?.phone || "",
+                          )
+                        }
+                        className="p-1 text-gray-400 opacity-0 group-hover:opacity-100 hover:text-blue-600 transition-all"
+                      >
+                        <Edit2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
                   </div>
+                  {editingField === "phone" ? (
+                    <div className="flex items-center gap-1 mt-1">
+                      <input
+                        type="text"
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        className="w-full text-sm border border-gray-300 rounded px-2 py-1 focus:ring-1 focus:ring-blue-500 outline-none font-medium text-gray-800"
+                        autoFocus
+                      />
+                      <button
+                        onClick={handleUpdateLead}
+                        disabled={isUpdatingLead}
+                        className="p-1 text-green-600 hover:bg-green-50 rounded transition-colors disabled:opacity-50"
+                      >
+                        <Check className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={cancelEditLead}
+                        className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        userSelect: "none",
+                        WebkitUserSelect: "none",
+                        MozUserSelect: "none",
+                        msUserSelect: "none",
+                      }}
+                      onCopy={(e) => e.preventDefault()}
+                      onDragStart={(e) => e.preventDefault()}
+                      onContextMenu={(e) => e.preventDefault()}
+                      className="font-medium text-gray-800 select-none"
+                    >
+                      {user?.role === "agent"
+                        ? maskPhoneNumber(selectedConversation?.leadId?.phone)
+                        : selectedConversation?.leadId?.phone || "—"}
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex flex-col text-sm text-gray-500">
-                  <div className="flex items-center gap-2">Email</div>
-                  <div
-                    style={{
-                      userSelect: "none",
-                      WebkitUserSelect: "none",
-                      MozUserSelect: "none",
-                      msUserSelect: "none",
-                    }}
-                    onCopy={(e) => e.preventDefault()}
-                    onDragStart={(e) => e.preventDefault()}
-                    onContextMenu={(e) => e.preventDefault()}
-                    className="font-medium text-gray-800 select-none"
-                  >
-                    {user?.role === "agent"
-                      ? maskEmail(
-                          selectedConversation?.leadId?.email ||
-                            "bajuddinkhan0786@gmail.com",
-                        )
-                      : selectedConversation?.leadId?.email || "—"}
+                  <div className="flex items-center gap-2 group">
+                    <div className="flex items-center gap-2">Email</div>
+                    {editingField !== "email" && (
+                      <button
+                        onClick={() =>
+                          handleEditLead(
+                            "email",
+                            selectedConversation?.leadId?.email || "",
+                          )
+                        }
+                        className="p-1 text-gray-400 opacity-0 group-hover:opacity-100 hover:text-blue-600 transition-all"
+                      >
+                        <Edit2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
                   </div>
+                  {editingField === "email" ? (
+                    <div className="flex items-center gap-1 mt-1">
+                      <input
+                        type="text"
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        className="w-full text-sm border border-gray-300 rounded px-2 py-1 focus:ring-1 focus:ring-blue-500 outline-none font-medium text-gray-800"
+                        autoFocus
+                      />
+                      <button
+                        onClick={handleUpdateLead}
+                        disabled={isUpdatingLead}
+                        className="p-1 text-green-600 hover:bg-green-50 rounded transition-colors disabled:opacity-50"
+                      >
+                        <Check className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={cancelEditLead}
+                        className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        userSelect: "none",
+                        WebkitUserSelect: "none",
+                        MozUserSelect: "none",
+                        msUserSelect: "none",
+                      }}
+                      onCopy={(e) => e.preventDefault()}
+                      onDragStart={(e) => e.preventDefault()}
+                      onContextMenu={(e) => e.preventDefault()}
+                      className="font-medium text-gray-800 select-none"
+                    >
+                      {user?.role === "agent"
+                        ? maskEmail(
+                            selectedConversation?.leadId?.email ||
+                              "bajuddinkhan0786@gmail.com",
+                          )
+                        : selectedConversation?.leadId?.email || "—"}
+                    </div>
+                  )}
                 </div>
               </div>
 
