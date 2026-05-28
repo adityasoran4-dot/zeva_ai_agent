@@ -14,15 +14,6 @@ export default function withAgentAuth<P extends object>(
     const router = useRouter();
 
     useEffect(() => {
-      const clearStorage = () => {
-        // Remove stored auth tokens
-        const keys = ['token', 'userToken', 'agentToken', 'doctorToken'];
-        keys.forEach((k) => {
-          try { localStorage.removeItem(k); } catch {}
-          try { sessionStorage.removeItem(k); } catch {}
-        });
-      };
-
       const checkAuth = async () => {
         // Check for both agentToken (for staff role) and userToken (for doctorStaff role)
         const agentToken = typeof window !== 'undefined'
@@ -38,8 +29,8 @@ export default function withAgentAuth<P extends object>(
         const token = agentToken || doctorToken || userToken;
 
         if (!token) {
-          toast.error('Please login to continue');
-          clearStorage();
+          // No token found - check if there are other tokens we should preserve
+          // Don't clear storage unless we've confirmed token invalidity from API
           setIsLoading(false);
           router.replace('/staff');
           return;
@@ -71,21 +62,34 @@ export default function withAgentAuth<P extends object>(
 
           const data = await response.json();
 
+          // Only clear tokens that are confirmed invalid by API (not due to network errors)
+          const clearSpecificToken = (tokenToRemove: string) => {
+            const keys = ['agentToken', 'doctorToken', 'userToken'];
+            keys.forEach((k) => {
+              const stored = localStorage.getItem(k) || sessionStorage.getItem(k);
+              if (stored === tokenToRemove) {
+                try { localStorage.removeItem(k); } catch {}
+                try { sessionStorage.removeItem(k); } catch {}
+              }
+            });
+          };
+
           if (response.ok && data.valid) {
             setIsAuthenticated(true);
             setUserData(data.user || decoded);
           } else {
+            // Token is confirmed invalid by API - clear only this specific token
+            clearSpecificToken(token);
             const message = data.message === 'Token expired'
               ? 'Session expired. Please login again.'
               : data.message || 'Authentication failed. Please login again.';
             toast.error(message);
-            clearStorage();
             router.replace('/staff');
           }
         } catch (error) {
           console.error('Token verification failed:', error);
-          toast.error('Something went wrong. Please login again.');
-          clearStorage();
+          // Network error - don't clear tokens, just redirect
+          // The next page load will re-verify the token
           router.replace('/staff');
         } finally {
           setIsLoading(false);

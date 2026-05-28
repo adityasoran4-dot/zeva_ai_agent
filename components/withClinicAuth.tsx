@@ -28,18 +28,16 @@ export default function withClinicAuth<P extends Record<string, unknown> = Recor
             : null;
 
           if (!token) {
-            toast.error('Please login to continue');
-            clearStorage();
-            
+            // No token found - redirect without clearing storage
             // Check user role to determine redirect destination
             let role = null;
-            // Check all possible token storage locations
+            // Check all possible token storage locations for role detection
             for (const key of ['clinicToken', 'agentToken', 'userToken']) {
-              const token = localStorage.getItem(key) || sessionStorage.getItem(key);
-              if (token) {
+              const storedToken = localStorage.getItem(key) || sessionStorage.getItem(key);
+              if (storedToken) {
                 try {
                   // Decode JWT token to get role
-                  const base64Url = token.split('.')[1];
+                  const base64Url = storedToken.split('.')[1];
                   const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
                   const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
                     return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
@@ -76,8 +74,7 @@ export default function withClinicAuth<P extends Record<string, unknown> = Recor
               });
             } catch (decodeError) {
               console.error('Error decoding token:', decodeError);
-              toast.error('User data not found. Please login again.');
-              clearStorage();
+              // Token decode failed - just redirect, don't clear storage
               
               // Check user role to determine redirect destination
               let role = null;
@@ -122,11 +119,20 @@ export default function withClinicAuth<P extends Record<string, unknown> = Recor
           const data = await res.json();
 
           if (!res.ok || !data.valid) {
-            clearStorage();
+            // Only clear the specific token that was confirmed invalid
+            const clearSpecificToken = () => {
+              try { localStorage.removeItem('clinicToken'); } catch {}
+              try { sessionStorage.removeItem('clinicToken'); } catch {}
+              try { localStorage.removeItem('agentToken'); } catch {}
+              try { sessionStorage.removeItem('agentToken'); } catch {}
+              try { localStorage.removeItem('userToken'); } catch {}
+              try { sessionStorage.removeItem('userToken'); } catch {}
+            };
+            clearSpecificToken();
+            
             const errorMessage = data.message || 'Authentication failed';
             
             if (data.trialExpired) {
-              // Trial expired - redirect to login with trial expired message
               toast.error(errorMessage);
               setTimeout(() => {
                 router.replace('/clinic/login-clinic?trialExpired=true');
@@ -137,7 +143,6 @@ export default function withClinicAuth<P extends Record<string, unknown> = Recor
                 router.replace('/clinic/login-clinic');
               }, 4000);
             } else {
-              // Show the actual error message from the API
               toast.error(errorMessage);
               console.error('Clinic auth error:', errorMessage, data);
               router.replace('/clinic/login-clinic');
@@ -153,7 +158,7 @@ export default function withClinicAuth<P extends Record<string, unknown> = Recor
             setIsAuthorized(true);
           } else {
             toast.error('Access denied: Invalid user role');
-            clearStorage();
+            // Role not allowed - just redirect, don't clear storage
             
             // Check user role to determine redirect destination
             let role = null;
@@ -186,18 +191,18 @@ export default function withClinicAuth<P extends Record<string, unknown> = Recor
           }
         } catch (err) {
           console.error('Auth error:', err);
-          toast.error('Session expired. Please login again.');
-          clearStorage();
+          // Network error - don't clear tokens, just redirect
+          // The next page load will re-verify the token
           
           // Check user role to determine redirect destination
           let role = null;
           // Check all possible token storage locations
           for (const key of ['clinicToken', 'agentToken', 'userToken']) {
-            const token = localStorage.getItem(key) || sessionStorage.getItem(key);
-            if (token) {
+            const storedToken = localStorage.getItem(key) || sessionStorage.getItem(key);
+            if (storedToken) {
               try {
                 // Decode JWT token to get role
-                const base64Url = token.split('.')[1];
+                const base64Url = storedToken.split('.')[1];
                 const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
                 const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
                   return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
@@ -205,8 +210,8 @@ export default function withClinicAuth<P extends Record<string, unknown> = Recor
                 const decoded = JSON.parse(jsonPayload);
                 role = decoded?.role || null;
                 break;
-              } catch (err) {
-                console.warn('Unable to decode token:', err);
+              } catch (decodeErr) {
+                console.warn('Unable to decode token:', decodeErr);
               }
             }
           }
@@ -222,17 +227,6 @@ export default function withClinicAuth<P extends Record<string, unknown> = Recor
         } finally {
           setLoading(false);
         }
-      };
-
-      const clearStorage = () => {
-        localStorage.removeItem('clinicToken');
-        localStorage.removeItem('clinicUser');
-        localStorage.removeItem('clinicEmail');
-        localStorage.removeItem('clinicName');
-        sessionStorage.removeItem('clinicToken');
-        sessionStorage.removeItem('clinicUser');
-        sessionStorage.removeItem('clinicEmail');
-        sessionStorage.removeItem('clinicName');
       };
 
       checkAuth();

@@ -10,15 +10,26 @@ import { Search, Filter, CheckCircle, XCircle, Eye, FileText, Upload, X, AlertCi
 const TOKEN_PRIORITY = ["clinicToken", "doctorToken", "agentToken", "staffToken", "userToken", "adminToken"];
 
 // Helper function to get user role from token
+// Priority: agent/doctorStaff/doctor roles -> agent auth, clinic role -> clinic auth
 const getUserRole = () => {
   if (typeof window === 'undefined') return null;
   try {
-    for (const key of TOKEN_PRIORITY) {
+    // Check tokens in order of specificity - prefer role-specific tokens
+    const tokenKeys = ['agentToken', 'doctorToken', 'clinicToken', 'staffToken', 'userToken', 'adminToken'];
+    
+    for (const key of tokenKeys) {
       const token = localStorage.getItem(key) || sessionStorage.getItem(key);
       if (token) {
         try {
           const payload = JSON.parse(atob(token.split('.')[1]));
-          return payload.role || null;
+          const role = payload.role || null;
+          
+          // Return the role from the token if it's a valid role for this page
+          // agent/doctorStaff/doctor -> use agent auth
+          // clinic -> use clinic auth
+          if (role && ['agent', 'doctorStaff', 'doctor', 'clinic', 'staff', 'admin'].includes(role)) {
+            return role;
+          }
         } catch (e) {
           continue;
         }
@@ -26,7 +37,6 @@ const getUserRole = () => {
     }
   } catch (error) {
     console.error('Error getting user role:', error);
-    return null;
   }
   return null;
 };

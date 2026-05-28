@@ -613,28 +613,28 @@ const ClinicSidebar: FC<ClinicSidebarProps> = ({
       // Get trial info from login response stored in sessionStorage
       const trialData = typeof window !== 'undefined' ? sessionStorage.getItem('clinicTrialInfo') : null;
      
-      console.log('Sidebar - Trial Data from sessionStorage:', trialData);
+      // console.log('Sidebar - Trial Data from sessionStorage:', trialData);
      
       if (!trialData) {
-        console.log('Sidebar - No trial data found in sessionStorage');
+        // console.log('Sidebar - No trial data found in sessionStorage');
         setTrialInfo(null);
         return;
       }
 
       try {
         const trial = JSON.parse(trialData);
-        console.log('Sidebar - Parsed trial data:', trial);
+        // console.log('Sidebar - Parsed trial data:', trial);
        
         // Check if this is a legacy user (no trial restriction)
         if (trial.isLegacyUser) {
-          console.log('Sidebar - Legacy user detected, hiding trial countdown');
+          // console.log('Sidebar - Legacy user detected, hiding trial countdown');
           setTrialInfo(null);
           return;
         }
        
         // Handle case where trialEndDate might be null
         if (!trial.trialEndDate) {
-          console.log('Sidebar - No trial end date, hiding countdown');
+          // console.log('Sidebar - No trial end date, hiding countdown');
           setTrialInfo(null);
           return;
         }
@@ -643,17 +643,17 @@ const ClinicSidebar: FC<ClinicSidebarProps> = ({
         const now = new Date();
         const difference = trialEndDate.getTime() - now.getTime();
        
-        console.log('Sidebar - Trial calculation:', {
-          trialEndDate,
-          now,
-          difference,
-          isExpired: difference <= 0
-        });
+        // console.log('Sidebar - Trial calculation:', {
+        //   trialEndDate,
+        //   now,
+        //   difference,
+        //   isExpired: difference <= 0
+        // });
 
         if (difference <= 0) {
           // Trial has expired - show warning but don't auto-logout
           // The verify-token API or page navigation will handle authentication
-          console.log('Sidebar - Trial expired! Showing warning...');
+          // console.log('Sidebar - Trial expired! Showing warning...');
          
           // Show trial expired popup
           setShowTrialExpiredPopup(true);
@@ -674,7 +674,7 @@ const ClinicSidebar: FC<ClinicSidebarProps> = ({
         const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
         const seconds = Math.floor((difference % (1000 * 60)) / 1000);
 
-        console.log('Sidebar - Setting trial info:', { days, hours, minutes, seconds });
+        // console.log('Sidebar - Setting trial info:', { days, hours, minutes, seconds });
        
         setTrialInfo({
           days,

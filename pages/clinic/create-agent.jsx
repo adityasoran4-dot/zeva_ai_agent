@@ -1307,8 +1307,8 @@ const ManageAgentsPage = () => {
                           </div>
                         </div>
                       </div>
-                      {/* Only show 3-dot menu if canUpdate or canDelete is true */}
-                      {(canUpdate === true || canDelete === true) && (
+                      {/* Only show 3-dot menu if canCreate, canUpdate, canDelete, or canRead is true */}
+                      {(canCreate === true || canUpdate === true || canDelete === true || canRead === true) && (
                         <div className="relative flex-shrink-0">
                           <button
                             type="button"
@@ -1345,7 +1345,7 @@ const ManageAgentsPage = () => {
                                 View
                               </button>
                             )}
-                                {canUpdate === true && (
+                                {canCreate === true && (
                                   <button
                                     className="w-full text-left px-3 py-2 text-[11px] hover:bg-gray-50 text-teal-700 transition-colors border-t border-gray-200"
                                     onClick={(e) => {

@@ -14,6 +14,7 @@ export default async function handler(req, res) {
   try {
     // Get the logged-in user
     const me = await getUserFromReq(req);
+    console.log("[get-module-permissions] me.role:", me?.role);
     if (!me) {
       return res.status(401).json({ success: false, message: 'Unauthorized: Missing or invalid token' });
     }
