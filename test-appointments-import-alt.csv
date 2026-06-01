@@ -1,0 +1,7 @@
+Patient Name,Patient Phone,Patient Email,Patient Gender,Doctor Name,Room Name,Appointment Date,Start Time,End Time,Status,Follow Type,Notes
+Sarah Wilson,9876543215,sarah.wilson@example.com,Female,Dr. Smith,Room 1,20/12/2024,09:00 AM,09:30 AM,booked,first time,Morning appointment
+David Lee,9876543216,david.lee@example.com,Male,Dr. Johnson,Room 2,20/12/2024,10:15 AM,11:00 AM,booked,follow up,Regular follow-up visit
+Lisa Anderson,9876543217,lisa.a@example.com,Female,Dr. Smith,Room 1,20/12/2024,02:00 PM,02:30 PM,booked,repeat,Afternoon consultation
+James Taylor,9876543218,james.taylor@example.com,Male,Dr. Johnson,Room 2,20/12/2024,03:00 PM,03:45 PM,booked,first time,New patient
+Maria Garcia,9876543219,maria.garcia@example.com,Female,Dr. Smith,Room 1,20/12/2024,04:00 PM,04:30 PM,booked,follow up,Post-treatment check
+

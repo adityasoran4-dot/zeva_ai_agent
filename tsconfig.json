@@ -1,0 +1,46 @@
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitAny": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "paths": {
+      "@/*": ["./*"]
+    }
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    "lib/firebase.js",
+    "models/Treatment.js",
+    "models/Clinic.js",
+    "pages/api/clinics/treatments.js",
+    "pages/api/clinics/register.js",
+    "pages/api/auth/register.js",
+    "pages/api/admin/deleteTreatment.js",
+    "pages/api/lead-ms/auth.js",
+    "pages/api/lead-ms/permissions-helper.js",
+    "components/createBlog.tsx",
+    "pages/staff/update-patient-info/[id].jsx",
+    "components/blog.jsx",
+    "components/Index1.jsx",
+    "components/Footer.jsx",
+    "components/CalculatorGames.jsx",
+    "pages/clinic/segments.jsx"
+  ],
+  "exclude": ["node_modules"]
+}

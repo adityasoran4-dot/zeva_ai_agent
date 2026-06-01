@@ -1,0 +1,633 @@
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
+import axios from 'axios';
+import {
+  Search, Package, Clock, CheckCircle, XCircle, Calendar,
+  DollarSign, User, AlertCircle, TrendingUp, Filter, Eye, X
+} from 'lucide-react';
+import withClinicAuth from '../../components/withClinicAuth';
+
+const TOKEN_PRIORITY = [
+  "clinicToken",
+  "doctorToken",
+  "agentToken",
+  "staffToken",
+  "userToken",
+  "adminToken",
+];
+
+const getStoredToken = () => {
+  if (typeof window === "undefined") return null;
+  for (const key of TOKEN_PRIORITY) {
+    const value = localStorage.getItem(key) || sessionStorage.getItem(key);
+    if (value) {
+      console.log('Found token in', key, ':', value.substring(0, 20) + '...');
+      return value;
+    }
+  }
+  console.warn('No token found in localStorage or sessionStorage');
+  return null;
+};
+
+const getAuthHeaders = () => {
+  const token = getStoredToken();
+  if (!token) {
+    console.error('No authentication token found');
+    return {};
+  }
+  
+  // Decode token to check clinicId
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(''));
+    const decoded = JSON.parse(jsonPayload);
+    console.log('Decoded token - clinicId:', decoded.clinicId);
+  } catch (e) {
+    console.error('Error decoding token:', e);
+  }
+  
+  return { Authorization: `Bearer ${token}` };
+};
+
+interface UserPackage {
+  _id: string;
+  patientId: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+    emrNumber?: string;
+  };
+  packageName: string;
+  totalPrice: number;
+  totalSessions: number;
+  remainingSessions: number;
+  sessionPrice: number;
+  treatments: Array<{
+    treatmentName: string;
+    treatmentSlug: string;
+    allocatedPrice: number;
+    sessions: number;
+    usedSessions: number;
+    sessionPrice: number;
+  }>;
+  startDate: string;
+  endDate: string;
+  status: 'active' | 'completed' | 'expired' | 'cancelled';
+  approvalStatus: 'pending' | 'approved' | 'rejected';
+  paymentStatus: 'paid' | 'pending' | 'partial';
+  createdAt: string;
+}
+
+const UserPackagesPage: React.FC = () => {
+  const router = useRouter();
+  const [activeTab, setActiveTab] = useState<'pending' | 'approved'>('pending');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [pendingPackages, setPendingPackages] = useState<UserPackage[]>([]);
+  const [approvedPackages, setApprovedPackages] = useState<UserPackage[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedPackage, setSelectedPackage] = useState<UserPackage | null>(null);
+  const [showModal, setShowModal] = useState(false);
+
+  useEffect(() => {
+    fetchPackages();
+  }, [activeTab, searchQuery]);
+
+  const fetchPackages = async () => {
+    try {
+      setLoading(true);
+      const status = activeTab === 'pending' ? 'pending' : 'approved';
+      const params = new URLSearchParams({ status });
+      
+      if (searchQuery.trim()) {
+        params.append('search', searchQuery.trim());
+      }
+
+      console.log('Fetching packages with status:', status, 'search:', searchQuery);
+      
+      const response = await axios.get(`/api/clinic/user-packages?${params.toString()}`, {
+        headers: getAuthHeaders()
+      });
+
+      console.log('API Response:', response.data);
+
+      if (response.data.success) {
+        if (activeTab === 'pending') {
+          setPendingPackages(response.data.packages);
+          console.log('Set pending packages:', response.data.packages.length);
+        } else {
+          setApprovedPackages(response.data.packages);
+          console.log('Set approved packages:', response.data.packages.length);
+        }
+      } else {
+        console.error('API returned success: false');
+        setError('API returned error');
+      }
+    } catch (err: any) {
+      console.error('Error fetching packages:', err);
+      console.error('Error details:', err.response);
+      setError(err.response?.data?.message || 'Failed to fetch packages');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleApprovePackage = async (packageId: string) => {
+    try {
+      const response = await axios.patch(
+        `/api/clinic/user-packages/${packageId}`,
+        { action: 'approve' },
+        { headers: getAuthHeaders() }
+      );
+
+      if (response.data.success) {
+        alert('Package approved successfully!');
+        fetchPackages();
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to approve package');
+    }
+  };
+
+  const handleRejectPackage = async (packageId: string) => {
+    if (!confirm('Are you sure you want to reject this package?')) return;
+    
+    try {
+      const response = await axios.patch(
+        `/api/clinic/user-packages/${packageId}`,
+        { action: 'reject' },
+        { headers: getAuthHeaders() }
+      );
+
+      if (response.data.success) {
+        alert('Package rejected successfully!');
+        fetchPackages();
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to reject package');
+    }
+  };
+
+  const handleViewDetails = (pkg: UserPackage) => {
+    setSelectedPackage(pkg);
+    setShowModal(true);
+  };
+
+  const closeModal = () => {
+    setShowModal(false);
+    setSelectedPackage(null);
+  };
+
+  const getPatientName = (patient: any) => {
+    if (!patient) return 'Unknown Patient';
+    return `${patient.firstName || ''} ${patient.lastName || ''}`.trim() || 'Unknown Patient';
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'active':
+        return 'bg-green-100 text-green-800 border-green-300';
+      case 'completed':
+        return 'bg-blue-100 text-blue-800 border-blue-300';
+      case 'expired':
+        return 'bg-red-100 text-red-800 border-red-300';
+      case 'cancelled':
+        return 'bg-gray-100 text-gray-800 border-gray-300';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-300';
+    }
+  };
+
+  const getPaymentStatusColor = (status: string) => {
+    switch (status) {
+      case 'paid':
+        return 'bg-green-100 text-green-700';
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-700';
+      case 'partial':
+        return 'bg-orange-100 text-orange-700';
+      default:
+        return 'bg-gray-100 text-gray-700';
+    }
+  };
+
+  const currentPackages = activeTab === 'pending' ? pendingPackages : approvedPackages;
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      {/* Header Section */}
+      <div className="bg-white shadow-sm border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+                <Package className="w-8 h-8 text-indigo-600" />
+                User Created Packages
+              </h1>
+              <p className="text-gray-500 mt-1">Manage and review patient-created treatment packages</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="bg-indigo-100 text-indigo-700 px-4 py-2 rounded-lg font-medium">
+                Pending: {pendingPackages.length}
+              </div>
+              <div className="bg-green-100 text-green-700 px-4 py-2 rounded-lg font-medium">
+                Approved: {approvedPackages.length}
+              </div>
+            </div>
+          </div>
+
+          {/* Search Bar */}
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Search className="h-5 w-5 text-gray-400" />
+            </div>
+            <input
+              type="text"
+              placeholder="Search by patient name or EMR number..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition duration-150 ease-in-out"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Two Slider Tabs */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="bg-white rounded-xl shadow-lg overflow-hidden mb-6">
+            <div className="flex border-b border-gray-200">
+              <button
+                onClick={() => setActiveTab('pending')}
+                className={`flex-1 py-4 px-6 text-center font-semibold transition-all duration-200 flex items-center justify-center gap-2 ${
+                  activeTab === 'pending'
+                    ? 'bg-yellow-50 text-yellow-700 border-b-2 border-yellow-500'
+                    : 'bg-white text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+                }`}
+              >
+                <Clock className="w-5 h-5" />
+                Pending Approval
+                {pendingPackages.length > 0 && (
+                  <span className="ml-2 bg-yellow-500 text-white px-2 py-0.5 rounded-full text-sm">
+                    {pendingPackages.length}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => setActiveTab('approved')}
+                className={`flex-1 py-4 px-6 text-center font-semibold transition-all duration-200 flex items-center justify-center gap-2 ${
+                  activeTab === 'approved'
+                    ? 'bg-green-50 text-green-700 border-b-2 border-green-500'
+                    : 'bg-white text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+                }`}
+              >
+                <CheckCircle className="w-5 h-5" />
+                Approved Packages
+                {approvedPackages.length > 0 && (
+                  <span className="ml-2 bg-green-500 text-white px-2 py-0.5 rounded-full text-sm">
+                    {approvedPackages.length}
+                  </span>
+                )}
+              </button>
+            </div>
+
+            {/* Content Area */}
+            <div className="p-6">
+              {loading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+                  <span className="ml-3 text-gray-600">Loading packages...</span>
+                </div>
+              ) : error ? (
+                <div className="text-center py-12">
+                  <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
+                  <p className="text-red-600 font-medium">{error}</p>
+                </div>
+              ) : currentPackages.length === 0 ? (
+                <div className="text-center py-12">
+                  <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-500 text-lg">
+                    No {activeTab} packages found
+                  </p>
+                  {searchQuery && (
+                    <p className="text-gray-400 text-sm mt-2">
+                      Try adjusting your search criteria
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {currentPackages.map((pkg) => (
+                    <div
+                      key={pkg._id}
+                      className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-lg transition-shadow duration-200 overflow-hidden"
+                    >
+                      {/* Card Header */}
+                      <div className="bg-gradient-to-r from-indigo-500 to-purple-600 px-6 py-4">
+                        <h3 className="text-lg font-bold text-white mb-1">
+                          {pkg.packageName}
+                        </h3>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 text-white/90 text-sm">
+                            <User className="w-4 h-4" />
+                            <span>{getPatientName(pkg.patientId)}</span>
+                          </div>
+                          {pkg.patientId?.emrNumber && (
+                            <span className="text-xs bg-white/20 px-2 py-1 rounded text-white">
+                              EMR: {pkg.patientId.emrNumber}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Card Body */}
+                      <div className="p-6 space-y-4">
+                        {/* Price & Sessions */}
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="bg-gray-50 p-3 rounded-lg">
+                            <div className="flex items-center gap-2 text-gray-600 text-sm mb-1">
+                              <DollarSign className="w-4 h-4" />
+                              <span>Total Price</span>
+                            </div>
+                            <p className="text-xl font-bold text-gray-900">
+                              ₹{pkg.totalPrice.toLocaleString()}
+                            </p>
+                          </div>
+                          <div className="bg-gray-50 p-3 rounded-lg">
+                            <div className="flex items-center gap-2 text-gray-600 text-sm mb-1">
+                              <Package className="w-4 h-4" />
+                              <span>Sessions</span>
+                            </div>
+                            <p className="text-xl font-bold text-gray-900">
+                              {pkg.remainingSessions}/{pkg.totalSessions}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Status Badges */}
+                        <div className="flex flex-wrap gap-2">
+                          <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(pkg.status)}`}>
+                            {pkg.status.toUpperCase()}
+                          </span>
+                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${getPaymentStatusColor(pkg.paymentStatus)}`}>
+                            {pkg.paymentStatus.toUpperCase()}
+                          </span>
+                        </div>
+
+                        {/* Date Range */}
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 text-sm text-gray-600">
+                            <Calendar className="w-4 h-4" />
+                            <span>Start: {formatDate(pkg.startDate)}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-gray-600">
+                            <Calendar className="w-4 h-4" />
+                            <span>End: {formatDate(pkg.endDate)}</span>
+                          </div>
+                        </div>
+
+                        {/* Treatments */}
+                        {pkg.treatments && pkg.treatments.length > 0 && (
+                          <div className="border-t border-gray-200 pt-4">
+                            <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                              <TrendingUp className="w-4 h-4" />
+                              Treatments ({pkg.treatments.length})
+                            </h4>
+                            <div className="space-y-2 max-h-32 overflow-y-auto">
+                              {pkg.treatments.map((treatment, idx) => (
+                                <div key={idx} className="text-sm">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-gray-700 font-medium truncate">
+                                      {treatment.treatmentName}
+                                    </span>
+                                    <span className="text-gray-500 text-xs">
+                                      {treatment.usedSessions}/{treatment.sessions} sessions
+                                    </span>
+                                  </div>
+                                  <div className="text-xs text-gray-500">
+                                    ₹{treatment.allocatedPrice.toLocaleString()}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Actions */}
+                        {activeTab === 'pending' && (
+                          <div className="border-t border-gray-200 pt-4">
+                            <button
+                              onClick={() => handleViewDetails(pkg)}
+                              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-lg font-medium transition-colors duration-200 flex items-center justify-center gap-2"
+                            >
+                              <Eye className="w-4 h-4" />
+                              View Details
+                            </button>
+                          </div>
+                        )}
+
+                        {activeTab === 'approved' && (
+                          <div className="border-t border-gray-200 pt-4">
+                            <button
+                              onClick={() => handleViewDetails(pkg)}
+                              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-lg font-medium transition-colors duration-200 flex items-center justify-center gap-2"
+                            >
+                              <Eye className="w-4 h-4" />
+                              View Details
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Package Details Modal */}
+        {showModal && selectedPackage && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+              {/* Modal Header */}
+              <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-4 rounded-t-xl flex items-center justify-between sticky top-0 z-10">
+                <div>
+                  <h2 className="text-2xl font-bold text-white">{selectedPackage.packageName}</h2>
+                  <p className="text-indigo-100 text-sm mt-1">Package Details</p>
+                </div>
+                <button
+                  onClick={closeModal}
+                  className="text-white hover:bg-white/20 rounded-lg p-2 transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-6 space-y-6">
+                {/* Patient Information */}
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                    <User className="w-5 h-5 text-indigo-600" />
+                    Patient Information
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-gray-500">Name</p>
+                      <p className="font-medium text-gray-900">{getPatientName(selectedPackage.patientId)}</p>
+                    </div>
+                    {selectedPackage.patientId?.emrNumber && (
+                      <div>
+                        <p className="text-sm text-gray-500">EMR Number</p>
+                        <p className="font-medium text-gray-900">{selectedPackage.patientId.emrNumber}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Package Overview */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg">
+                    <div className="flex items-center gap-2 text-blue-700 mb-2">
+                      <DollarSign className="w-5 h-5" />
+                      <span className="text-sm font-medium">Total Price</span>
+                    </div>
+                    <p className="text-2xl font-bold text-blue-900">₹{selectedPackage.totalPrice.toLocaleString()}</p>
+                  </div>
+                  <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg">
+                    <div className="flex items-center gap-2 text-green-700 mb-2">
+                      <Package className="w-5 h-5" />
+                      <span className="text-sm font-medium">Sessions</span>
+                    </div>
+                    <p className="text-2xl font-bold text-green-900">{selectedPackage.remainingSessions}/{selectedPackage.totalSessions}</p>
+                  </div>
+                  <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-lg">
+                    <div className="flex items-center gap-2 text-purple-700 mb-2">
+                      <Calendar className="w-5 h-5" />
+                      <span className="text-sm font-medium">Duration</span>
+                    </div>
+                    <p className="text-sm font-bold text-purple-900">
+                      {formatDate(selectedPackage.startDate)} - {formatDate(selectedPackage.endDate)}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Status Information */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="border border-gray-200 rounded-lg p-4">
+                    <p className="text-sm text-gray-500 mb-2">Package Status</p>
+                    <span className={`px-3 py-1.5 rounded-full text-sm font-medium border ${getStatusColor(selectedPackage.status)}`}>
+                      {selectedPackage.status.toUpperCase()}
+                    </span>
+                  </div>
+                  <div className="border border-gray-200 rounded-lg p-4">
+                    <p className="text-sm text-gray-500 mb-2">Payment Status</p>
+                    <span className={`px-3 py-1.5 rounded-full text-sm font-medium ${getPaymentStatusColor(selectedPackage.paymentStatus)}`}>
+                      {selectedPackage.paymentStatus.toUpperCase()}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Treatments */}
+                {selectedPackage.treatments && selectedPackage.treatments.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                      <TrendingUp className="w-5 h-5 text-indigo-600" />
+                      Treatments Included ({selectedPackage.treatments.length})
+                    </h3>
+                    <div className="space-y-3">
+                      {selectedPackage.treatments.map((treatment, idx) => (
+                        <div key={idx} className="bg-white border border-gray-200 rounded-lg p-4">
+                          <div className="flex justify-between items-start mb-2">
+                            <div>
+                              <h4 className="font-semibold text-gray-900">{treatment.treatmentName}</h4>
+                              <p className="text-sm text-gray-500">Treatment Slug: {treatment.treatmentSlug}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-lg font-bold text-gray-900">₹{treatment.allocatedPrice.toLocaleString()}</p>
+                              <p className="text-sm text-gray-500">{treatment.usedSessions}/{treatment.sessions} sessions used</p>
+                            </div>
+                          </div>
+                          {/* Progress Bar */}
+                          <div className="mt-2">
+                            <div className="flex justify-between text-xs text-gray-600 mb-1">
+                              <span>Progress</span>
+                              <span>{Math.round((treatment.usedSessions / treatment.sessions) * 100)}%</span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2">
+                              <div
+                                className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
+                                style={{ width: `${(treatment.usedSessions / treatment.sessions) * 100}%` }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Additional Information */}
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-3">Additional Information</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-gray-500">Created At</p>
+                      <p className="font-medium text-gray-900">{formatDate(selectedPackage.createdAt)}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Session Price</p>
+                      <p className="font-medium text-gray-900">₹{selectedPackage.sessionPrice.toLocaleString()}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Approval Actions */}
+                {selectedPackage.approvalStatus === 'pending' && (
+                  <div className="border-t pt-4">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-3">Approval Actions</h3>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={async () => {
+                          await handleApprovePackage(selectedPackage._id);
+                          closeModal();
+                        }}
+                        className="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 px-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                      >
+                        <CheckCircle className="w-5 h-5" />
+                        Approve Package
+                      </button>
+                      <button
+                        onClick={async () => {
+                          await handleRejectPackage(selectedPackage._id);
+                          closeModal();
+                        }}
+                        className="flex-1 bg-red-600 hover:bg-red-700 text-white py-3 px-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                      >
+                        <XCircle className="w-5 h-5" />
+                        Reject Package
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default withClinicAuth(UserPackagesPage);

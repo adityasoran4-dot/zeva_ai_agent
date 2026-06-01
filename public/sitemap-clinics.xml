@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>http://localhost:3000/clinics/health-service-center-noida-sector-2</loc>
+    <lastmod>2026-04-07T08:27:02.998Z</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>  <url>
+    <loc>http://localhost:3000/clinics/monis-clinic-noida</loc>
+    <lastmod>2026-02-06T06:42:52.009Z</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>  <url>
+    <loc>http://localhost:3000/clinics/nancys-clinic-sarojini-new-delhi</loc>
+    <lastmod>2026-01-28T12:36:18.974Z</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>  <url>
+    <loc>http://localhost:3000/clinics/sunshine-clinic</loc>
+    <lastmod>2026-02-21T12:57:46.301Z</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>  <url>
+    <loc>http://localhost:3000/clinics/sunshine-clinic-noida-sector-2</loc>
+    <lastmod>2026-01-13T13:00:54.324Z</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url></urlset>
