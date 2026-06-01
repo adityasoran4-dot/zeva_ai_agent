@@ -1,10 +1,11 @@
 import ClinicLayout from "@/components/ClinicLayout";
 import withClinicAuth from "@/components/withClinicAuth";
-import React, { ReactElement, useState, useEffect} from "react";
+import React, { ReactElement, useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import axios from "axios";
 import { NextPageWithLayout } from "../../_app";
 import AvatarComponent from "@/components/shared/AvatarComponent";
+import AiAgentChat from "@/components/AIAgentChat";
 import {
   Search,
   Filter,
@@ -81,13 +82,16 @@ const getStoredToken = () => {
 
 const InboxPage: NextPageWithLayout = () => {
   const router = useRouter();
-  const [_routeContext, setRouteContext] = useState<"clinic" | "agent">("clinic");
+  const [_routeContext, setRouteContext] = useState<"clinic" | "agent">(
+    "clinic",
+  );
   const [permissions, setPermissions] = useState({
     canRead: false,
     canCreate: false,
     canUpdate: false,
     canDelete: false,
   });
+  const [isAiChatOpen, setIsAiChatOpen] = useState(false);
   const [permissionsLoaded, setPermissionsLoaded] = useState(false);
   const [hasAgentToken, setHasAgentToken] = useState(false);
   const [isAgentRoute, setIsAgentRoute] = useState(false);
@@ -171,15 +175,15 @@ const InboxPage: NextPageWithLayout = () => {
       const hasAgent =
         Boolean(
           localStorage.getItem("agentToken") ||
-            sessionStorage.getItem("agentToken"),
+          sessionStorage.getItem("agentToken"),
         ) ||
         Boolean(
           localStorage.getItem("staffToken") ||
-            sessionStorage.getItem("staffToken"),
+          sessionStorage.getItem("staffToken"),
         ) ||
         Boolean(
           localStorage.getItem("userToken") ||
-            sessionStorage.getItem("userToken"),
+          sessionStorage.getItem("userToken"),
         );
       setHasAgentToken(hasAgent);
     };
@@ -208,8 +212,8 @@ const InboxPage: NextPageWithLayout = () => {
 
   // Use agent permissions hook for agent routes
   const agentPermissionsHook: any = useAgentPermissions(
-            isAgentRoute ? "clinic_inbox" : null,
-          );
+    isAgentRoute ? "clinic_inbox" : null,
+  );
   const agentPermissions = agentPermissionsHook?.permissions || {
     canRead: false,
     canCreate: false,
@@ -440,9 +444,7 @@ const InboxPage: NextPageWithLayout = () => {
     if (agentToken || staffToken || userToken) {
       const fetchPermissions = async () => {
         try {
-          console.log(
-                    "Fetching Agent/Staff Permissions for clinic_inbox...",
-                  );
+          console.log("Fetching Agent/Staff Permissions for clinic_inbox...");
           setPermissionsLoaded(false);
           // Use agent permissions API for agent/doctorStaff
           const res = await axios.get("/api/agent/get-module-permissions", {
@@ -640,8 +642,12 @@ const InboxPage: NextPageWithLayout = () => {
     return (
       <div className="flex h-[92vh] items-center justify-center bg-gray-50">
         <div className="text-center">
-          <h2 className="text-2xl font-semibold text-gray-800 mb-2">Access Denied</h2>
-          <p className="text-gray-600">You don't have permission to view this page.</p>
+          <h2 className="text-2xl font-semibold text-gray-800 mb-2">
+            Access Denied
+          </h2>
+          <p className="text-gray-600">
+            You don't have permission to view this page.
+          </p>
         </div>
       </div>
     );
@@ -743,69 +749,73 @@ const InboxPage: NextPageWithLayout = () => {
                   <MoreHorizontal className="h-4 w-4" />
                 </button>
 
-                {showStatusDropdown && conversationStatusOptions?.length > 4 && (
-                  <div
-                    ref={statusDropdownRef}
-                    role="menu"
-                    className="absolute right-0 mt-2 w-44 bg-white border border-gray-200 rounded-md shadow-lg z-50 py-1"
-                  >
-                    {conversationStatusOptions.slice(4).map((opt) => (
-                      <button
-                        key={opt.value}
-                        onClick={() => {
-                          setFilters((prev) => ({ ...prev, status: opt.value }));
-                          setConversationStatusOptions((prev) => {
-                            const selIndex = prev.findIndex(
-                              (o) => o.value === opt.value,
-                            );
-                            if (selIndex === -1) return prev;
-                            const selectedOption = prev[selIndex];
-
-                            // Keep reference to original 4th item (index 3)
-                            const originalThird = prev[3];
-
-                            // Remove selected from list
-                            const withoutSelected = prev.filter(
-                              (o) => o.value !== opt.value,
-                            );
-
-                            // Insert selectedOption at index 3 (4th position)
-                            const insertIndex = Math.min(
-                              3,
-                              withoutSelected.length,
-                            );
-                            let updatedOptions = [
-                              ...withoutSelected.slice(0, insertIndex),
-                              selectedOption,
-                              ...withoutSelected.slice(insertIndex),
-                            ];
-
-                            // If there was an original 3rd item (and it's not the selected one), move it to the end
-                            if (
-                              originalThird &&
-                              originalThird.value !== opt.value
-                            ) {
-                              const idx = updatedOptions.findIndex(
-                                (o) => o.value === originalThird.value,
+                {showStatusDropdown &&
+                  conversationStatusOptions?.length > 4 && (
+                    <div
+                      ref={statusDropdownRef}
+                      role="menu"
+                      className="absolute right-0 mt-2 w-44 bg-white border border-gray-200 rounded-md shadow-lg z-50 py-1"
+                    >
+                      {conversationStatusOptions.slice(4).map((opt) => (
+                        <button
+                          key={opt.value}
+                          onClick={() => {
+                            setFilters((prev) => ({
+                              ...prev,
+                              status: opt.value,
+                            }));
+                            setConversationStatusOptions((prev) => {
+                              const selIndex = prev.findIndex(
+                                (o) => o.value === opt.value,
                               );
-                              if (idx > -1) {
-                                updatedOptions.splice(idx, 1);
-                                updatedOptions.push(originalThird);
-                              }
-                            }
+                              if (selIndex === -1) return prev;
+                              const selectedOption = prev[selIndex];
 
-                            return updatedOptions;
-                          });
-                          setShowStatusDropdown(false);
-                        }}
-                        role="menuitem"
-                        className={`w-full text-left px-3 py-2 text-sm transition-colors hover:bg-gray-50 text-gray-700`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
+                              // Keep reference to original 4th item (index 3)
+                              const originalThird = prev[3];
+
+                              // Remove selected from list
+                              const withoutSelected = prev.filter(
+                                (o) => o.value !== opt.value,
+                              );
+
+                              // Insert selectedOption at index 3 (4th position)
+                              const insertIndex = Math.min(
+                                3,
+                                withoutSelected.length,
+                              );
+                              let updatedOptions = [
+                                ...withoutSelected.slice(0, insertIndex),
+                                selectedOption,
+                                ...withoutSelected.slice(insertIndex),
+                              ];
+
+                              // If there was an original 3rd item (and it's not the selected one), move it to the end
+                              if (
+                                originalThird &&
+                                originalThird.value !== opt.value
+                              ) {
+                                const idx = updatedOptions.findIndex(
+                                  (o) => o.value === originalThird.value,
+                                );
+                                if (idx > -1) {
+                                  updatedOptions.splice(idx, 1);
+                                  updatedOptions.push(originalThird);
+                                }
+                              }
+
+                              return updatedOptions;
+                            });
+                            setShowStatusDropdown(false);
+                          }}
+                          role="menuitem"
+                          className={`w-full text-left px-3 py-2 text-sm transition-colors hover:bg-gray-50 text-gray-700`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
               </div>
             </div>
           )}
@@ -982,354 +992,372 @@ const InboxPage: NextPageWithLayout = () => {
             {/* Message Input */}
             {permissions.canCreate && (
               <div className="border-t border-gray-200 bg-white shadow-lg">
-              {selectedMessage && (
-                <div
-                  className={`m-2.5 p-3 bg-gray-50 border-l-4 ${selectedMessage?.channel === "whatsapp" ? "border-l-green-500" : selectedMessage?.channel === "email" ? "border-l-gray-500" : ""} rounded-lg flex justify-between items-start space-x-4`}
-                >
-                  <div className="flex-1">
-                    <div className="text-sm text-gray-600 mb-1">
-                      Replying to{" "}
-                      {selectedMessage?.direction === "incoming"
-                        ? selectedMessage?.recipientId?.name
-                        : selectedMessage?.senderId?.name || "Customer Support"}
-                    </div>
-                    <div className="text-sm text-gray-800">
-                      {selectedMessage?.content &&
-                      selectedMessage?.content?.length > 90
-                        ? selectedMessage?.content?.substring(0, 90) + "..."
-                        : selectedMessage?.content || "Media message"}
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setSelectedMessage(null)}
-                    className="text-gray-400 cursor-pointer hover:text-gray-600 transition-colors"
+                {selectedMessage && (
+                  <div
+                    className={`m-2.5 p-3 bg-gray-50 border-l-4 ${selectedMessage?.channel === "whatsapp" ? "border-l-green-500" : selectedMessage?.channel === "email" ? "border-l-gray-500" : ""} rounded-lg flex justify-between items-start space-x-4`}
                   >
-                    <X className="h-5 w-5" />
-                  </button>
-                </div>
-              )}
+                    <div className="flex-1">
+                      <div className="text-sm text-gray-600 mb-1">
+                        Replying to{" "}
+                        {selectedMessage?.direction === "incoming"
+                          ? selectedMessage?.recipientId?.name
+                          : selectedMessage?.senderId?.name ||
+                            "Customer Support"}
+                      </div>
+                      <div className="text-sm text-gray-800">
+                        {selectedMessage?.content &&
+                        selectedMessage?.content?.length > 90
+                          ? selectedMessage?.content?.substring(0, 90) + "..."
+                          : selectedMessage?.content || "Media message"}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setSelectedMessage(null)}
+                      className="text-gray-400 cursor-pointer hover:text-gray-600 transition-colors"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+                )}
 
-              {selectedProvider?.type?.includes("email") && (
-                <div className="p-2.5 border-b border-gray-100">
-                  <input
-                    type="text"
-                    value={state.subject}
-                    onChange={(e) => setSubject(e.target.value)}
-                    placeholder="Subject"
-                    className="w-full text-sm font-medium border-none outline-none focus:ring-0 placeholder:text-gray-400"
+                {selectedProvider?.type?.includes("email") && (
+                  <div className="p-2.5 border-b border-gray-100">
+                    <input
+                      type="text"
+                      value={state.subject}
+                      onChange={(e) => setSubject(e.target.value)}
+                      placeholder="Subject"
+                      className="w-full text-sm font-medium border-none outline-none focus:ring-0 placeholder:text-gray-400"
+                    />
+                  </div>
+                )}
+                <div className="flex space-x-3 p-2.5">
+                  <textarea
+                    ref={textAreaRef}
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    placeholder="Type your message here..."
+                    className="flex-1 text-sm border-none outline-none resize-none overflow-y-auto min-h-[60px]"
                   />
                 </div>
-              )}
-              <div className="flex space-x-3 p-2.5">
-                <textarea
-                  ref={textAreaRef}
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  placeholder="Type your message here..."
-                  className="flex-1 text-sm border-none outline-none resize-none overflow-y-auto min-h-[60px]"
-                />
-              </div>
 
-              {/* Quick Actions */}
-              <div className="flex items-center justify-between bg-gray-50 p-2.5 mt-2 text-sm">
-                <div className="flex items-center gap-2">
-                  <CustomDropdown
-                    position="top-left"
-                    align="start"
-                    offset={2}
-                    autoPosition={true}
-                    trigger={
-                      <button
-                        title="Choose Provider"
-                        className="group flex items-center gap-2 px-4 py-2.5 text-gray-700 bg-white border border-gray-300 hover:border-gray-400 hover:shadow-md rounded-lg transition-all duration-200 focus:outline-none"
-                      >
-                        <div className="flex items-center gap-2">
-                          {selectedProvider ? (
-                            <>
-                              {selectedProvider?.type?.includes("sms") ? (
-                                <Phone className="h-5 w-5 text-blue-500" />
-                              ) : selectedProvider?.type?.includes(
-                                  "whatsapp",
-                                ) ? (
-                                <FaWhatsapp className="h-5 w-5 text-green-600" />
-                              ) : selectedProvider?.type?.includes("email") ? (
-                                <Mail className="h-5 w-5 text-red-500" />
-                              ) : (
+                {/* Quick Actions */}
+                <div className="flex items-center justify-between bg-gray-50 p-2.5 mt-2 text-sm">
+                  <div className="flex items-center gap-2">
+                    <CustomDropdown
+                      position="top-left"
+                      align="start"
+                      offset={2}
+                      autoPosition={true}
+                      trigger={
+                        <button
+                          title="Choose Provider"
+                          className="group flex items-center gap-2 px-4 py-2.5 text-gray-700 bg-white border border-gray-300 hover:border-gray-400 hover:shadow-md rounded-lg transition-all duration-200 focus:outline-none"
+                        >
+                          <div className="flex items-center gap-2">
+                            {selectedProvider ? (
+                              <>
+                                {selectedProvider?.type?.includes("sms") ? (
+                                  <Phone className="h-5 w-5 text-blue-500" />
+                                ) : selectedProvider?.type?.includes(
+                                    "whatsapp",
+                                  ) ? (
+                                  <FaWhatsapp className="h-5 w-5 text-green-600" />
+                                ) : selectedProvider?.type?.includes(
+                                    "email",
+                                  ) ? (
+                                  <Mail className="h-5 w-5 text-red-500" />
+                                ) : (
+                                  <User className="h-5 w-5" />
+                                )}
+                                <div className="text-left">
+                                  <span className="font-semibold text-gray-800 text-sm block leading-tight">
+                                    {selectedProvider.label ||
+                                      selectedProvider?.phone ||
+                                      selectedProvider?.email ||
+                                      "Unknown Provider"}
+                                  </span>
+                                </div>
+                              </>
+                            ) : (
+                              <>
                                 <User className="h-5 w-5" />
-                              )}
-                              <div className="text-left">
-                                <span className="font-semibold text-gray-800 text-sm block leading-tight">
-                                  {selectedProvider.label ||
-                                    selectedProvider?.phone ||
-                                    selectedProvider?.email ||
-                                    "Unknown Provider"}
-                                </span>
-                              </div>
-                            </>
-                          ) : (
-                            <>
-                              <User className="h-5 w-5" />
-                              {/* <span className="font-medium text-gray-600">
+                                {/* <span className="font-medium text-gray-600">
                                 Select Provider
                               </span> */}
-                            </>
-                          )}
-                        </div>
-                        <ChevronDown
-                          className={`h-4 w-4 text-gray-700 transition-transform duration-300`}
-                        />
-                      </button>
-                    }
-                    maxHeight="50vh"
-                    dropdownClassName="bg-white border border-gray-200 rounded-xl shadow-xl py-2 backdrop-blur-sm bg-white/95"
-                    closeOnSelect={true}
-                  >
-                    <div className="w-[320px]">
-                      {/* Header */}
-                      <div className="px-4 py-3 border-b border-gray-100">
-                        <h3 className="font-semibold text-gray-800 text-sm">
-                          Select Provider
-                        </h3>
-                        <p className="text-xs text-gray-500 mt-0.5">
-                          Choose a communication provider
-                        </p>
-                      </div>
-
-                      {/* Providers List */}
-                      <div className="max-h-[40vh] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent py-2">
-                        {providers.length === 0 ? (
-                          <div className="px-4 py-8 text-center">
-                            <div className="inline-flex p-3 rounded-full bg-gray-100 mb-3">
-                              <User className="h-6 w-6 text-gray-400" />
-                            </div>
-                            <p className="text-gray-500 text-sm">
-                              No providers available
-                            </p>
+                              </>
+                            )}
                           </div>
-                        ) : (
-                          providers.map((provider) => {
-                            const isSelected =
-                              selectedProvider?._id === provider._id;
+                          <ChevronDown
+                            className={`h-4 w-4 text-gray-700 transition-transform duration-300`}
+                          />
+                        </button>
+                      }
+                      maxHeight="50vh"
+                      dropdownClassName="bg-white border border-gray-200 rounded-xl shadow-xl py-2 backdrop-blur-sm bg-white/95"
+                      closeOnSelect={true}
+                    >
+                      <div className="w-[320px]">
+                        {/* Header */}
+                        <div className="px-4 py-3 border-b border-gray-100">
+                          <h3 className="font-semibold text-gray-800 text-sm">
+                            Select Provider
+                          </h3>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            Choose a communication provider
+                          </p>
+                        </div>
 
-                            // Determine icon and colors based on provider type
-                            const getIcon = () => {
-                              if (provider?.type?.includes("sms")) {
-                                return <Phone className="h-4 w-4" />;
-                              } else if (provider?.type?.includes("whatsapp")) {
-                                return <FaWhatsapp className="h-4 w-4" />;
-                              } else if (provider?.type?.includes("email")) {
-                                return <Mail className="h-4 w-4" />;
-                              }
-                              return <User className="h-4 w-4" />;
-                            };
+                        {/* Providers List */}
+                        <div className="max-h-[40vh] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent py-2">
+                          {providers.length === 0 ? (
+                            <div className="px-4 py-8 text-center">
+                              <div className="inline-flex p-3 rounded-full bg-gray-100 mb-3">
+                                <User className="h-6 w-6 text-gray-400" />
+                              </div>
+                              <p className="text-gray-500 text-sm">
+                                No providers available
+                              </p>
+                            </div>
+                          ) : (
+                            providers.map((provider) => {
+                              const isSelected =
+                                selectedProvider?._id === provider._id;
 
-                            const getBgColor = () => {
-                              if (provider?.type?.includes("sms"))
-                                return "bg-blue-100";
-                              if (provider?.type?.includes("whatsapp"))
-                                return "bg-green-100";
-                              if (provider?.type?.includes("email"))
-                                return "bg-red-100";
-                              return "bg-purple-100";
-                            };
-
-                            const getTextColor = () => {
-                              if (provider?.type?.includes("sms"))
-                                return "text-blue-600";
-                              if (provider?.type?.includes("whatsapp"))
-                                return "text-green-600";
-                              if (provider?.type?.includes("email"))
-                                return "text-red-600";
-                              return "text-purple-600";
-                            };
-
-                            const getTypeLabel = () => {
-                              if (provider?.type?.includes("sms")) return "SMS";
-                              if (provider?.type?.includes("whatsapp"))
-                                return "WhatsApp";
-                              if (provider?.type?.includes("email"))
-                                return "Email";
-                              return "Provider";
-                            };
-
-                            const getStatusColor = () => {
-                              const status = provider.status?.toLowerCase();
-                              if (status === "approved")
-                                return "bg-green-100 text-green-700";
-                              if (status === "rejected")
-                                return "bg-red-100 text-red-700";
-                              if (status === "pending")
-                                return "bg-yellow-100 text-yellow-700";
-                              return "bg-gray-100 text-gray-800";
-                            };
-
-                            return (
-                              <div
-                                key={provider._id}
-                                role="button"
-                                tabIndex={0}
-                                onClick={() => {
-                                  setSelectedProvider(provider);
-                                }}
-                                onKeyDown={(e) =>
-                                  e.key === "Enter" &&
-                                  setSelectedProvider(provider)
+                              // Determine icon and colors based on provider type
+                              const getIcon = () => {
+                                if (provider?.type?.includes("sms")) {
+                                  return <Phone className="h-4 w-4" />;
+                                } else if (
+                                  provider?.type?.includes("whatsapp")
+                                ) {
+                                  return <FaWhatsapp className="h-4 w-4" />;
+                                } else if (provider?.type?.includes("email")) {
+                                  return <Mail className="h-4 w-4" />;
                                 }
-                                className={`mx-2 my-1 px-3 py-3 cursor-pointer rounded-xl transition-all duration-200 ${
-                                  isSelected
-                                    ? "bg-gradient-to-r from-blue-50 to-blue-50/50 border border-blue-200 shadow-sm"
-                                    : "hover:bg-gray-50 active:bg-gray-100 border border-transparent hover:border-gray-200"
-                                }`}
-                              >
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-3">
-                                    <div
-                                      className={`relative p-2.5 rounded-xl ${getBgColor()} ${getTextColor()} shadow-sm`}
-                                    >
-                                      {getIcon()}
-                                      {provider.status === "approved" && (
-                                        <span className="absolute -top-1 -right-1 h-2.5 w-2.5 bg-green-500 rounded-full border border-white"></span>
-                                      )}
-                                    </div>
-                                    <div className="text-left">
-                                      <div className="flex items-center gap-2">
-                                        <span className="font-semibold text-gray-800 text-sm">
-                                          {provider.label ||
-                                            provider?.phone ||
-                                            provider?.email ||
-                                            "Unknown Provider"}
-                                        </span>
-                                        {/* {provider.default && (
+                                return <User className="h-4 w-4" />;
+                              };
+
+                              const getBgColor = () => {
+                                if (provider?.type?.includes("sms"))
+                                  return "bg-blue-100";
+                                if (provider?.type?.includes("whatsapp"))
+                                  return "bg-green-100";
+                                if (provider?.type?.includes("email"))
+                                  return "bg-red-100";
+                                return "bg-purple-100";
+                              };
+
+                              const getTextColor = () => {
+                                if (provider?.type?.includes("sms"))
+                                  return "text-blue-600";
+                                if (provider?.type?.includes("whatsapp"))
+                                  return "text-green-600";
+                                if (provider?.type?.includes("email"))
+                                  return "text-red-600";
+                                return "text-purple-600";
+                              };
+
+                              const getTypeLabel = () => {
+                                if (provider?.type?.includes("sms"))
+                                  return "SMS";
+                                if (provider?.type?.includes("whatsapp"))
+                                  return "WhatsApp";
+                                if (provider?.type?.includes("email"))
+                                  return "Email";
+                                return "Provider";
+                              };
+
+                              const getStatusColor = () => {
+                                const status = provider.status?.toLowerCase();
+                                if (status === "approved")
+                                  return "bg-green-100 text-green-700";
+                                if (status === "rejected")
+                                  return "bg-red-100 text-red-700";
+                                if (status === "pending")
+                                  return "bg-yellow-100 text-yellow-700";
+                                return "bg-gray-100 text-gray-800";
+                              };
+
+                              return (
+                                <div
+                                  key={provider._id}
+                                  role="button"
+                                  tabIndex={0}
+                                  onClick={() => {
+                                    setSelectedProvider(provider);
+                                  }}
+                                  onKeyDown={(e) =>
+                                    e.key === "Enter" &&
+                                    setSelectedProvider(provider)
+                                  }
+                                  className={`mx-2 my-1 px-3 py-3 cursor-pointer rounded-xl transition-all duration-200 ${
+                                    isSelected
+                                      ? "bg-gradient-to-r from-blue-50 to-blue-50/50 border border-blue-200 shadow-sm"
+                                      : "hover:bg-gray-50 active:bg-gray-100 border border-transparent hover:border-gray-200"
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                      <div
+                                        className={`relative p-2.5 rounded-xl ${getBgColor()} ${getTextColor()} shadow-sm`}
+                                      >
+                                        {getIcon()}
+                                        {provider.status === "approved" && (
+                                          <span className="absolute -top-1 -right-1 h-2.5 w-2.5 bg-green-500 rounded-full border border-white"></span>
+                                        )}
+                                      </div>
+                                      <div className="text-left">
+                                        <div className="flex items-center gap-2">
+                                          <span className="font-semibold text-gray-800 text-sm">
+                                            {provider.label ||
+                                              provider?.phone ||
+                                              provider?.email ||
+                                              "Unknown Provider"}
+                                          </span>
+                                          {/* {provider.default && (
                         <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
                           Default
                         </span>
                       )} */}
-                                      </div>
-                                      <div className="flex items-center gap-2 mt-1">
-                                        {provider.status && (
-                                          <span
-                                            className={`text-xs px-1.5 py-0.5 rounded-full ${getStatusColor()}`}
-                                          >
-                                            {capitalize(provider.status)}
+                                        </div>
+                                        <div className="flex items-center gap-2 mt-1">
+                                          {provider.status && (
+                                            <span
+                                              className={`text-xs px-1.5 py-0.5 rounded-full ${getStatusColor()}`}
+                                            >
+                                              {capitalize(provider.status)}
+                                            </span>
+                                          )}
+                                          <span className="text-xs text-gray-500">
+                                            {getTypeLabel()}
                                           </span>
+                                        </div>
+                                        {(provider.phone || provider.email) && (
+                                          <p className="text-xs text-gray-600 mt-1 truncate max-w-[180px]">
+                                            {provider.phone || provider.email}
+                                          </p>
                                         )}
-                                        <span className="text-xs text-gray-500">
-                                          {getTypeLabel()}
-                                        </span>
                                       </div>
-                                      {(provider.phone || provider.email) && (
-                                        <p className="text-xs text-gray-600 mt-1 truncate max-w-[180px]">
-                                          {provider.phone || provider.email}
-                                        </p>
-                                      )}
                                     </div>
-                                  </div>
 
-                                  {/* Selection indicator */}
-                                  <div className="flex items-center">
-                                    <div
-                                      className={`h-5 w-5 rounded-full border-2 flex items-center justify-center transition-all ${
-                                        isSelected
-                                          ? "border-blue-500 bg-blue-500"
-                                          : "border-gray-300"
-                                      }`}
-                                    >
-                                      {isSelected && (
-                                        <svg
-                                          className="h-2.5 w-2.5 text-white"
-                                          fill="none"
-                                          viewBox="0 0 24 24"
-                                          stroke="currentColor"
-                                        >
-                                          <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            strokeWidth="3"
-                                            d="M5 13l4 4L19 7"
-                                          />
-                                        </svg>
-                                      )}
+                                    {/* Selection indicator */}
+                                    <div className="flex items-center">
+                                      <div
+                                        className={`h-5 w-5 rounded-full border-2 flex items-center justify-center transition-all ${
+                                          isSelected
+                                            ? "border-blue-500 bg-blue-500"
+                                            : "border-gray-300"
+                                        }`}
+                                      >
+                                        {isSelected && (
+                                          <svg
+                                            className="h-2.5 w-2.5 text-white"
+                                            fill="none"
+                                            viewBox="0 0 24 24"
+                                            stroke="currentColor"
+                                          >
+                                            <path
+                                              strokeLinecap="round"
+                                              strokeLinejoin="round"
+                                              strokeWidth="3"
+                                              d="M5 13l4 4L19 7"
+                                            />
+                                          </svg>
+                                        )}
+                                      </div>
                                     </div>
                                   </div>
                                 </div>
-                              </div>
-                            );
-                          })
-                        )}
+                              );
+                            })
+                          )}
+                        </div>
+
+                        {/* Footer with Add New Provider button */}
+                        <div className="px-4 py-3 border-t border-gray-100 bg-gray-50/50 rounded-b-xl">
+                          <button
+                            onClick={() => {
+                              // Add your add provider logic here
+                              console.log("Add new provider");
+                            }}
+                            className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
+                          >
+                            <Plus className="h-4 w-4" />
+                            Add New Provider
+                          </button>
+                        </div>
                       </div>
+                    </CustomDropdown>
 
-                      {/* Footer with Add New Provider button */}
-                      <div className="px-4 py-3 border-t border-gray-100 bg-gray-50/50 rounded-b-xl">
-                        <button
-                          onClick={() => {
-                            // Add your add provider logic here
-                            console.log("Add new provider");
-                          }}
-                          className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
-                        >
-                          <Plus className="h-4 w-4" />
-                          Add New Provider
-                        </button>
-                      </div>
-                    </div>
-                  </CustomDropdown>
+                    <TemplatesModal
+                      templates={templates}
+                      attachedFile={attachedFile}
+                      selectedTemplate={selectedTemplate}
+                      selectedProvider={selectedProvider}
+                      setSelectedTemplate={setSelectedTemplate}
+                      setAttachedFile={setAttachedFile}
+                      setMessage={setMessage}
+                      setMediaType={setMediaType}
+                      setBodyParameters={setBodyParameters}
+                      setHeaderParameters={setHeaderParameters}
+                      handleRemoveTemplate={handleRemoveTemplate}
+                    />
 
-                  <TemplatesModal
-                    templates={templates}
-                    attachedFile={attachedFile}
-                    selectedTemplate={selectedTemplate}
-                    selectedProvider={selectedProvider}
-                    setSelectedTemplate={setSelectedTemplate}
-                    setAttachedFile={setAttachedFile}
-                    setMessage={setMessage}
-                    setMediaType={setMediaType}
-                    setBodyParameters={setBodyParameters}
-                    setHeaderParameters={setHeaderParameters}
-                    handleRemoveTemplate={handleRemoveTemplate}
-                  />
+                    {!isMobileView && (
+                      <>
+                        <AttachmentModal
+                          attachedFile={attachedFile}
+                          setAttachedFile={setAttachedFile}
+                          attachedFiles={state.attachedFiles}
+                          setAttachedFiles={setAttachedFiles}
+                          mediaUrl={mediaUrl}
+                        />
 
-                  {!isMobileView && (
-                    <>
-                      <AttachmentModal
-                        attachedFile={attachedFile}
-                        setAttachedFile={setAttachedFile}
-                        attachedFiles={state.attachedFiles}
-                        setAttachedFiles={setAttachedFiles}
-                        mediaUrl={mediaUrl}
-                      />
+                        <EmojiPickerModal
+                          inputRef={textAreaRef as any}
+                          triggerButton={
+                            <button className="border border-gray-300 cursor-pointer rounded-md p-2.5">
+                              <Smile
+                                size={20}
+                                className="text-muted-foreground transition-transform duration-200"
+                              />
+                            </button>
+                          }
+                          position="top-left"
+                          align="start"
+                          setValue={setMessage}
+                        />
 
-                      <EmojiPickerModal
-                        inputRef={textAreaRef as any}
-                        triggerButton={
-                          <button className="border border-gray-300 cursor-pointer rounded-md p-2.5">
-                            <Smile
+                        {/* Location Sharing Button - Only for WhatsApp */}
+                        {selectedProvider?.type?.includes("whatsapp") && (
+                          <button
+                            onClick={() => setIsLocationPickerOpen(true)}
+                            className="border border-gray-300 cursor-pointer rounded-md p-2.5 hover:bg-gray-50 transition-colors"
+                            title="Share Location"
+                          >
+                            <MapPin
                               size={20}
-                              className="text-muted-foreground transition-transform duration-200"
+                              className="transition-transform duration-200"
                             />
                           </button>
-                        }
-                        position="top-left"
-                        align="start"
-                        setValue={setMessage}
-                      />
+                        )}
+                      </>
+                    )}
+                  <div className="relative">
+  <button
+    onClick={() => setIsAiChatOpen((prev) => !prev)}
+    className="bg-white text-gray-700 border border-gray-200 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed p-2.5 rounded-xl font-semibold flex items-center space-x-2 transition-all hover:shadow-md"
+  >
+    Talk to an AI Agent
+  </button>
+  <AiAgentChat
+    isOpen={isAiChatOpen}
+    onClose={() => setIsAiChatOpen(false)}
+  />
+</div>
 
-                      {/* Location Sharing Button - Only for WhatsApp */}
-                      {selectedProvider?.type?.includes("whatsapp") && (
-                        <button
-                          onClick={() => setIsLocationPickerOpen(true)}
-                          className="border border-gray-300 cursor-pointer rounded-md p-2.5 hover:bg-gray-50 transition-colors"
-                          title="Share Location"
-                        >
-                          <MapPin
-                            size={20}
-                            className="transition-transform duration-200"
-                          />
-                        </button>
-                      )}
-                    </>
-                  )}
-
-                  {/* <EmojiPickerModal
+                    {/* <EmojiPickerModal
                     triggerButton={
                       <button className="border border-gray-300 rounded-md p-2.5">
                         <Smile
@@ -1342,26 +1370,26 @@ const InboxPage: NextPageWithLayout = () => {
                     align="start"
                     setValue={(val) => setMessage((prev) => `${prev} ${val}`)}
                   /> */}
-                </div>
+                  </div>
 
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setIsScheduleModalOpen(true)}
-                    disabled={!canSchedule}
-                    className="bg-white text-gray-700 border border-gray-200 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed p-2.5 rounded-xl font-semibold flex items-center space-x-2 transition-all hover:shadow-md"
-                  >
-                    <Timer className="h-5 w-5" />
-                  </button>
-                  <button
-                    onClick={() => handleSendMessage()}
-                    disabled={sendMsgLoading || !canSend}
-                    className="bg-gradient-to-r from-gray-800 to-gray-900 text-white hover:from-gray-700 hover:to-gray-800 disabled:opacity-50 disabled:cursor-not-allowed p-2.5 rounded-xl font-semibold flex items-center space-x-2 transition-all hover:shadow-md"
-                  >
-                    <Send className="h-5 w-5" />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setIsScheduleModalOpen(true)}
+                      disabled={!canSchedule}
+                      className="bg-white text-gray-700 border border-gray-200 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed p-2.5 rounded-xl font-semibold flex items-center space-x-2 transition-all hover:shadow-md"
+                    >
+                      <Timer className="h-5 w-5" />
+                    </button>
+                    <button
+                      onClick={() => handleSendMessage()}
+                      disabled={sendMsgLoading || !canSend}
+                      className="bg-gradient-to-r from-gray-800 to-gray-900 text-white hover:from-gray-700 hover:to-gray-800 disabled:opacity-50 disabled:cursor-not-allowed p-2.5 rounded-xl font-semibold flex items-center space-x-2 transition-all hover:shadow-md"
+                    >
+                      <Send className="h-5 w-5" />
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
             )}
           </>
         )}

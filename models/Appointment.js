@@ -85,7 +85,7 @@ const AppointmentSchema = new mongoose.Schema(
         "Schedule Conflict",
         "Found Another Clinic",
         "Too Expensive",
-        "Other"
+        "Other",
       ],
       default: null,
     },
@@ -128,7 +128,15 @@ const AppointmentSchema = new mongoose.Schema(
     // Track who booked the appointment
     bookedByRole: {
       type: String,
-      enum: ["clinic", "agent", "admin", "doctor", "doctorStaff", "staff", "user"],
+      enum: [
+        "clinic",
+        "agent",
+        "admin",
+        "doctor",
+        "doctorStaff",
+        "staff",
+        "user",
+      ],
       default: null,
     },
     bookedByUserId: {
