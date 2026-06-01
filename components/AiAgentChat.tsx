@@ -43,15 +43,12 @@ const AiAgentChat: React.FC<AiAgentChatProps> = ({ isOpen, onClose }) => {
     setIsLoading(true);
 
     try {
-      console.log("threadId =", threadId);
+      const clinicToken = localStorage.getItem("clinicToken");
       const payload = {
         messages: trimmed,
         threadId,
+        clinicToken
       };
-
-      console.log("PAYLOAD:", payload);
-      console.log("JSON:", JSON.stringify(payload));
-
       const response = await fetch("http://localhost:8000/chat", {
         method: "POST",
         headers: {

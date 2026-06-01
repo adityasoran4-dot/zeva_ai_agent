@@ -52,11 +52,11 @@ class BookingPayload(BaseModel):
     toTime: str
 
 
-@tool
-def check_data():
+
 
 @tool("book_appointment",args_schema=BookingPayload)
 def book_appointment(patientId: str,doctorId: str,roomId: str,status: str,followType: str,startDate: str, fromTime: str,toTime: str ):
+    "Booking Appointment"
     print("http://localhost:3000/api/clinic/appointments")
 
 
