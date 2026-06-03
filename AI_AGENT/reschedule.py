@@ -1,27 +1,83 @@
+# reschedule.py
 import httpx
 from reference_id import ref_to_appointment_id
 from datetime import datetime, timedelta
+from cache import get_cache, set_cache, redis_client
 
-def normalize_time(time_str: str) -> str:
-    time_str = time_str.strip()
-    for fmt in ("%H:%M", "%I:%M %p", "%I %p", "%I:%M%p", "%I%p"):
-        try:
-            return datetime.strptime(time_str.upper(), fmt).strftime("%H:%M")
-        except ValueError:
-            continue
-    raise ValueError(f"Cannot parse time: '{time_str}'")
+APPOINTMENT_CACHE_TTL = 120                
 
-def normalize_date(date_str: str) -> str:
-    date_str = date_str.strip()
-    if len(date_str) == 10 and date_str[4] == '-':
-        return date_str
-    try:
-        return datetime.strptime(date_str, "%d-%m-%Y").strftime("%Y-%m-%d")
-    except ValueError:
-        pass
-    raise ValueError(f"Cannot parse date: '{date_str}'")
 
-def reschedule_apt(clinicToken: str, ref_id: str, startDate: str, fromTime: str) -> dict:
+async def find_appointment_by_id(apt_id: str, headers: dict) -> dict | None:
+    page = 1
+    async with httpx.AsyncClient() as client:
+        while True:
+            try:
+                resp = await client.get(
+                    "http://localhost:3000/api/clinic/all-appointments",
+                    headers=headers,
+                    params={"page": page, "limit": 50},
+                    timeout=10.0
+                )
+                data = resp.json()
+            except Exception:
+                return None
+
+            if not data.get("success"):
+                return None
+
+            appointments = data.get("appointments", [])
+            if not appointments:
+                break
+
+            for apt in appointments:
+                if apt["_id"] == apt_id:
+                    return apt
+
+            if len(appointments) < 50:
+                break
+
+            page += 1
+
+    return None
+
+
+async def get_appointment_details(clinicToken: str, ref_id: str) -> dict:
+
+    apt_id = ref_to_appointment_id(ref_id)
+    if not apt_id:
+        return {"Status": "Error", "Message": f"No appointment found for reference ID: {ref_id}"}
+
+    # ── Check cache first ─────────────────────────────────────────────
+    cache_key = f"appointment:{clinicToken}:{apt_id}"
+    cached = await get_cache(cache_key)
+    if cached:
+        return cached                      
+
+    headers = {"Authorization": f"Bearer {clinicToken}"}
+    existing = await find_appointment_by_id(apt_id, headers)
+
+    if not existing:
+        return {"Status": "Error", "Message": f"Appointment not found for reference ID: {ref_id}"}
+
+    result = {
+        "Status":      "Found",
+        "patientName": existing["patientName"],
+        "doctorName":  existing["doctorName"],
+        "serviceName": existing["serviceName"],
+        "roomName":    existing["roomName"],
+        "currentDate": existing["registeredDate"],
+        "currentTime": existing["registeredTime"],
+        "status":      existing["status"],
+    }
+
+    # ── Store in cache ────────────────────────────────────────────────
+    await set_cache(cache_key, result, APPOINTMENT_CACHE_TTL)  
+
+    return result
+
+
+async def reschedule_apt(clinicToken: str, ref_id: str, startDate: str, fromTime: str) -> dict:
+
     apt_id = ref_to_appointment_id(ref_id)
     if not apt_id:
         return {"Status": "Error", "Message": f"No appointment found for reference ID: {ref_id}"}
@@ -29,56 +85,44 @@ def reschedule_apt(clinicToken: str, ref_id: str, startDate: str, fromTime: str)
     toTime = (datetime.strptime(fromTime, "%H:%M") + timedelta(minutes=20)).strftime("%H:%M")
     headers = {"Authorization": f"Bearer {clinicToken}"}
 
-    # ── STEP 1: Fetch existing appointment ────────────────────────────
-    try:
-        =httpx.get(
-            f"http://localhost:3000/api/clinic/all-appointments"
-            headers=headers,
-            timeout=10.0
-        )
-        data=   get_resp.json()
-    except Exception as e:
-        return {"Status": "Error", "Message": f"Failed to fetch appointment: {e}"}
+    existing = await find_appointment_by_id(apt_id, headers)
 
-    if not get_data.get("success"):
-        return {"Status": "Error", "Message": get_data.get("message", "Could not fetch appointment.")}
-
-    existing = get_data.get("appointment") or get_data.get("data") or get_data.get("result")
     if not existing:
-        return {"Status": "Error", "Message": f"Unexpected response shape: {get_data}"}
+        return {"Status": "Error", "Message": f"Appointment not found for reference ID: {ref_id}"}
 
-    # ── STEP 2: Merge only date/time fields ───────────────────────────
-    payload = {**existing, "startDate": startDate, "fromTime": fromTime, "toTime": toTime}
+    existing["startDate"] = startDate
+    existing["fromTime"]  = fromTime
+    existing["toTime"]    = toTime
 
-    for field in ["_id", "__v", "createdAt", "updatedAt", "referenceId"]:
-        payload.pop(field, None)
+    fields_to_remove = ["_id", "__v", "createdAt", "updatedAt", "referenceId"]
+    for field in fields_to_remove:
+        if field in existing:
+            del existing[field]
 
-    print(f"[RESCHEDULE] PUT payload: {payload}")
-
-    # ── STEP 3: Send full updated object ──────────────────────────────
     try:
-        put_resp = httpx.put(
-            f"http://localhost:3000/api/clinic/update-appointment/{apt_id}",
-            json=payload,
-            headers=headers,
-            timeout=10.0
-        )
-        print(f"[RESCHEDULE] PUT status : {put_resp.status_code}")
-        print(f"[RESCHEDULE] PUT body   : {put_resp.text}")
+        async with httpx.AsyncClient() as client:
+            put_resp = await client.put(
+                f"http://localhost:3000/api/clinic/update-appointment/{apt_id}",
+                json=existing,
+                headers=headers,
+                timeout=10.0
+            )
         put_data = put_resp.json()
     except Exception as e:
         return {"Status": "Error", "Message": f"Failed to update appointment: {e}"}
 
-    if put_data.get("success"):
+    if put_data["success"]:
+        cache_key = f"appointment:{clinicToken}:{apt_id}"
+        await redis_client.delete(cache_key)   
+
         return {
-            "Status": "Rescheduled",
+            "Status":  "Rescheduled",
             "Message": put_data.get("message", "Appointment rescheduled successfully."),
             "newDate": startDate,
             "newTime": fromTime,
         }
     else:
         return {
-            "Status": "Error",
+            "Status":  "Error",
             "Message": put_data.get("message", "Server rejected the update."),
-            "debug": put_data,
         }

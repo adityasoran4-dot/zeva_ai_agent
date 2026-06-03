@@ -1,23 +1,14 @@
-import os
-from typing import Annotated, Literal, TypedDict
-from annotated_types import T
-import httpx
+from typing import Literal, TypedDict
+import httpx                                    
 from langchain_openai import ChatOpenAI
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
-from langgraph.graph import END, START, StateGraph, add_messages
-from pydantic import BaseModel
-from langgraph.checkpoint.sqlite import SqliteSaver
-from langgraph.prebuilt import tool_node, tools_condition
-from langchain_classic.tools import tool
+from langgraph.graph import END, START, StateGraph
 from datetime import datetime, timedelta
-from dotenv import load_dotenv
-
 from reference_id import appointment_id_to_ref
+
 load_dotenv()
 
-class AppointmentState(TypedDict):
+class AppointmentState(TypedDict):             
     clinicToken: str
     patient_name: str
     doctor_name: str
@@ -36,7 +27,7 @@ class AppointmentState(TypedDict):
     selectedDoctorId: str
     selectedTreatment: str
     patientId: str
-    Status:str
+    Status: str
     referenceId: str
     appointmentId: str
     startDate: str
@@ -44,23 +35,25 @@ class AppointmentState(TypedDict):
     toTime: str
     errorMessage: str
 
-token=None
-def get_header(token):
+def get_header(token):                        
     return {"Authorization": f"Bearer {token}"}
 
 
-def check_patient(state: AppointmentState):
-    header= get_header(token)
-    url=f"http://localhost:3000/api/clinic/search-patients?search={state['patient_name']}"
-    search_patient=httpx.get(url,headers=header)
-    data=search_patient.json()
+
+async def check_patient(state: AppointmentState):
+    header = get_header(state['clinicToken'])
+    url = f"http://localhost:3000/api/clinic/search-patients?search={state['patient_name']}"
+
+    async with httpx.AsyncClient() as client:                    
+        search_patient = await client.get(url, headers=header)
+    data = search_patient.json()
+
     if data.get("success") and len(data.get("patients", [])) > 0:
         return {
             "patientExists": True,
             "patients": data["patients"],
             "patientId": data["patients"][0]["_id"],
         }
-       
     else:
         return {
             "patientExists": False,
@@ -68,11 +61,13 @@ def check_patient(state: AppointmentState):
             "patientId": "",
         }
 
-def check_doctor(state: AppointmentState):
-    header = get_header(token)
+
+async def check_doctor(state: AppointmentState):
+    header = get_header(state['clinicToken'])
     url = "http://localhost:3000/api/lead-ms/get-agents-options?role=doctorStaff"
 
-    search_doctor = httpx.get(url, headers=header)
+    async with httpx.AsyncClient() as client:                    
+        search_doctor = await client.get(url, headers=header)
     data = search_doctor.json()
 
     doctor_name = state["doctor_name"].strip().lower()
@@ -85,7 +80,6 @@ def check_doctor(state: AppointmentState):
             ),
             None,
         )
-
         if doctor:
             return {
                 "doctorExists": True,
@@ -99,11 +93,13 @@ def check_doctor(state: AppointmentState):
         "selectedDoctorId": "",
     }
 
-def check_room(state: AppointmentState):
-    header = get_header(token)
+
+async def check_room(state: AppointmentState):
+    header = get_header(state['clinicToken'])
     url = "http://localhost:3000/api/clinic/rooms"
 
-    search_room = httpx.get(url, headers=header)
+    async with httpx.AsyncClient() as client:                   
+        search_room = await client.get(url, headers=header)
     data = search_room.json()
 
     room_name = state["room_name"].strip().lower()
@@ -116,7 +112,6 @@ def check_room(state: AppointmentState):
             ),
             None,
         )
-
         if room:
             return {
                 "roomExists": True,
@@ -130,11 +125,13 @@ def check_room(state: AppointmentState):
         "selectedRoomId": "",
     }
 
-def check_treatments(state: AppointmentState):
-    header = get_header(token)
+
+async def check_treatments(state: AppointmentState):
+    header = get_header(state['clinicToken'])
     url = "http://localhost:3000/api/clinic/services"
 
-    search_treatments = httpx.get(url, headers=header)
+    async with httpx.AsyncClient() as client:                   
+        search_treatments = await client.get(url, headers=header)
     data = search_treatments.json()
 
     treatment_name = state["treatment_name"].strip().lower()
@@ -147,7 +144,6 @@ def check_treatments(state: AppointmentState):
             ),
             None,
         )
-
         if treatment:
             return {
                 "treatmentExists": True,
@@ -162,43 +158,37 @@ def check_treatments(state: AppointmentState):
     }
 
 
-def confirm_time(state: AppointmentState):
-    start_time_str = state["fromTime"]     
-    date_str = state["startDate"]         
-    
+def confirm_time(state: AppointmentState):    
+    start_time_str = state["fromTime"]
+    date_str = state["startDate"]
+
     start_time = datetime.strptime(start_time_str, "%H:%M")
     end_time = start_time + timedelta(minutes=20)
     to_time_str = end_time.strftime("%H:%M")
-    
+
     return {
         "timeConfirmed": True,
         "startDate": date_str,
         "fromTime": start_time_str,
-        "toTime": to_time_str              
-    }    
+        "toTime": to_time_str
+    }
 
-llm=ChatOpenAI(model="gpt-4o-mini")
 
-def handle_error(state: AppointmentState):
-    if (state["patientExists"]==False):
-        prompt=f"Patient named {state['patient_name']} does not exist. Write a friendly message to inform the user about this issue and suggest to check the patient name or create a new patient profile."
-        error_message=llm.invoke(prompt).content
-        return {"Status": "Error", "errorMessage": error_message}
-    elif (state["doctorExists"]==False):
-        prompt=f"Doctor named {state['doctor_name']} does not exist. Write a friendly message to inform the user about this issue and suggest to check the doctor name or contact support."
-        error_message=llm.invoke(prompt).content
-        return {"Status": "Error", "errorMessage": error_message}
-    elif (state["roomExists"]==False):
-        prompt=f"Room named {state['room_name']} does not exist. Write a friendly message to inform the user about this issue and suggest to check the room name or contact support."
-        error_message=llm.invoke(prompt).content
-        return {"Status": "Error", "errorMessage": error_message}
-    elif (state["treatmentExists"]==False):
-        prompt=f"Treatment named {state['treatment_name']} does not exist. Write a friendly message to inform the user about this issue and suggest to check the treatment name or contact support."
-        error_message=llm.invoke(prompt).content
-        return {"Status": "Error", "errorMessage": error_message}
+llm = ChatOpenAI(model="gpt-4o-mini")         
 
-def book_appointment(state: AppointmentState):
-    header = get_header(token)
+def handle_error(state: AppointmentState):     
+    if not state["patientExists"]:
+        return {"Status": "Error", "errorMessage": f"Patient '{state['patient_name']}' was not found. Please check the name or register the patient first."}
+    elif not state["doctorExists"]:
+        return {"Status": "Error", "errorMessage": f"Doctor '{state['doctor_name']}' was not found. Please check the name or contact support."}
+    elif not state["roomExists"]:
+        return {"Status": "Error", "errorMessage": f"Room '{state['room_name']}' was not found. Please check the room name or contact support."}
+    elif not state["treatmentExists"]:
+        return {"Status": "Error", "errorMessage": f"Treatment '{state['treatment_name']}' is not available. Please check the name or contact support."}
+
+
+async def book_appointment(state: AppointmentState):
+    header = get_header(state['clinicToken'])
     url = "http://localhost:3000/api/clinic/appointments"
     payload = {
         "patientId": state["patientId"],
@@ -212,48 +202,39 @@ def book_appointment(state: AppointmentState):
         "fromTime": state["fromTime"],
         "toTime": state["toTime"]
     }
-    response = httpx.post(url, json=payload, headers=header)
+
+    async with httpx.AsyncClient() as client:                   
+        response = await client.post(url, json=payload, headers=header)
     data = response.json()
+
     if data["success"] == True:
-        appointment_db_id = data["appointment"]["_id"]  # adjust key as per your API
+        appointment_db_id = data["appointment"]["_id"]
         ref_id = appointment_id_to_ref(appointment_db_id)
-        print("Generated Reference ID:", ref_id)  # Debugging statement
         return {
             "Status": "Booked",
-            "referenceId": ref_id,          # ← send this back to user
+            "referenceId": ref_id,
             "appointmentId": appointment_db_id
-        }    
+        }
     else:
         return {"Status": "Error", "Message": data.get("message", "An error occurred while booking the appointment.")}
 
 
+
 def after_check_patient(state: AppointmentState) -> Literal["check_doctor", "handle_error"]:
-    if state["patientExists"] == True:
-        return "check_doctor"
-    else:
-        return "handle_error"
+    return "check_doctor" if state["patientExists"] else "handle_error"
 
 def after_check_doctor(state: AppointmentState) -> Literal["check_room", "handle_error"]:
-    if state["doctorExists"] == True:
-        return "check_room"
-    else:
-        return "handle_error"
+    return "check_room" if state["doctorExists"] else "handle_error"
 
 def after_check_room(state: AppointmentState) -> Literal["check_treatments", "handle_error"]:
-    if state["roomExists"] == True:
-        return "check_treatments"
-    else:
-        return "handle_error"
+    return "check_treatments" if state["roomExists"] else "handle_error"
 
 def after_check_treatments(state: AppointmentState) -> Literal["confirm_time", "handle_error"]:
-    if state["treatmentExists"] == True:
-        return "confirm_time"
-    else:
-        return "handle_error"
+    return "confirm_time" if state["treatmentExists"] else "handle_error"
 
-def buildGraph(clinicToken:str,payload: dict):
-    global token
-    token=clinicToken
+
+
+def buildGraph(clinicToken: str, payload: dict):
     initial_state = {
         "clinicToken": clinicToken,
         "patient_name": payload.get("patient_name", ""),
@@ -278,9 +259,9 @@ def buildGraph(clinicToken:str,payload: dict):
         "timeConfirmed": False,
         "patientId": "",
     }
+
     graph = StateGraph(AppointmentState)
 
-    # Defining the Nodes
     graph.add_node("check_patient", check_patient)
     graph.add_node("check_doctor", check_doctor)
     graph.add_node("check_room", check_room)
@@ -289,7 +270,6 @@ def buildGraph(clinicToken:str,payload: dict):
     graph.add_node("handle_error", handle_error)
     graph.add_node("book_appointment", book_appointment)
 
-    # Adding Edges
     graph.add_edge(START, "check_patient")
     graph.add_conditional_edges("check_patient", after_check_patient)
     graph.add_conditional_edges("check_doctor", after_check_doctor)

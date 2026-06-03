@@ -1,6 +1,6 @@
 import httpx
 
-url="http://localhost:3000/api/clinic/all-appointments"
+url="http://localhost:3000/api/clinics/myallClinic"
 header={"Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2ODkwOWIzMGZhYTk4ZjYzZTk3ZTNkMTciLCJyb2xlIjoiY2xpbmljIiwiZW1haWwiOiI0NGR3aXZlZGlzYXJ0aGFrQGdtYWlsLmNvbSIsImlhdCI6MTc4MDM5MzAyNywiZXhwIjoxNzgwNDc5NDI3fQ.ApbPmac84VylgTSk6iq14-DB3AWJNYuk3qzifwoQ9JU"}
 search_patient=httpx.get(url,headers=header)
 data=search_patient.json()

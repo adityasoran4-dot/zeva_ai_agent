@@ -14,18 +14,35 @@ from langchain_core.messages import (
     ToolMessage,
     SystemMessage,
 )
-from langgraph.checkpoint.sqlite import SqliteSaver
+from contextlib import asynccontextmanager
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.prebuilt import ToolNode,tools_condition
-from langchain_classic.tools import tool
-import sqlite3
+from langchain_core.tools import tool
 from reference_id import ref_to_appointment_id
 from appointment import buildGraph
-from reschedule import reschedule_apt
+from reschedule import get_appointment_details, reschedule_apt
+from faq import get_info
+from psycopg import AsyncConnection
+from contextvars import ContextVar
+
 load_dotenv()
 
+clinic_token_var: ContextVar[str] = ContextVar('clinic_token')
 
 llm=ChatOpenAI(model="gpt-4o-mini")
-app=FastAPI()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    conn = await AsyncConnection.connect(os.getenv("DATABASE_URL"))
+    await conn.set_autocommit(True)
+    checkpointer = AsyncPostgresSaver(conn)
+    await checkpointer.setup()
+    app.state.workflow = build_workflow(checkpointer)   
+    yield
+    await conn.close()
+
+app = FastAPI(lifespan=lifespan)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -54,22 +71,45 @@ class BookingPayload(BaseModel):
     fromTime: str
 
 
-clinicToken=None
-threadId=None
+prompt = """.
+You are an appointment booking assistant for ZEVA clinic.
 
-prompt = """
-You are an appointment booking assistant for a medical clinic.
+PERSONALITY & GREETING:
 
-You help users book, reschedule, and cancel appointments.
+- Always greet users warmly and professionally when starting a new conversation.
+- Use a premium, welcoming, and reassuring tone.
+- Be concise and respectful.
+- Make patients feel valued and cared for.
+- Do not sound robotic.
+- Do not use excessive emojis.
 
-For booking an appointment, collect the following required information:
+Examples:
 
-1. patient_name
-2. doctor_name
-3. room_name
-4. treatment_name
-5. startDate (DD-MM-YYYY)
-6. fromTime (HH:MM, 12-hour format)
+User: Hi
+
+Assistant:
+Welcome to ZEVA clinic. I'm happy to assist you with booking, rescheduling and FAQ inquiries. How may I help you today?
+
+User: Hello
+
+Assistant:
+Hi!, welcome to ZEVA clinic. I'm here to help you manage your appointments and answer any clinic-related questions. How can I assist you today?
+
+User: I want to book an appointment.
+
+Assistant:
+I'd be delighted to help you schedule an appointment. Please provide:
+- Patient name
+- Doctor name
+- Room name
+- Treatment name
+- Appointment date
+- Appointment time
+
+------------------------------------------------
+
+
+You help users book, reschedule
 
 Rules:
 
@@ -92,7 +132,7 @@ BOOKING RULES:
 - If the tool output contains a field named `referenceId`, ALWAYS include it in the response.
 - Tell the user to save the Reference ID because it is required for:
     - rescheduling appointments
-    - cancelling appointments
+
     - appointment support requests
 
 IMPORTANT:
@@ -101,7 +141,7 @@ When a booking succeeds and a referenceId is present, your response MUST include
 
 Reference ID: <referenceId>
 
-Please save this Reference ID. It will be required for future rescheduling or cancellation requests.
+Please save this Reference ID. It will be required for future rescheduling.
 
 Never omit the referenceId if it exists in the tool output.
 
@@ -109,15 +149,22 @@ RESCHEDULING RULES:
 
 - If the user wants to reschedule an appointment, ask for their Appointment Reference ID if it has not been provided.
 - Do not ask for patient name, doctor name, or appointment details if the Reference ID is available.
-- Use the Reference ID to locate the appointment.
+- Once Reference ID is provided, ALWAYS call get_appointment_details first.
+- After getting details, show the current information about the appointment.
 - After finding the appointment, collect the new date and/or time.
-- Call the rescheduling tool once sufficient information is available.
+-  Only call reschedule_appointment once you have both new date and new time confirmed..
 
-CANCELLATION RULES:
+FAQ RULES:
 
-- If the user wants to cancel an appointment, ask for their Appointment Reference ID if it has not been provided.
-- Use the Reference ID to identify the appointment.
-- Call the cancellation tool after confirmation.
+- For any question about timings, doctors, treatments, prices, or contact — call get_clinic_info tool first.
+- Never answer from memory — always call the tool first.
+- Answer only what the user asked — do not dump all clinic info at once.
+- Never reveal doctor emails, IDs, or any internal information.
+- Never mention break time to the user.
+- If a treatment is not in the list — say it is not available.
+- If price is "0" — tell the user to contact the clinic directly.
+
+
 
 Examples:
 
@@ -162,10 +209,34 @@ My reference ID is APT-AB12CD.
 
 Response:
 What new date and time would you like for the appointment?
+
+User: What are your timings?
+Response: Show only open days and opening/closing times. Do NOT mention break times.
+
+User: Are you open on Sunday?
+Response: Check Sunday in timings. Reply open or closed with timings only.
+
+User: Which doctors are available?
+Response: List only doctor names. Never share emails or IDs.
+
+User: Do you have a dentist?
+Response: Check doctors list and treatments. Reply based on tool data only.
+
+User: How much does root canal cost?
+Response: Find root canal in treatments and show its price only.
+
+User: What treatments do you offer?
+Response: List available treatment categories and their sub treatments.
+
+User: What is your phone number?
+Response: Share phone number from tool data only.
+
+User: Where are you located?
+Response: Share clinic address from tool data only.
 """
 
 @tool("book_appointment",args_schema=BookingPayload)
-def book_appointment( 
+async def book_appointment( 
     patient_name: str,
     doctor_name: str,
     room_name: str,
@@ -201,21 +272,41 @@ Call this tool only when every required field is available and confirmed."""
         "startDate": startDate,
         "fromTime": fromTime,
     }
+    clinicToken = clinic_token_var.get()
     workflow, initial_state = buildGraph(clinicToken, payload)
-    response=workflow.invoke(initial_state)
+    response=await workflow.ainvoke(initial_state)
     return {
         "response_from_tool": response
         }
 
-# In main.py — replace the reschedule tool
 
 class RescheduleSchema(BaseModel):
     ref_id: str       
     startDate: str    
-    fromTime: str    
+    fromTime: str  
+class GetDetailsSchema(BaseModel):
+    ref_id: str
+
+@tool("get_appointment_details", args_schema=GetDetailsSchema)
+async def get_appointment_details_tool(ref_id: str) -> dict:
+    """Fetches current appointment details before rescheduling.
+
+    Use this tool when:
+    - User wants to reschedule an appointment.
+
+    - You need to know the current information of the appointment before rescheduling.
+
+    Use this BEFORE calling reschedule_appointment so you know
+    the existing Information.
+    """
+    clinicToken = clinic_token_var.get()
+    return await get_appointment_details(
+        clinicToken=clinicToken,
+        ref_id=ref_id,
+    )  
 
 @tool("reschedule_appointment", args_schema=RescheduleSchema)
-def reschedule_appointment(ref_id: str, startDate: str, fromTime: str) -> dict:
+async def reschedule_appointment(ref_id: str, startDate: str, fromTime: str) -> dict:
     """Reschedules an existing appointment.
 
     Use this tool when the user wants to reschedule and has provided:
@@ -225,54 +316,54 @@ def reschedule_appointment(ref_id: str, startDate: str, fromTime: str) -> dict:
 
     Do NOT call this tool if any of these fields are missing.
     """
-    return reschedule_apt(
+    clinicToken = clinic_token_var.get()
+    return await reschedule_apt(
         clinicToken=clinicToken,  
         ref_id=ref_id,
         startDate=startDate,
         fromTime=fromTime,
     )
 
-tools=[book_appointment, reschedule_appointment]
+@tool
+async def get_faq():
+    """Fetches clinic information. Call this tool when user asks about:
+    - Timings / working hours / open days
+    - Doctors / staff / who to consult
+    - Treatments / services available
+    - Prices / fees / charges
+    - Contact details / phone / email / whatsapp
+    - Clinic address / location
+
+    Answer only from tool data. Never guess or reveal internal details.
+    """
+    clinicToken = clinic_token_var.get()
+    return await get_info(clinicToken=clinicToken)
+
+
+tools=[book_appointment, reschedule_appointment,get_appointment_details_tool, get_faq]
 agent=llm.bind_tools(tools)
 
+def build_workflow(checkpointer):
+    async def chat_node(state: ChatState):
+        system_message = SystemMessage(content=prompt)
+        response = await agent.ainvoke([system_message] + state["messages"])
+        return {"messages": [response]}
 
-conn = sqlite3.connect("chatbot.db", check_same_thread=False)
-checkpointer=SqliteSaver(conn=conn)
-graph=StateGraph(ChatState)
-
-def chat_node(state: ChatState):
-    messages = state["messages"]
-
-    system_message = SystemMessage(content=prompt)
-    message_with_system = [system_message] + messages
-    response = agent.invoke(
-        message_with_system
-    )
-
-    return {
-        "messages": [response]
-    }
-
-tool_node=ToolNode(tools)
-
-graph.add_node("chat",chat_node)
-graph.add_node("tools",tool_node)
-graph.add_edge(START,"chat")
-graph.add_conditional_edges("chat", tools_condition)
-graph.add_edge("tools", "chat")
-
-
-workflow=graph.compile(checkpointer=checkpointer)
+    graph = StateGraph(ChatState)
+    graph.add_node("chat", chat_node)
+    graph.add_node("tools", ToolNode(tools))
+    graph.add_edge(START, "chat")
+    graph.add_conditional_edges("chat", tools_condition)
+    graph.add_edge("tools", "chat")
+    return graph.compile(checkpointer=checkpointer)
 
 
 @app.post("/chat")
-def chat(req:ChatRequest):
-    global clinicToken,threadId
-    clinicToken=req.clinicToken
-    threadId=req.threadId
+async def chat(req:ChatRequest):
+    clinic_token_var.set(req.clinicToken)
     config={"configurable":{"thread_id":req.threadId}}
     
-    response = workflow.invoke(
+    response = await app.state.workflow.ainvoke(
     {"messages": HumanMessage(content=req.messages)},
     config=config,
         )   

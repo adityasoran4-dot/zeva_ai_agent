@@ -1,0 +1,1 @@
+hhttp://localhost:3000/api/clinics/allClinics

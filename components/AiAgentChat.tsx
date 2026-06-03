@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { X, Send, Bot, Loader2, User } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
+import ReactMarkdown from "react-markdown";
 
 interface Message {
   role: "user" | "assistant";
@@ -30,37 +31,24 @@ const AiAgentChat: React.FC<AiAgentChatProps> = ({ isOpen, onClose }) => {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    console.log(threadId);
 
     const trimmed = input.trim();
     if (!trimmed || isLoading) return;
 
     const userMessage: Message = { role: "user", content: trimmed };
-    const updatedMessages = [...messages, userMessage];
-
-    setMessages(updatedMessages);
+    setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setIsLoading(true);
 
     try {
       const clinicToken = localStorage.getItem("clinicToken");
-      const payload = {
-        messages: trimmed,
-        threadId,
-        clinicToken
-      };
       const response = await fetch("http://localhost:8000/chat", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: trimmed, threadId, clinicToken }),
       });
 
       const data = await response.json();
-
-      console.log("status", response.status);
-      console.log("data", data);
 
       setMessages((prev) => [
         ...prev,
@@ -69,7 +57,7 @@ const AiAgentChat: React.FC<AiAgentChatProps> = ({ isOpen, onClose }) => {
           content: data?.response || "Sorry, I couldn't process that.",
         },
       ]);
-    } catch (err) {
+    } catch {
       setMessages((prev) => [
         ...prev,
         {
@@ -85,15 +73,15 @@ const AiAgentChat: React.FC<AiAgentChatProps> = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="absolute bottom-20 left-4 z-50 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col overflow-hidden">
+    <div className="absolute bottom-20 left-4 z-50 w-[22rem] sm:w-[26rem] md:w-[30rem] bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-gray-800 to-gray-900 text-white">
+      <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-gray-800 to-gray-900 text-white flex-shrink-0">
         <div className="flex items-center gap-2">
           <div className="bg-white/20 p-1.5 rounded-lg">
             <Bot className="h-4 w-4" />
           </div>
           <div>
-            <p className="text-sm font-semibold leading-tight">AI Agent</p>
+            <p className="text-sm font-semibold leading-tight">AI Assistant</p>
             <p className="text-xs text-gray-300">Always here to help</p>
           </div>
         </div>
@@ -106,14 +94,18 @@ const AiAgentChat: React.FC<AiAgentChatProps> = ({ isOpen, onClose }) => {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3 max-h-80 bg-gray-50">
+      <div
+        className="overflow-y-auto p-4 space-y-4 bg-gray-50"
+        style={{ height: "380px", minHeight: "380px", maxHeight: "380px" }}
+      >
         {messages.map((msg, i) => (
           <div
             key={i}
-            className={`flex items-end gap-2 ${msg.role === "user" ? "flex-row-reverse" : "flex-row"}`}
+            className={`flex items-start gap-2 ${msg.role === "user" ? "flex-row-reverse" : "flex-row"}`}
           >
+            {/* Avatar */}
             <div
-              className={`p-1.5 rounded-full flex-shrink-0 ${msg.role === "user" ? "bg-gray-800" : "bg-blue-100"}`}
+              className={`p-1.5 rounded-full flex-shrink-0 mt-1 ${msg.role === "user" ? "bg-gray-800" : "bg-blue-100"}`}
             >
               {msg.role === "user" ? (
                 <User className="h-3 w-3 text-white" />
@@ -121,25 +113,88 @@ const AiAgentChat: React.FC<AiAgentChatProps> = ({ isOpen, onClose }) => {
                 <Bot className="h-3 w-3 text-blue-600" />
               )}
             </div>
+
+            {/* Bubble */}
             <div
-              className={`max-w-[75%] px-3 py-2 rounded-2xl text-sm leading-relaxed ${
+              className={`px-3 py-2.5 rounded-2xl text-sm leading-relaxed break-words min-w-0 max-w-[80%] ${
                 msg.role === "user"
-                  ? "bg-gray-800 text-white rounded-br-sm"
-                  : "bg-white text-gray-800 border border-gray-200 rounded-bl-sm shadow-sm"
+                  ? "bg-gray-800 text-white rounded-tr-sm"
+                  : "bg-white text-gray-800 border border-gray-200 rounded-tl-sm shadow-sm"
               }`}
             >
-              {msg.content}
+              {msg.role === "assistant" ? (
+                <ReactMarkdown
+                  components={{
+                    // Headings
+                    h1: ({ children }) => (
+                      <h1 className="text-base font-bold mb-1">{children}</h1>
+                    ),
+                    h2: ({ children }) => (
+                      <h2 className="text-sm font-bold mb-1">{children}</h2>
+                    ),
+                    h3: ({ children }) => (
+                      <h3 className="text-sm font-semibold mb-1">{children}</h3>
+                    ),
+
+                    // Paragraph
+                    p: ({ children }) => (
+                      <p className="mb-1 last:mb-0">{children}</p>
+                    ),
+
+                    // Bold
+                    strong: ({ children }) => (
+                      <span className="font-semibold text-gray-900">
+                        {children}
+                      </span>
+                    ),
+
+                    // Lists
+                    ul: ({ children }) => (
+                      <ul className="list-disc list-inside space-y-0.5 mb-1">
+                        {children}
+                      </ul>
+                    ),
+                    ol: ({ children }) => (
+                      <ol className="list-decimal list-inside space-y-0.5 mb-1">
+                        {children}
+                      </ol>
+                    ),
+                    li: ({ children }) => (
+                      <li className="text-sm">{children}</li>
+                    ),
+
+                    // Divider
+                    hr: () => <hr className="my-2 border-gray-200" />,
+
+                    // Code
+                    code: ({ children }) => (
+                      <code className="bg-gray-100 text-gray-800 text-xs px-1 py-0.5 rounded">
+                        {children}
+                      </code>
+                    ),
+                  }}
+                >
+                  {msg.content}
+                </ReactMarkdown>
+              ) : (
+                msg.content
+              )}
             </div>
           </div>
         ))}
 
+        {/* Loading */}
         {isLoading && (
-          <div className="flex items-end gap-2">
-            <div className="p-1.5 rounded-full bg-blue-100">
+          <div className="flex items-start gap-2">
+            <div className="p-1.5 rounded-full bg-blue-100 mt-1">
               <Bot className="h-3 w-3 text-blue-600" />
             </div>
-            <div className="bg-white border border-gray-200 rounded-2xl rounded-bl-sm px-3 py-2 shadow-sm">
-              <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+            <div className="bg-white border border-gray-200 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
+              <div className="flex gap-1 items-center">
+                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:0ms]" />
+                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:150ms]" />
+                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:300ms]" />
+              </div>
             </div>
           </div>
         )}
@@ -147,10 +202,10 @@ const AiAgentChat: React.FC<AiAgentChatProps> = ({ isOpen, onClose }) => {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Form */}
+      {/* Input */}
       <form
         onSubmit={handleSubmit}
-        className="p-3 border-t border-gray-200 bg-white flex items-end gap-2"
+        className="p-3 border-t border-gray-200 bg-white flex items-end gap-2 flex-shrink-0"
       >
         <textarea
           value={input}
@@ -168,7 +223,7 @@ const AiAgentChat: React.FC<AiAgentChatProps> = ({ isOpen, onClose }) => {
         <button
           type="submit"
           disabled={!input.trim() || isLoading}
-          className="bg-gray-800 hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed text-white p-2.5 rounded-xl transition-all"
+          className="bg-gray-800 hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed text-white p-2.5 rounded-xl transition-all flex-shrink-0"
         >
           <Send className="h-4 w-4" />
         </button>
