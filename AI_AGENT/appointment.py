@@ -280,4 +280,5 @@ def buildGraph(clinicToken: str, payload: dict):
     graph.add_edge("book_appointment", END)
 
     workflow = graph.compile()
+ 
     return workflow, initial_state

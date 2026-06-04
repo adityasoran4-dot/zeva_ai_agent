@@ -17,8 +17,8 @@ export default async function handler(req, res) {
   try {
     // Get the logged-in clinic user
     const me = await getUserFromReq(req);
-    console.log('[sidebar-permissions API] me:', me);
-    console.log('[sidebar-permissions API] me.role:', me.role);
+    // console.log('[sidebar-permissions API] me:', me);
+    // console.log('[sidebar-permissions API] me.role:', me.role);
     if (!me) {
       return res.status(401).json({ success: false, message: 'Unauthorized: Missing or invalid token' });
     }
@@ -57,8 +57,8 @@ export default async function handler(req, res) {
 
     // Get clinic permissions
     const clinicPermission = await ClinicPermission.findOne({ clinicId: clinic._id });
-    console.log('[sidebar-permissions API] clinicPermission:', clinicPermission);
-    console.log('[sidebar-permissions API] clinicPermission.permissions:', clinicPermission?.permissions);
+    // console.log('[sidebar-permissions API] clinicPermission:', clinicPermission);
+    // console.log('[sidebar-permissions API] clinicPermission.permissions:', clinicPermission?.permissions);
 
     // Get navigation items for clinic role
     const navigationItems = await ClinicNavigationItem.find({ 
@@ -200,7 +200,7 @@ export default async function handler(req, res) {
       navigationItems: filteredNavigationItems,
       clinicId: clinic._id.toString()
     };
-    console.log('[sidebar-permissions API] Returning response:', response);
+    // console.log('[sidebar-permissions API] Returning response:', response);
     return res.status(200).json(response);
 
   } catch (error) {

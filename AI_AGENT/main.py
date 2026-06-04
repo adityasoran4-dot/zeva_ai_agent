@@ -9,16 +9,13 @@ from pydantic import BaseModel
 from langchain_core.messages import (
     HumanMessage,
     BaseMessage,
-    AIMessageChunk,
-    AIMessage,
-    ToolMessage,
     SystemMessage,
 )
 from contextlib import asynccontextmanager
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.prebuilt import ToolNode,tools_condition
 from langchain_core.tools import tool
-from reference_id import ref_to_appointment_id
+from patients import get_patients
 from appointment import buildGraph
 from reschedule import get_appointment_details, reschedule_apt
 from faq import get_info
@@ -77,6 +74,8 @@ You are an appointment booking assistant for ZEVA clinic.
 PERSONALITY & GREETING:
 
 - Always greet users warmly and professionally when starting a new conversation.
+- Always answer in different languages based on the user's query language to make them feel comfortable and valued.
+
 - Use a premium, welcoming, and reassuring tone.
 - Be concise and respectful.
 - Make patients feel valued and cared for.
@@ -109,7 +108,7 @@ I'd be delighted to help you schedule an appointment. Please provide:
 ------------------------------------------------
 
 
-You help users book, reschedule
+You help users book, reschedule, FAQs related to ZEVA clinic and Patients Information.
 
 Rules:
 
@@ -264,6 +263,8 @@ Never guess, assume, or fabricate appointment details.
 If the user provides information across multiple messages, use the previously collected information.
 
 Call this tool only when every required field is available and confirmed."""
+
+
     payload = {
         "patient_name": patient_name,
         "doctor_name": doctor_name,
@@ -339,6 +340,14 @@ async def get_faq():
     clinicToken = clinic_token_var.get()
     return await get_info(clinicToken=clinicToken)
 
+@tool
+async def get_patient_info():
+    """
+    This tool fetches all the details about Patients.
+    Use this tool when user wants information related to patients.
+    """
+    clinicToken = clinic_token_var.get()
+    return await get_patients(clinicToken=clinicToken)
 
 tools=[book_appointment, reschedule_appointment,get_appointment_details_tool, get_faq]
 agent=llm.bind_tools(tools)

@@ -16,6 +16,7 @@ import {
   WORKFLOW_TRIGGER_TYPE,
 } from "../../../bullmq/workflow";
 import Campaign from "../../../models/Campaign";
+import { scheduleAIReply } from "../whatsapp/aiAutoReply";
 
 // Utility: normalize phone number by removing leading + and non-digit chars
 const getWithoutPlusNumber = (num) => {
@@ -23,6 +24,14 @@ const getWithoutPlusNumber = (num) => {
   const s = String(num).trim();
   // remove leading '+' then strip any non-digit characters
   return s.replace(/^\+/, "").replace(/\D/g, "");
+};
+
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: "10mb",
+    },
+  },
 };
 
 export default async function handler(req, res) {
@@ -58,6 +67,8 @@ export default async function handler(req, res) {
 }
 
 const processWhatsAppWebhook = async (req) => {
+  console.log("WEBHOOK HIT", JSON.stringify(req.body)); // ADD THIS
+
   // ensure mongoose connection is established before using models
   try {
     await dbConnect();
@@ -119,7 +130,9 @@ const processWhatsAppWebhook = async (req) => {
 
           // Emit status update to user via socket
           const userId = message?.senderId?.toString();
-          await emitMessageStatusUpdateToUser(userId, message);
+          if (userId) {
+            await emitMessageStatusUpdateToUser(userId, message);
+          }
         }
         if (message.campaignId) {
           const campaign = await Campaign.findById(message.campaignId);
@@ -565,6 +578,25 @@ const processWhatsAppWebhook = async (req) => {
           // updateConsentHelpOfContact(teamId, newMessage?._id);
 
           // Note: Execute workflow for the incoming message
+          const messageTextContent =
+            message.text?.body ||
+            caption ||
+            message?.button?.text ||
+            (locationMetadata
+              ? `📍 ${locationMetadata.name || locationMetadata.address || "Location"}`
+              : "");
+          console.log("CALLING SCHEDULE AI REPLY", {
+            conversationId: conversation._id.toString(),
+            messageContent: messageTextContent,
+          });
+          scheduleAIReply({
+            conversationId: conversation._id.toString(),
+            messageContent: messageTextContent,
+            clinicToken: provider.clinicId.toString(),
+            providerPhone: whatsappPhoneId,
+            customerPhone: from,
+          });
+
           executeWorkflows({
             entity: WORKFLOW_ENTITY_TYPE.MESSAGE,
             trigger: WORKFLOW_TRIGGER_TYPE.INCOMING_MESSAGE,

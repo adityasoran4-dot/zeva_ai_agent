@@ -1,4 +1,3 @@
-# faq.py
 import httpx
 import asyncio
 from cache import get_cache, set_cache
@@ -25,7 +24,8 @@ async def get_info(clinicToken: str) -> dict:
                     "http://localhost:3000/api/clinics/myallClinic",
                     headers=headers,
                     timeout=10.0
-                )
+                ),    
+                
             )
         except Exception as e:
             return {"Status": "Error", "Message": f"Failed to fetch clinic data: {e}"}
