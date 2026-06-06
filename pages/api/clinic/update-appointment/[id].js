@@ -10,7 +10,9 @@ export default async function handler(req, res) {
   await dbConnect();
 
   if (req.method !== "PUT") {
-    return res.status(405).json({ success: false, message: "Method not allowed" });
+    return res
+      .status(405)
+      .json({ success: false, message: "Method not allowed" });
   }
 
   try {
@@ -19,8 +21,17 @@ export default async function handler(req, res) {
     if (!clinicUser) {
       return res.status(401).json({ success: false, message: "Unauthorized" });
     }
-    if (!["clinic", "admin", "agent", "doctor", "doctorStaff", "staff"].includes(clinicUser.role)) {
-      return res.status(403).json({ success: false, message: "Access denied. Clinic role required." });
+    if (
+      !["clinic", "admin", "agent", "doctor", "doctorStaff", "staff"].includes(
+        clinicUser.role,
+      )
+    ) {
+      return res
+        .status(403)
+        .json({
+          success: false,
+          message: "Access denied. Clinic role required.",
+        });
     }
 
     let { clinicId, error, isAdmin } = await getClinicIdFromUser(clinicUser);
@@ -30,26 +41,37 @@ export default async function handler(req, res) {
 
     // Ensure clinicId is set correctly
     if (!clinicId && clinicUser.role === "clinic") {
-      const clinic = await Clinic.findOne({ owner: clinicUser._id }).select("_id");
+      const clinic = await Clinic.findOne({ owner: clinicUser._id }).select(
+        "_id",
+      );
       if (!clinic) {
-        return res.status(404).json({ success: false, message: "Clinic not found" });
+        return res
+          .status(404)
+          .json({ success: false, message: "Clinic not found" });
       }
       clinicId = clinic._id;
     }
 
     if (!clinicId) {
-      return res.status(404).json({ success: false, message: "Clinic not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Clinic not found" });
     }
 
     // ✅ Check permission for updating appointments (only for agent, doctorStaff roles)
     // Clinic, doctor, and staff roles have full access by default, admin bypasses
-    if (!isAdmin && clinicId && ["agent", "doctorStaff"].includes(clinicUser.role)) {
-      const { checkAgentPermission } = await import("../../agent/permissions-helper");
+    if (
+      !isAdmin &&
+      clinicId &&
+      ["agent", "doctorStaff"].includes(clinicUser.role)
+    ) {
+      const { checkAgentPermission } =
+        await import("../../agent/permissions-helper");
 
       // Support both legacy and new module keys for appointments
       const moduleKeysToTry = [
         "clinic_ScheduledAppointment", // new key used on frontend
-        "clinic_Appointment",          // legacy key
+        "clinic_Appointment", // legacy key
         "ScheduledAppointment",
         "Appointment",
       ];
@@ -61,7 +83,7 @@ export default async function handler(req, res) {
         const result = await checkAgentPermission(
           clinicUser._id,
           moduleKey,
-          "update"
+          "update",
         );
 
         if (result.hasPermission) {
@@ -73,7 +95,10 @@ export default async function handler(req, res) {
         lastError = result.error;
 
         // If module not found, continue trying other keys (backward compatibility)
-        if (result.error && result.error.includes("not found in agent permissions")) {
+        if (
+          result.error &&
+          result.error.includes("not found in agent permissions")
+        ) {
           continue;
         }
       }
@@ -81,7 +106,8 @@ export default async function handler(req, res) {
       if (!hasPermission) {
         return res.status(403).json({
           success: false,
-          message: lastError || "You do not have permission to update appointments",
+          message:
+            lastError || "You do not have permission to update appointments",
         });
       }
     }
@@ -89,17 +115,26 @@ export default async function handler(req, res) {
 
     // Validate appointment ID
     if (!appointmentId || !appointmentId.match(/^[0-9a-fA-F]{24}$/)) {
-      return res.status(400).json({ success: false, message: "Invalid appointment ID" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid appointment ID" });
     }
 
     // Find the appointment and verify it belongs to this clinic
     const appointment = await Appointment.findById(appointmentId);
     if (!appointment) {
-      return res.status(404).json({ success: false, message: "Appointment not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Appointment not found" });
     }
 
     if (appointment.clinicId.toString() !== clinicId.toString()) {
-      return res.status(403).json({ success: false, message: "Access denied. Appointment does not belong to your clinic." });
+      return res
+        .status(403)
+        .json({
+          success: false,
+          message: "Access denied. Appointment does not belong to your clinic.",
+        });
     }
 
     // Get update data from request body
@@ -135,11 +170,11 @@ export default async function handler(req, res) {
       missingFields.push("doctorId");
       missingFieldLabels.push("Doctor");
     }
-    if (!roomId) {
-      errors.roomId = "Room is required";
-      missingFields.push("roomId");
-      missingFieldLabels.push("Room");
-    }
+    // if (!roomId) {
+    //   errors.roomId = "Room is required";
+    //   missingFields.push("roomId");
+    //   missingFieldLabels.push("Room");
+    // }
     if (!status) {
       errors.status = "Status is required";
       missingFields.push("status");
@@ -178,26 +213,52 @@ export default async function handler(req, res) {
 
     // Validate doctor belongs to clinic
     const doctor = await User.findById(doctorId);
-    if (!doctor || doctor.role !== "doctorStaff" || doctor.clinicId?.toString() !== clinicId.toString()) {
-      return res.status(400).json({ success: false, message: "Invalid doctor. Doctor must belong to your clinic." });
+    if (
+      !doctor ||
+      doctor.role !== "doctorStaff" ||
+      doctor.clinicId?.toString() !== clinicId.toString()
+    ) {
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: "Invalid doctor. Doctor must belong to your clinic.",
+        });
     }
 
     // Validate room belongs to clinic
-    const room = await Room.findById(roomId);
-    if (!room || room.clinicId?.toString() !== clinicId.toString()) {
-      return res.status(400).json({ success: false, message: "Invalid room. Room must belong to your clinic." });
-    }
+    // const room = await Room.findById(roomId);
+    // if (!room || room.clinicId?.toString() !== clinicId.toString()) {
+    //   return res.status(400).json({ success: false, message: "Invalid room. Room must belong to your clinic." });
+    // }
 
     // Validate status enum
-    const validStatuses = ["booked", "enquiry", "Discharge", "Arrived", "Consultation", "Cancelled", "Approved", "Rescheduled", "Waiting", "Rejected", "Completed", "invoice"];
+    const validStatuses = [
+      "booked",
+      "enquiry",
+      "Discharge",
+      "Arrived",
+      "Consultation",
+      "Cancelled",
+      "Approved",
+      "Rescheduled",
+      "Waiting",
+      "Rejected",
+      "Completed",
+      "invoice",
+    ];
     if (!validStatuses.includes(status)) {
-      return res.status(400).json({ success: false, message: "Invalid status" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid status" });
     }
 
     // Validate followType enum
     const validFollowTypes = ["first time", "follow up", "repeat"];
     if (!validFollowTypes.includes(followType)) {
-      return res.status(400).json({ success: false, message: "Invalid follow type" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid follow type" });
     }
 
     // Validate referral enum
@@ -208,14 +269,16 @@ export default async function handler(req, res) {
 
     // Validate emergency enum
     if (emergency && !["yes", "no"].includes(emergency)) {
-      return res.status(400).json({ success: false, message: "Invalid emergency value" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid emergency value" });
     }
 
     // Update appointment
     const updateData = {
       patientId,
       doctorId,
-      roomId,
+      roomId: roomId && roomId.trim() !== "" ? roomId : undefined,
       status,
       followType,
       startDate: new Date(startDate),
@@ -226,7 +289,11 @@ export default async function handler(req, res) {
       notes: notes || "",
       treatment: treatment || "",
       serviceId: serviceId || null,
-      serviceIds: Array.isArray(serviceIds) ? serviceIds : (serviceId ? [serviceId] : []),
+      serviceIds: Array.isArray(serviceIds)
+        ? serviceIds
+        : serviceId
+          ? [serviceId]
+          : [],
     };
 
     // If status is "Arrived", set arrivedAt timestamp
@@ -237,7 +304,7 @@ export default async function handler(req, res) {
     const updatedAppointment = await Appointment.findByIdAndUpdate(
       appointmentId,
       { $set: updateData },
-      { new: true, runValidators: true }
+      { new: true, runValidators: true },
     )
       .populate("patientId", "firstName lastName mobileNumber email emrNumber")
       .populate("doctorId", "name email")
@@ -259,4 +326,3 @@ export default async function handler(req, res) {
     });
   }
 }
-

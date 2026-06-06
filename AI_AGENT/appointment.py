@@ -4,7 +4,6 @@ from langchain_openai import ChatOpenAI
 from dotenv import load_dotenv
 from langgraph.graph import END, START, StateGraph
 from datetime import datetime, timedelta
-from reference_id import appointment_id_to_ref
 
 load_dotenv()
 
@@ -12,18 +11,14 @@ class AppointmentState(TypedDict):
     clinicToken: str
     patient_name: str
     doctor_name: str
-    room_name: str
     treatment_name: str
-    rooms: list
     doctors: list
     treatments: list
     patients: list
     patientExists: bool
     doctorExists: bool
-    roomExists: bool
     treatmentExists: bool
     timeConfirmed: bool
-    selectedRoomId: str
     selectedDoctorId: str
     selectedTreatment: str
     patientId: str
@@ -34,6 +29,8 @@ class AppointmentState(TypedDict):
     fromTime: str
     toTime: str
     errorMessage: str
+    Message: str  
+
 
 def get_header(token):                        
     return {"Authorization": f"Bearer {token}"}
@@ -94,36 +91,36 @@ async def check_doctor(state: AppointmentState):
     }
 
 
-async def check_room(state: AppointmentState):
-    header = get_header(state['clinicToken'])
-    url = "http://localhost:3000/api/clinic/rooms"
+# async def check_room(state: AppointmentState):
+#     header = get_header(state['clinicToken'])
+#     url = "http://localhost:3000/api/clinic/rooms"
 
-    async with httpx.AsyncClient() as client:                   
-        search_room = await client.get(url, headers=header)
-    data = search_room.json()
+#     async with httpx.AsyncClient() as client:                   
+#         search_room = await client.get(url, headers=header)
+#     data = search_room.json()
 
-    room_name = state["room_name"].strip().lower()
+#     room_name = state["room_name"].strip().lower()
 
-    if data["success"] == True:
-        room = next(
-            (
-                r for r in data["rooms"]
-                if r.get("name", "").strip().lower() == room_name
-            ),
-            None,
-        )
-        if room:
-            return {
-                "roomExists": True,
-                "rooms": data,
-                "selectedRoomId": room["_id"],
-            }
+#     if data["success"] == True:
+#         room = next(
+#             (
+#                 r for r in data["rooms"]
+#                 if r.get("name", "").strip().lower() == room_name
+#             ),
+#             None,
+#         )
+#         if room:
+#             return {
+#                 "roomExists": True,
+#                 "rooms": data,
+#                 "selectedRoomId": room["_id"],
+#             }
 
-    return {
-        "roomExists": False,
-        "rooms": data,
-        "selectedRoomId": "",
-    }
+#     return {
+#         "roomExists": False,
+#         "rooms": data,
+#         "selectedRoomId": "",
+#     }
 
 
 async def check_treatments(state: AppointmentState):
@@ -162,13 +159,30 @@ def confirm_time(state: AppointmentState):
     start_time_str = state["fromTime"]
     date_str = state["startDate"]
 
+    converted_date = None
+    formats_to_try = ["%d-%m-%Y", "%Y-%m-%d", "%Y-%m-%dT%H:%M:%S.%fZ"]
+
+    for fmt in formats_to_try:
+        try:
+            converted_date = datetime.strptime(date_str, fmt).strftime("%Y-%m-%dT00:00:00.000Z")
+            break
+        except ValueError:
+            continue
+
+    if not converted_date:
+        # Last resort — return error instead of storing wrong date
+        return {
+            "Status": "Error",
+            "errorMessage": f"Could not parse date: {date_str}"
+        }
+
     start_time = datetime.strptime(start_time_str, "%H:%M")
     end_time = start_time + timedelta(minutes=20)
     to_time_str = end_time.strftime("%H:%M")
 
     return {
         "timeConfirmed": True,
-        "startDate": date_str,
+        "startDate": converted_date,
         "fromTime": start_time_str,
         "toTime": to_time_str
     }
@@ -181,8 +195,6 @@ def handle_error(state: AppointmentState):
         return {"Status": "Error", "errorMessage": f"Patient '{state['patient_name']}' was not found. Please check the name or register the patient first."}
     elif not state["doctorExists"]:
         return {"Status": "Error", "errorMessage": f"Doctor '{state['doctor_name']}' was not found. Please check the name or contact support."}
-    elif not state["roomExists"]:
-        return {"Status": "Error", "errorMessage": f"Room '{state['room_name']}' was not found. Please check the room name or contact support."}
     elif not state["treatmentExists"]:
         return {"Status": "Error", "errorMessage": f"Treatment '{state['treatment_name']}' is not available. Please check the name or contact support."}
 
@@ -193,7 +205,6 @@ async def book_appointment(state: AppointmentState):
     payload = {
         "patientId": state["patientId"],
         "doctorId": state["selectedDoctorId"],
-        "roomId": state["selectedRoomId"],
         "serviceId": state["selectedTreatment"],
         "serviceName": state["treatment_name"],
         "status": "booked",
@@ -206,14 +217,12 @@ async def book_appointment(state: AppointmentState):
     async with httpx.AsyncClient() as client:                   
         response = await client.post(url, json=payload, headers=header)
     data = response.json()
+    print(data)
 
     if data["success"] == True:
-        appointment_db_id = data["appointment"]["_id"]
-        ref_id = appointment_id_to_ref(appointment_db_id)
         return {
             "Status": "Booked",
-            "referenceId": ref_id,
-            "appointmentId": appointment_db_id
+            "Message":"Appointment Booked Successfully"
         }
     else:
         return {"Status": "Error", "Message": data.get("message", "An error occurred while booking the appointment.")}
@@ -223,11 +232,11 @@ async def book_appointment(state: AppointmentState):
 def after_check_patient(state: AppointmentState) -> Literal["check_doctor", "handle_error"]:
     return "check_doctor" if state["patientExists"] else "handle_error"
 
-def after_check_doctor(state: AppointmentState) -> Literal["check_room", "handle_error"]:
-    return "check_room" if state["doctorExists"] else "handle_error"
+def after_check_doctor(state: AppointmentState) -> Literal["check_treatments", "handle_error"]:
+    return "check_treatments" if state["doctorExists"] else "handle_error"
 
-def after_check_room(state: AppointmentState) -> Literal["check_treatments", "handle_error"]:
-    return "check_treatments" if state["roomExists"] else "handle_error"
+# def after_check_room(state: AppointmentState) -> Literal["check_treatments", "handle_error"]:
+#     return "check_treatments" if state["roomExists"] else "handle_error"
 
 def after_check_treatments(state: AppointmentState) -> Literal["confirm_time", "handle_error"]:
     return "confirm_time" if state["treatmentExists"] else "handle_error"
@@ -238,33 +247,32 @@ def buildGraph(clinicToken: str, payload: dict):
     initial_state = {
         "clinicToken": clinicToken,
         "patient_name": payload.get("patient_name", ""),
-        "selectedDoctorId": payload.get("doctorId", ""),
-        "selectedRoomId": payload.get("roomId", ""),
-        "selectedTreatment": payload.get("treatment_name", ""),
-        "followType": payload.get("followType", ""),
+        "doctor_name": payload.get("doctor_name", ""),
+        "treatment_name": payload.get("treatment_name", ""),
         "startDate": payload.get("startDate", ""),
         "fromTime": payload.get("fromTime", ""),
-        "toTime": payload.get("toTime", ""),
-        "doctor_name": payload.get("doctor_name", ""),
-        "room_name": payload.get("room_name", ""),
-        "treatment_name": payload.get("treatment_name", ""),
-        "rooms": [],
+        "toTime": "",
+        "selectedDoctorId": "",
+        "selectedTreatment": "",
         "doctors": [],
         "treatments": [],
         "patients": [],
         "patientExists": False,
         "doctorExists": False,
-        "roomExists": False,
         "treatmentExists": False,
         "timeConfirmed": False,
         "patientId": "",
+        "Status": "",
+        "errorMessage": "",
+        "Message": "",
+        "referenceId": "",
+        "appointmentId": "",
     }
 
     graph = StateGraph(AppointmentState)
 
     graph.add_node("check_patient", check_patient)
     graph.add_node("check_doctor", check_doctor)
-    graph.add_node("check_room", check_room)
     graph.add_node("check_treatments", check_treatments)
     graph.add_node("confirm_time", confirm_time)
     graph.add_node("handle_error", handle_error)
@@ -273,7 +281,7 @@ def buildGraph(clinicToken: str, payload: dict):
     graph.add_edge(START, "check_patient")
     graph.add_conditional_edges("check_patient", after_check_patient)
     graph.add_conditional_edges("check_doctor", after_check_doctor)
-    graph.add_conditional_edges("check_room", after_check_room)
+    # graph.add_conditional_edges("check_room", after_check_room)
     graph.add_conditional_edges("check_treatments", after_check_treatments)
     graph.add_edge("confirm_time", "book_appointment")
     graph.add_edge("handle_error", END)

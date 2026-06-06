@@ -31,7 +31,7 @@ export default async function handler(req, res) {
     console.error("JWT_SECRET is not configured");
     return res.status(500).json({
       success: false,
-      message: "Server configuration error: JWT_SECRET not configured"
+      message: "Server configuration error: JWT_SECRET not configured",
     });
   }
 
@@ -45,23 +45,33 @@ export default async function handler(req, res) {
     if (clinicUser.role === "clinic") {
       const clinic = await Clinic.findOne({ owner: clinicUser._id }).lean();
       if (!clinic) {
-        return res.status(404).json({ success: false, message: "Clinic not found" });
+        return res
+          .status(404)
+          .json({ success: false, message: "Clinic not found" });
       }
       clinicId = clinic._id;
-    } else if (["agent", "doctor", "doctorStaff", "staff"].includes(clinicUser.role)) {
+    } else if (
+      ["agent", "doctor", "doctorStaff", "staff"].includes(clinicUser.role)
+    ) {
       clinicId = clinicUser.clinicId;
       if (!clinicId) {
-        return res.status(403).json({ success: false, message: "Access denied. User not linked to a clinic." });
+        return res.status(403).json({
+          success: false,
+          message: "Access denied. User not linked to a clinic.",
+        });
       }
     } else {
-      return res.status(403).json({ success: false, message: "Access denied. Clinic role required." });
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. Clinic role required.",
+      });
     }
-    
+
     // Validate that clinicId exists
     if (!clinicId) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Invalid clinic ID" 
+      return res.status(400).json({
+        success: false,
+        message: "Invalid clinic ID",
       });
     }
 
@@ -69,20 +79,28 @@ export default async function handler(req, res) {
     // Clinic, doctor, and staff roles have full access by default, admin bypasses
     if (clinicId && ["agent", "doctorStaff"].includes(clinicUser.role)) {
       try {
-        const { checkAgentPermission } = await import("../agent/permissions-helper");
+        const { checkAgentPermission } =
+          await import("../agent/permissions-helper");
         const result = await checkAgentPermission(
           clinicUser._id,
           "clinic_ScheduledAppointment",
-          "read"
+          "read",
         );
 
         // If module not found in permissions, allow by default (legacy behavior)
-        if (!result.hasPermission && result.error && result.error.includes("not found in agent permissions")) {
-          console.log(`[all-appointments] Module clinic_ScheduledAppointment not found in permissions for user ${clinicUser._id}, allowing access by default`);
+        if (
+          !result.hasPermission &&
+          result.error &&
+          result.error.includes("not found in agent permissions")
+        ) {
+          console.log(
+            `[all-appointments] Module clinic_ScheduledAppointment not found in permissions for user ${clinicUser._id}, allowing access by default`,
+          );
         } else if (!result.hasPermission) {
           return res.status(403).json({
             success: false,
-            message: result.error || "You do not have permission to view appointments"
+            message:
+              result.error || "You do not have permission to view appointments",
           });
         }
       } catch (permissionError) {
@@ -108,6 +126,7 @@ export default async function handler(req, res) {
         followType,
         referral,
         emergency,
+        patientId,
         createdBy,
         page = 1,
         limit = 50,
@@ -115,7 +134,7 @@ export default async function handler(req, res) {
 
       // Build query
       let query = { clinicId };
-      
+
       // If user is doctorStaff, only show their appointments
       if (clinicUser.role === "doctorStaff") {
         query.doctorId = clinicUser._id;
@@ -129,14 +148,18 @@ export default async function handler(req, res) {
         query.startDate = {};
         if (start) {
           if (isNaN(start.getTime())) {
-            return res.status(400).json({ success: false, message: "Invalid fromDate parameter" });
+            return res
+              .status(400)
+              .json({ success: false, message: "Invalid fromDate parameter" });
           }
           start.setHours(0, 0, 0, 0);
           query.startDate.$gte = start;
         }
         if (end) {
           if (isNaN(end.getTime())) {
-            return res.status(400).json({ success: false, message: "Invalid toDate parameter" });
+            return res
+              .status(400)
+              .json({ success: false, message: "Invalid toDate parameter" });
           }
           end.setHours(23, 59, 59, 999);
           query.startDate.$lte = end;
@@ -166,6 +189,9 @@ export default async function handler(req, res) {
       if (status) {
         query.status = status;
       }
+      if (patientId) {
+        query.patientId = patientId;
+      }
 
       // Follow type filter
       if (followType) {
@@ -186,66 +212,80 @@ export default async function handler(req, res) {
       let patientQuery = {};
       let matchingAppointmentIds = [];
       let matchingPatientIds = [];
-      
+
       if (search) {
         // Check if search is a 4-character hex string (for visitId or patientId search)
         const isHexSearch = search.length <= 4 && /^[0-9a-fA-F]+$/.test(search);
-        
+
         if (isHexSearch) {
           // Search by visitId (last 4 digits of appointment _id)
           try {
-            const allAppointments = await Appointment.find({ clinicId }).select("_id").lean();
+            const allAppointments = await Appointment.find({ clinicId })
+              .select("_id")
+              .lean();
             matchingAppointmentIds = allAppointments
-              .filter((apt) => apt._id.toString().slice(-4).toLowerCase() === search.toLowerCase())
+              .filter(
+                (apt) =>
+                  apt._id.toString().slice(-4).toLowerCase() ===
+                  search.toLowerCase(),
+              )
               .map((apt) => apt._id);
           } catch (err) {
             console.error("Error fetching appointments for hex search:", err);
             matchingAppointmentIds = [];
           }
-          
+
           // Search by patientId (last 4 digits) - only for current clinic patients
           try {
-            const allPatients = await PatientRegistration.find({ clinicId }).select("_id").lean();
+            const allPatients = await PatientRegistration.find({ clinicId })
+              .select("_id")
+              .lean();
             matchingPatientIds = allPatients
-              .filter((p) => p._id.toString().slice(-4).toLowerCase() === search.toLowerCase())
+              .filter(
+                (p) =>
+                  p._id.toString().slice(-4).toLowerCase() ===
+                  search.toLowerCase(),
+              )
               .map((p) => p._id);
           } catch (err) {
             console.error("Error fetching patients for hex search:", err);
             matchingPatientIds = [];
           }
         }
-        
+
         // Always search in patient fields (name, mobile)
         patientQuery.$or = [
           { firstName: { $regex: search, $options: "i" } },
           { lastName: { $regex: search, $options: "i" } },
           { mobileNumber: { $regex: search, $options: "i" } },
         ];
-        
+
         // If we found patient IDs from hex search, add them to patient query
         if (matchingPatientIds.length > 0) {
           patientQuery.$or.push({ _id: { $in: matchingPatientIds } });
         }
       }
-      
+
       if (emrNumber) {
         patientQuery.emrNumber = { $regex: emrNumber, $options: "i" };
       }
 
       // Build the final query
       const queryConditions = [];
-      
+
       // If we have appointment ID matches (visitId search), add them
       if (matchingAppointmentIds.length > 0) {
         queryConditions.push({ _id: { $in: matchingAppointmentIds } });
       }
-      
+
       // If we have patient search conditions, find matching patient IDs
       if (Object.keys(patientQuery).length > 0) {
         try {
-          const patients = await PatientRegistration.find(patientQuery).select("_id").lean();
+          const patients = await PatientRegistration.find(patientQuery)
+            .select("_id")
+            .lean();
           const patientIds = patients.map((p) => p._id);
-          
+
           if (patientIds.length > 0) {
             queryConditions.push({ patientId: { $in: patientIds } });
           } else if (matchingAppointmentIds.length === 0) {
@@ -267,7 +307,7 @@ export default async function handler(req, res) {
           });
         }
       }
-      
+
       // Combine conditions with $or if we have multiple, otherwise use the single condition
       if (queryConditions.length > 1) {
         query.$or = queryConditions;
@@ -280,11 +320,13 @@ export default async function handler(req, res) {
       const limitNum = parseInt(limit);
       const skip = (pageNum - 1) * limitNum;
 
-      let total, appointments, totalRevenue = 0;
+      let total,
+        appointments,
+        totalRevenue = 0;
       try {
         // Get total count for pagination (use the final query)
         total = await Appointment.countDocuments(query);
-      
+
         // Compute total revenue for the same filtered appointments
         try {
           const revenueAgg = await Appointment.aggregate([
@@ -315,13 +357,14 @@ export default async function handler(req, res) {
         } catch (revErr) {
           totalRevenue = 0;
         }
-      
+
         // Fetch appointments with pagination
         appointments = await Appointment.find(query)
           .populate({
             path: "patientId",
             model: "PatientRegistration",
-            select: "firstName lastName mobileNumber email emrNumber invoiceNumber gender invoicedDate",
+            select:
+              "firstName lastName mobileNumber email emrNumber invoiceNumber gender invoicedDate",
           })
           .populate({
             path: "doctorId",
@@ -355,7 +398,7 @@ export default async function handler(req, res) {
           error: err.message,
         });
       }
-            
+
       // Format appointments for frontend
       const formatted = appointments.map((apt, index) => {
         const patient = apt.patientId || {};
@@ -373,7 +416,8 @@ export default async function handler(req, res) {
               year: "numeric",
             })
           : "-";
-        const registeredTime = apt.fromTime && apt.toTime ? `${apt.fromTime} - ${apt.toTime}` : "-";
+        const registeredTime =
+          apt.fromTime && apt.toTime ? `${apt.fromTime} - ${apt.toTime}` : "-";
 
         // For invoiced date/time, use patient's invoicedDate if available
         const invoicedDate = patient.invoicedDate
@@ -395,7 +439,9 @@ export default async function handler(req, res) {
           _id: apt._id.toString(),
           visitId,
           patientId: patient._id?.toString() || "",
-          patientName: `${patient.firstName || ""} ${patient.lastName || ""}`.trim() || "Unknown",
+          patientName:
+            `${patient.firstName || ""} ${patient.lastName || ""}`.trim() ||
+            "Unknown",
           patientNumber: patient.mobileNumber || "",
           patientEmail: patient.email || "",
           emrNumber: patient.emrNumber || "",
@@ -408,11 +454,20 @@ export default async function handler(req, res) {
           roomName: room.name || "-",
           serviceId: apt.serviceId?._id?.toString() || "",
           serviceName: apt.serviceId?.name || "",
-          serviceIds: Array.isArray(apt.serviceIds) ? apt.serviceIds.map(s => s?._id?.toString()).filter(Boolean) : [],
+          serviceIds: Array.isArray(apt.serviceIds)
+            ? apt.serviceIds.map((s) => s?._id?.toString()).filter(Boolean)
+            : [],
           serviceNames: (() => {
-            const fromServiceIds = Array.isArray(apt.serviceIds) ? apt.serviceIds.map(s => s?.name || "").filter(Boolean) : [];
+            const fromServiceIds = Array.isArray(apt.serviceIds)
+              ? apt.serviceIds.map((s) => s?.name || "").filter(Boolean)
+              : [];
             const fromServiceId = apt.serviceId?.name || "";
-            const combined = fromServiceId ? [fromServiceId, ...fromServiceIds.filter(n => n !== fromServiceId)] : fromServiceIds;
+            const combined = fromServiceId
+              ? [
+                  fromServiceId,
+                  ...fromServiceIds.filter((n) => n !== fromServiceId),
+                ]
+              : fromServiceIds;
             return combined;
           })(),
           status: apt.status,
@@ -438,13 +493,15 @@ export default async function handler(req, res) {
         appointments: formatted,
         total,
         page: pageNum,
-            totalPages: Math.ceil(total / limitNum),
-            totalRevenue,
+        totalPages: Math.ceil(total / limitNum),
+        totalRevenue,
       });
     }
 
     res.setHeader("Allow", ["GET"]);
-    return res.status(405).json({ success: false, message: "Method not allowed" });
+    return res
+      .status(405)
+      .json({ success: false, message: "Method not allowed" });
   } catch (error) {
     console.error("Error in all-appointments API:", error);
     return res.status(500).json({

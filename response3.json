@@ -1,0 +1,259 @@
+{
+    "success": true,
+    "data": {
+        "doctors": [
+            {
+                "_id": "6a031ff3772d919dbd270009",
+                "name": "A2 Doc",
+                "email": "A2Doc@gmail.com",
+                "role": "doctorStaff",
+                "gender": null,
+                "dateOfBirth": null,
+                "age": null,
+                "phone": ""
+            },
+            {
+                "_id": "6a04405b772d919dbd52288e",
+                "name": "A3 Doc",
+                "email": "A3Doc@gmail.com",
+                "role": "doctorStaff",
+                "gender": null,
+                "dateOfBirth": null,
+                "age": null,
+                "phone": ""
+            },
+            {
+                "_id": "6a1b0b798666566e89d7a4d4",
+                "name": "Aparna",
+                "email": "Aparna1@gmail.com",
+                "role": "doctorStaff",
+                "gender": null,
+                "dateOfBirth": null,
+                "age": null
+            },
+            {
+                "_id": "691ea8fc93a5402fa4dd4d74",
+                "name": "Disha",
+                "phone": "7865435675",
+                "email": "disha@gmail.com",
+                "role": "doctorStaff"
+            },
+            {
+                "_id": "6983427a1d7304311f0044a8",
+                "name": "Dr Santosh Saroj ",
+                "email": "santosh12@gmail.com",
+                "role": "doctorStaff",
+                "gender": null,
+                "dateOfBirth": null,
+                "age": null,
+                "phone": ""
+            },
+            {
+                "_id": "69a540199141387aabb562fb",
+                "name": "Hansika",
+                "phone": "7666545476",
+                "email": "hansika@gmail.com",
+                "role": "doctorStaff",
+                "gender": null,
+                "dateOfBirth": null,
+                "age": null
+            },
+            {
+                "_id": "6a1b0ac78666566e89d6ba02",
+                "name": "Hirbod",
+                "email": "Hirbod@gmail.com",
+                "role": "doctorStaff",
+                "gender": null,
+                "dateOfBirth": null,
+                "age": null
+            },
+            {
+                "_id": "6a1b099d8666566e89d5b426",
+                "name": "Ifada",
+                "email": "Ifada@gmail.com",
+                "role": "doctorStaff",
+                "gender": null,
+                "dateOfBirth": null,
+                "age": null
+            },
+            {
+                "_id": "699430760bfb1971e55ae517",
+                "name": "Jeena",
+                "email": "Jeena@gmail.com",
+                "role": "doctorStaff",
+                "gender": null,
+                "dateOfBirth": null,
+                "age": null,
+                "phone": ""
+            },
+            {
+                "_id": "69ac0cf8f1856d8c47acb06e",
+                "name": "MIMI",
+                "email": "MIMI@gmail.com",
+                "role": "doctorStaff",
+                "gender": null,
+                "dateOfBirth": null,
+                "age": null,
+                "phone": ""
+            },
+            {
+                "_id": "69a540039141387aabb54acf",
+                "name": "Mahi",
+                "phone": "8766655657",
+                "email": "mahi@gmail.com",
+                "role": "doctorStaff",
+                "gender": null,
+                "dateOfBirth": null,
+                "age": null
+            },
+            {
+                "_id": "69afba7f9638f28a24bc1485",
+                "name": "Mayank",
+                "phone": "5678865556",
+                "email": "mayank@gmail.com",
+                "role": "doctorStaff",
+                "gender": null,
+                "dateOfBirth": null,
+                "age": null
+            },
+            {
+                "_id": "697db7417aa0083955ba33c2",
+                "name": "Mrinal",
+                "phone": "1234567890",
+                "email": "mrinal@gmail.com",
+                "role": "doctorStaff",
+                "gender": null,
+                "dateOfBirth": null,
+                "age": null
+            },
+            {
+                "_id": "6a1b0bcc8666566e89d7c372",
+                "name": "Noddaine",
+                "email": "Noddaine@gmail.com",
+                "role": "doctorStaff",
+                "gender": null,
+                "dateOfBirth": null,
+                "age": null
+            },
+            {
+                "_id": "692579767059025ec037eeb6",
+                "name": "Pranit",
+                "phone": "7865436787",
+                "email": "pranit@gmail.com",
+                "role": "doctorStaff",
+                "gender": null,
+                "dateOfBirth": null,
+                "age": null
+            },
+            {
+                "_id": "69cb54497da2e15f95ade7eb",
+                "name": "Preet",
+                "email": "Preet@gmail.com",
+                "role": "doctorStaff",
+                "gender": null,
+                "dateOfBirth": null,
+                "age": null,
+                "phone": ""
+            },
+            {
+                "_id": "69269f7496275482d82e5e7b",
+                "name": "Rahul Kumar",
+                "phone": "8318253673",
+                "email": "rahul@gmail.com",
+                "role": "doctorStaff",
+                "gender": null,
+                "dateOfBirth": null,
+                "age": null
+            },
+            {
+                "_id": "69a828fd3549b7384a2ecbb7",
+                "name": "Red Doc",
+                "email": "RedDoc@gmail.com",
+                "role": "doctorStaff",
+                "gender": null,
+                "dateOfBirth": null,
+                "age": null,
+                "phone": ""
+            },
+            {
+                "_id": "6a1b0aa58666566e89d67b7b",
+                "name": "Sahar",
+                "email": "Sahar@gmail.com",
+                "role": "doctorStaff",
+                "gender": null,
+                "dateOfBirth": null,
+                "age": null
+            },
+            {
+                "_id": "694f81824beeeb4df4edc894",
+                "name": "Sarraf",
+                "phone": "0904893887",
+                "email": "sarraf@gmail.com",
+                "role": "doctorStaff",
+                "gender": null,
+                "dateOfBirth": null,
+                "age": null
+            },
+            {
+                "_id": "6926ef285df51b9f76340489",
+                "name": "Sarthak Dwivedi",
+                "phone": "7389298373",
+                "email": "sd@gmail.com",
+                "role": "doctorStaff",
+                "gender": null,
+                "dateOfBirth": null,
+                "age": null
+            },
+            {
+                "_id": "6a1b0a688666566e89d61856",
+                "name": "Shamna",
+                "email": "Shamna@gmail.com",
+                "role": "doctorStaff",
+                "gender": null,
+                "dateOfBirth": null,
+                "age": null
+            },
+            {
+                "_id": "6a1b0c118666566e89d7f76a",
+                "name": "Shruti",
+                "email": "Shruti@gmail.com",
+                "role": "doctorStaff",
+                "gender": null,
+                "dateOfBirth": null,
+                "age": null
+            },
+            {
+                "_id": "6a1b0ba08666566e89d7a85a",
+                "name": "Sonita",
+                "email": "Sonita@gmail.com",
+                "role": "doctorStaff",
+                "gender": null,
+                "dateOfBirth": null,
+                "age": null
+            },
+            {
+                "_id": "691195d436d71f9f6e2ef6b8",
+                "name": "doct",
+                "phone": "7654325678",
+                "email": "yfdx@gmail.com",
+                "role": "doctorStaff"
+            },
+            {
+                "_id": "698039a51cf5fcd89de20802",
+                "name": "muskan",
+                "phone": "8765465767",
+                "email": "mus@gmail.com",
+                "role": "doctorStaff",
+                "gender": null,
+                "dateOfBirth": null,
+                "age": null
+            }
+        ],
+        "pagination": {
+            "currentPage": 1,
+            "totalPages": 1,
+            "totalDoctors": 26,
+            "hasMore": false
+        }
+    }
+}

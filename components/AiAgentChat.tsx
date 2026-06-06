@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from "react";
-import { X, Send, Bot, Loader2, User } from "lucide-react";
+import { X, Send, Bot, User } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface Message {
   role: "user" | "assistant";
@@ -11,9 +12,14 @@ interface Message {
 interface AiAgentChatProps {
   isOpen: boolean;
   onClose: () => void;
+  conversationId: string | null;
 }
 
-const AiAgentChat: React.FC<AiAgentChatProps> = ({ isOpen, onClose }) => {
+const AiAgentChat: React.FC<AiAgentChatProps> = ({
+  isOpen,
+  onClose,
+  conversationId,
+}) => {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
@@ -45,7 +51,12 @@ const AiAgentChat: React.FC<AiAgentChatProps> = ({ isOpen, onClose }) => {
       const response = await fetch("http://localhost:8000/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: trimmed, threadId, clinicToken }),
+        body: JSON.stringify({
+          messages: trimmed,
+          threadId,
+          clinicToken,
+          conversation_id: conversationId ?? "",
+        }),
       });
 
       const data = await response.json();
@@ -101,11 +112,15 @@ const AiAgentChat: React.FC<AiAgentChatProps> = ({ isOpen, onClose }) => {
         {messages.map((msg, i) => (
           <div
             key={i}
-            className={`flex items-start gap-2 ${msg.role === "user" ? "flex-row-reverse" : "flex-row"}`}
+            className={`flex items-start gap-2 ${
+              msg.role === "user" ? "flex-row-reverse" : "flex-row"
+            }`}
           >
             {/* Avatar */}
             <div
-              className={`p-1.5 rounded-full flex-shrink-0 mt-1 ${msg.role === "user" ? "bg-gray-800" : "bg-blue-100"}`}
+              className={`p-1.5 rounded-full flex-shrink-0 mt-1 ${
+                msg.role === "user" ? "bg-gray-800" : "bg-blue-100"
+              }`}
             >
               {msg.role === "user" ? (
                 <User className="h-3 w-3 text-white" />
@@ -124,8 +139,9 @@ const AiAgentChat: React.FC<AiAgentChatProps> = ({ isOpen, onClose }) => {
             >
               {msg.role === "assistant" ? (
                 <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
                   components={{
-                    // Headings
+                    // ── Headings ──────────────────────────────────────
                     h1: ({ children }) => (
                       <h1 className="text-base font-bold mb-1">{children}</h1>
                     ),
@@ -136,19 +152,19 @@ const AiAgentChat: React.FC<AiAgentChatProps> = ({ isOpen, onClose }) => {
                       <h3 className="text-sm font-semibold mb-1">{children}</h3>
                     ),
 
-                    // Paragraph
+                    // ── Paragraph ─────────────────────────────────────
                     p: ({ children }) => (
                       <p className="mb-1 last:mb-0">{children}</p>
                     ),
 
-                    // Bold
+                    // ── Bold ──────────────────────────────────────────
                     strong: ({ children }) => (
                       <span className="font-semibold text-gray-900">
                         {children}
                       </span>
                     ),
 
-                    // Lists
+                    // ── Lists ─────────────────────────────────────────
                     ul: ({ children }) => (
                       <ul className="list-disc list-inside space-y-0.5 mb-1">
                         {children}
@@ -163,15 +179,60 @@ const AiAgentChat: React.FC<AiAgentChatProps> = ({ isOpen, onClose }) => {
                       <li className="text-sm">{children}</li>
                     ),
 
-                    // Divider
+                    // ── Divider ───────────────────────────────────────
                     hr: () => <hr className="my-2 border-gray-200" />,
 
-                    // Code
+                    // ── Inline code ───────────────────────────────────
                     code: ({ children }) => (
                       <code className="bg-gray-100 text-gray-800 text-xs px-1 py-0.5 rounded">
                         {children}
                       </code>
                     ),
+
+                    // Hide the "Field | Details" header row
+                    thead: () => null,
+
+                    tbody: ({ children }) => <tbody>{children}</tbody>,
+
+                    tr: ({ children }) => (
+                      <tr style={{ borderBottom: "1px solid #f3f4f6" }}>
+                        {children}
+                      </tr>
+                    ),
+
+                    td: ({ children, node }) => {
+                      // ✅ Reliable column detection: find index among sibling <td>s
+                      const parent = (node as any)?.parent;
+                      const siblings =
+                        parent?.children?.filter(
+                          (c: any) => c.tagName === "td",
+                        ) ?? [];
+                      const idx = siblings.indexOf(node);
+                      const isLabel = idx === 0;
+
+                      // Hide the Status row entirely from the table body
+                      // (status is shown in the header pill instead)
+                      const rawText = (node as any)?.children?.[0]?.value ?? "";
+                      if (isLabel && rawText.toLowerCase().includes("status")) {
+                        return <></>;
+                      }
+
+                      return (
+                        <td
+                          style={{
+                            padding: "9px 14px",
+                            width: isLabel ? "38%" : "62%",
+                            fontSize: isLabel ? "11px" : "13px",
+                            color: isLabel ? "#6b7280" : "#111827",
+                            fontWeight: isLabel ? 400 : 600,
+                            textTransform: isLabel ? "uppercase" : "none",
+                            letterSpacing: isLabel ? "0.4px" : "0",
+                          }}
+                        >
+                          {children}
+                        </td>
+                      );
+                    },
                   }}
                 >
                   {msg.content}
@@ -183,7 +244,7 @@ const AiAgentChat: React.FC<AiAgentChatProps> = ({ isOpen, onClose }) => {
           </div>
         ))}
 
-        {/* Loading */}
+        {/* Loading indicator */}
         {isLoading && (
           <div className="flex items-start gap-2">
             <div className="p-1.5 rounded-full bg-blue-100 mt-1">

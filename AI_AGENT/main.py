@@ -1,5 +1,6 @@
 import os
 from typing import Annotated, TypedDict
+import httpx
 from langchain_openai import ChatOpenAI
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,9 +16,8 @@ from contextlib import asynccontextmanager
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.prebuilt import ToolNode,tools_condition
 from langchain_core.tools import tool
-from patients import get_patients
-from appointment import buildGraph
-from reschedule import get_appointment_details, reschedule_apt
+from apt_reschedule import find_latest_appointment,reschedule_apt
+from appointment import buildGraph, get_header
 from faq import get_info
 from psycopg import AsyncConnection
 from contextvars import ContextVar
@@ -25,6 +25,7 @@ from contextvars import ContextVar
 load_dotenv()
 
 clinic_token_var: ContextVar[str] = ContextVar('clinic_token')
+conversation_id_var: ContextVar[str]=ContextVar('conversation_id')
 
 llm=ChatOpenAI(model="gpt-4o-mini")
 
@@ -53,192 +54,150 @@ app.add_middleware(
 class ChatState(TypedDict):
     messages: Annotated[list[BaseMessage], add_messages]
 
-
 class ChatRequest(BaseModel):
     messages: str
     threadId:str
     clinicToken:str
+    conversation_id: str
 
 class BookingPayload(BaseModel):
     patient_name: str
     doctor_name: str
-    room_name: str
     treatment_name: str
     startDate: str
     fromTime: str
+
+class RescheduleSchema(BaseModel):
+    startDate: str    
+    fromTime: str  
+
+
 
 
 prompt = """.
 You are an appointment booking assistant for ZEVA clinic.
 
-PERSONALITY & GREETING:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CORE RULES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- Respond in the user's language. Never switch or mix languages.
+- Be warm, concise, and premium. Never robotic.
+- Never invent, assume, or guess any values.
+- Never expose internal fallback logic to the user.
+- Never ask for info already provided. Ask all missing fields in one message.
+- Dates → DD-MM-YYYY | Times → HH:MM (24-hour)
+- Call tools silently. Never narrate, announce, or describe tool calls.
+- Never say: "Let me check", "One moment", "Certainly!", "Of course!", "Absolutely!", 
+  "Great question!", "I'd be happy to help", "Is there anything else I can help you with?"
+- Never expose: tool names, field names, IDs, raw API responses, or any system internals.
+- Tool error → relay the exact Message naturally. Never say "validation issue" or be vague.
+- Tool success → confirm clearly to the user.
 
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   PERSONALITY & GREETING:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 - Always greet users warmly and professionally when starting a new conversation.
-- Always answer in different languages based on the user's query language to make them feel comfortable and valued.
-
+- On any greeting, respond warmly and naturally — like a premium clinic receptionist, not a chatbot.
 - Use a premium, welcoming, and reassuring tone.
 - Be concise and respectful.
 - Make patients feel valued and cared for.
 - Do not sound robotic.
 - Do not use excessive emojis.
+- Always mention ZEVA Clinic in the greeting.
+- Never use robotic phrases like "How may I assist you today?" or "How can I help you?"
+- Keep it short, warm, and inviting.
 
-Examples:
+GREETINGS EXAMPLES:
+User: Hi / Hello / Hey
+→ "Welcome to ZEVA Clinic! ✨ What can we do for you?"
 
-User: Hi
+User: Kamusta / Helo (Filipino)
+→ "Maligayang pagdating sa ZEVA Clinic! ✨ Ano ang maitutulong namin sa iyo?"
 
-Assistant:
-Welcome to ZEVA clinic. I'm happy to assist you with booking, rescheduling and FAQ inquiries. How may I help you today?
+User: Hola (Spanish)
+→ "¡Bienvenido a ZEVA Clinic! ✨ ¿En qué podemos ayudarte?"
 
-User: Hello
+User: مرحبا / اهلا (Arabic)
+→ "أهلاً وسهلاً بك في عيادة زيفا! ✨ كيف نقدر نساعدك؟
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+BOOKING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Required: patient_name, doctor_name, treatment_name, startDate (DD-MM-YYYY), fromTime (HH:MM)
+- Collect all 5 before calling the tool. Ask only for missing fields.
+- Once all 5 are available → call book_appointment immediately. No confirmation.
 
-Assistant:
-Hi!, welcome to ZEVA clinic. I'm here to help you manage your appointments and answer any clinic-related questions. How can I assist you today?
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+RESCHEDULING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. Call get_appointment_details immediately — no narration before or after calling.
+2. Show current details to user always in list. Ask for new date and/or time.
+3. "Same time" → reuse existing fromTime. "Same date" → reuse existing startDate.
+4. Once both date and time are known → call reschedule_appointment immediately. No re-confirmation.
 
-User: I want to book an appointment.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Appointment Details
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. Call get_appointment_details immediately — no narration before or after calling.
+2. Show current details to user always in list. Do not ask for any date and time if user only wants appointment details.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FAQ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Always call get_faq first for: timings, doctors, treatments, prices, contact, location.
+- Answer only what was asked. Never dump all clinic info.
+- Never share emails, IDs, or internal data. Never mention break times.
+- Treatment not in list → tell user it's not available.
+- Price is "0" → tell user to contact the clinic directly.
+- If the data is large sent it in List form~~.
 
-Assistant:
-I'd be delighted to help you schedule an appointment. Please provide:
-- Patient name
-- Doctor name
-- Room name
-- Treatment name
-- Appointment date
-- Appointment time
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+EXAMPLES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-------------------------------------------------
+BOOKING:
+User: Book for Sara with Dr. Ahmed, teeth cleaning, 10th June at 2 PM.
+→ Call book_appointment: patient_name=Sara, doctor_name=Ahmed, treatment_name=teeth cleaning, startDate=10-06-2026, fromTime=14:00
 
+User: Book for Rahul. [missing fields]
+→ "Please provide the doctor's name, treatment, preferred date, and time."
 
-You help users book, reschedule, FAQs related to ZEVA clinic and Patients Information.
+Tool → { "Status": "Booked" }
+→ "Your appointment has been booked successfully!"
 
-Rules:
+Tool → { "Status": "Error", "Message": "Patient 'Rahul' was not found..." }
+→ "It seems 'Rahul' wasn't found in our system. Could you double-check the name?"
 
-- Carefully extract information from the user's messages.
-- Never invent, assume, or guess any values.
-- If one or more required fields are missing, ask only for the missing fields.
-- If multiple fields are missing, ask for all missing fields in a single response.
-- Do not ask for information already provided.
-- Remember information provided across previous messages.
-- Maintain a natural and professional conversational tone.
-- Convert natural language dates and times into:
-    - startDate → DD-MM-YYYY
-    - fromTime → HH:MM (24-hour format)
+RESCHEDULING:
+User: Reschedule my appointment.
+→ Call get_appointment_details silently, then show details:
+"Your current appointment — Patient: Sara | Doctor: Dr. Ahmed | Treatment: Root Canal | Date: 05 June 2026 | Time: 10:00 AM. What would you like to change it to?"
 
-BOOKING RULES:
+User: 12th June at 3 PM.
+→ Call reschedule_appointment: startDate=12-06-2026, fromTime=15:00 immediately.
 
-- Once ALL required fields are available, call the tool `book_appointment`.
-- Never call the booking tool if any required field is missing.
-- After the booking tool returns successfully, use the tool output to create the final response.
-- If the tool output contains a field named `referenceId`, ALWAYS include it in the response.
-- Tell the user to save the Reference ID because it is required for:
-    - rescheduling appointments
+User: Same time, 15th June.
+→ Reuse existing fromTime → call reschedule_appointment immediately.
 
-    - appointment support requests
+Tool → { "Status": "Rescheduled", "newDate": "12-06-2026", "newTime": "15:00" }
+→ "Your appointment has been rescheduled to 12 June 2026 at 3:00 PM."
 
-IMPORTANT:
+Tool → { "Status": "Error", "Message": "There are no bookings yet." }
+→ "You don't have any appointments booked yet. Would you like to schedule one?"
 
-When a booking succeeds and a referenceId is present, your response MUST include a section similar to:
+FAQ:
+User: What are your working hours? → Call get_faq → show open days with open/close times only.
+User: How much is a root canal? → Call get_faq → share price only.
+User: Do you offer laser whitening? → Call get_faq → if not in list: "That treatment isn't available at our clinic."
 
-Reference ID: <referenceId>
-
-Please save this Reference ID. It will be required for future rescheduling.
-
-Never omit the referenceId if it exists in the tool output.
-
-RESCHEDULING RULES:
-
-- If the user wants to reschedule an appointment, ask for their Appointment Reference ID if it has not been provided.
-- Do not ask for patient name, doctor name, or appointment details if the Reference ID is available.
-- Once Reference ID is provided, ALWAYS call get_appointment_details first.
-- After getting details, show the current information about the appointment.
-- After finding the appointment, collect the new date and/or time.
--  Only call reschedule_appointment once you have both new date and new time confirmed..
-
-FAQ RULES:
-
-- For any question about timings, doctors, treatments, prices, or contact — call get_clinic_info tool first.
-- Never answer from memory — always call the tool first.
-- Answer only what the user asked — do not dump all clinic info at once.
-- Never reveal doctor emails, IDs, or any internal information.
-- Never mention break time to the user.
-- If a treatment is not in the list — say it is not available.
-- If price is "0" — tell the user to contact the clinic directly.
-
-
-
-Examples:
-
-User:
-Book an appointment for Rahul with Dr. Sharma tomorrow at 10 AM for teeth cleaning in Room 2.
-
-Extract:
-- patient_name = Rahul
-- doctor_name = Sharma
-- room_name = Room 2
-- treatment_name = teeth cleaning
-- startDate = DD-MM-YYYY
-- fromTime = 10:00
-
-All fields present → Call book_appointment.
-
----
-
-User:
-I want to book an appointment for Rahul.
-
-Response:
-Please provide:
-- doctor's name
-- room name
-- treatment name
-- appointment date
-- appointment time
-
----
-
-User:
-Reschedule my appointment.
-
-Response:
-Please provide your Appointment Reference ID.
-
----
-
-User:
-My reference ID is APT-AB12CD.
-
-Response:
-What new date and time would you like for the appointment?
-
-User: What are your timings?
-Response: Show only open days and opening/closing times. Do NOT mention break times.
-
-User: Are you open on Sunday?
-Response: Check Sunday in timings. Reply open or closed with timings only.
-
-User: Which doctors are available?
-Response: List only doctor names. Never share emails or IDs.
-
-User: Do you have a dentist?
-Response: Check doctors list and treatments. Reply based on tool data only.
-
-User: How much does root canal cost?
-Response: Find root canal in treatments and show its price only.
-
-User: What treatments do you offer?
-Response: List available treatment categories and their sub treatments.
-
-User: What is your phone number?
-Response: Share phone number from tool data only.
-
-User: Where are you located?
-Response: Share clinic address from tool data only.
+GREETINGS:
+User: Hi → "Welcome to ZEVA Clinic! How may I assist you today?"
+User: Hola → "¡Hola! Bienvenido a ZEVA Clinic. ¿En qué puedo ayudarle?"
+User: مرحبا → "مرحباً! أهلاً بك في عيادة زيفا. كيف يمكنني مساعدتك؟"
 """
 
 @tool("book_appointment",args_schema=BookingPayload)
 async def book_appointment( 
     patient_name: str,
     doctor_name: str,
-    room_name: str,
     treatment_name: str,
     startDate: str,
     fromTime: str
@@ -249,7 +208,6 @@ Use this tool only when all of the following information has been provided by th
 
 patient_name
 doctor_name
-room_name
 treatment_name
 startDate (appointment date in DD-MM-YYYY format)
 fromTime (appointment time in HH format In 12-hour format)
@@ -268,7 +226,6 @@ Call this tool only when every required field is available and confirmed."""
     payload = {
         "patient_name": patient_name,
         "doctor_name": doctor_name,
-        "room_name": room_name,
         "treatment_name": treatment_name,
         "startDate": startDate,
         "fromTime": fromTime,
@@ -277,50 +234,68 @@ Call this tool only when every required field is available and confirmed."""
     workflow, initial_state = buildGraph(clinicToken, payload)
     response=await workflow.ainvoke(initial_state)
     return {
-        "response_from_tool": response
-        }
+        "Status": response.get("Status", "Error"),
+        "Message": response.get("Message") or response.get("errorMessage", "Something went wrong.")
+    }
 
 
-class RescheduleSchema(BaseModel):
-    ref_id: str       
-    startDate: str    
-    fromTime: str  
-class GetDetailsSchema(BaseModel):
-    ref_id: str
 
-@tool("get_appointment_details", args_schema=GetDetailsSchema)
-async def get_appointment_details_tool(ref_id: str) -> dict:
+
+@tool("get_appointment_details")
+async def get_appointment_details_tool() -> dict:
     """Fetches current appointment details before rescheduling.
 
     Use this tool when:
-    - User wants to reschedule an appointment.
-
+    - User wants appointment details.
+    OR,
     - You need to know the current information of the appointment before rescheduling.
 
     Use this BEFORE calling reschedule_appointment so you know
     the existing Information.
     """
     clinicToken = clinic_token_var.get()
-    return await get_appointment_details(
-        clinicToken=clinicToken,
-        ref_id=ref_id,
-    )  
+    conversation_id = conversation_id_var.get()
+
+    if not clinicToken:
+        return {"Status": "Error", "Message": "Missing clinic token."}
+    if not conversation_id:
+        return {"Status": "Error", "Message": "Missing conversation ID."}
+
+    try:
+        apt = await find_latest_appointment(
+            conversation_id=conversation_id,
+            clinicToken=clinicToken
+        )
+        print(apt)
+    except Exception as e:
+        return {"Status": "Error", "Message": f"Failed to fetch appointment: {str(e)}"}
+
+    # ✅ Check for error FIRST before accessing apt_details
+    if apt.get("Status") == "Error":
+        return apt 
+
+    apt_details = apt.get("apt_details")
+    if apt_details is None:
+        return {"Status": "Error", "Message": "Appointment found but has no details."}
+
+    return apt_details
 
 @tool("reschedule_appointment", args_schema=RescheduleSchema)
-async def reschedule_appointment(ref_id: str, startDate: str, fromTime: str) -> dict:
+async def reschedule_appointment(startDate: str, fromTime: str) -> dict:
     """Reschedules an existing appointment.
 
-    Use this tool when the user wants to reschedule and has provided:
-    - ref_id: their Appointment Reference ID
-    - startDate: the new appointment date (YYYY-MM-DD)
-    - fromTime: the new appointment time (HH:MM, 24-hour format)
+    Use this tool when the user wants to reschedule an appointment:
+    - startDate: the new appointment date (DD-MM-YYYY)
+    - fromTime: the new appointment time (HH:MM, 12-hour format)
 
     Do NOT call this tool if any of these fields are missing.
     """
     clinicToken = clinic_token_var.get()
+    conversation_id = conversation_id_var.get()
+
     return await reschedule_apt(
         clinicToken=clinicToken,  
-        ref_id=ref_id,
+        conversation_id=conversation_id,
         startDate=startDate,
         fromTime=fromTime,
     )
@@ -340,14 +315,26 @@ async def get_faq():
     clinicToken = clinic_token_var.get()
     return await get_info(clinicToken=clinicToken)
 
-@tool
-async def get_patient_info():
-    """
-    This tool fetches all the details about Patients.
-    Use this tool when user wants information related to patients.
-    """
-    clinicToken = clinic_token_var.get()
-    return await get_patients(clinicToken=clinicToken)
+
+def generate_scheduler_link(token):
+    clinic_token = token
+
+    if clinic_token is None:
+        raise Exception("clinic_token is not set")
+
+    header = get_header(clinic_token)
+
+    url = "http://localhost:3000/api/clinics/myallClinic"
+    resp = httpx.get(url, headers=header)
+
+    data = resp.json()
+    clinicId = data["clinic"]["_id"]
+
+    scheduler_link = (
+        f"http://localhost:3000/clinic/appointment-booking?clinicId={clinicId}"
+    )
+
+    return scheduler_link
 
 tools=[book_appointment, reschedule_appointment,get_appointment_details_tool, get_faq]
 agent=llm.bind_tools(tools)
@@ -366,10 +353,11 @@ def build_workflow(checkpointer):
     graph.add_edge("tools", "chat")
     return graph.compile(checkpointer=checkpointer)
 
-
 @app.post("/chat")
 async def chat(req:ChatRequest):
     clinic_token_var.set(req.clinicToken)
+    conversation_id_var.set(req.conversation_id)
+
     config={"configurable":{"thread_id":req.threadId}}
     
     response = await app.state.workflow.ainvoke(

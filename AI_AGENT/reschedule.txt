@@ -1,5 +1,6 @@
 # reschedule.py
 import httpx
+from AI_AGENT.apt_reschedule import find_latest_appointment
 from reference_id import ref_to_appointment_id
 from datetime import datetime, timedelta
 from cache import get_cache, set_cache, redis_client
@@ -43,10 +44,6 @@ async def find_appointment_by_id(apt_id: str, headers: dict) -> dict | None:
 
 async def get_appointment_details(clinicToken: str, ref_id: str) -> dict:
 
-    apt_id = ref_to_appointment_id(ref_id)
-    if not apt_id:
-        return {"Status": "Error", "Message": f"No appointment found for reference ID: {ref_id}"}
-
     # ── Check cache first ─────────────────────────────────────────────
     cache_key = f"appointment:{clinicToken}:{apt_id}"
     cached = await get_cache(cache_key)
@@ -54,7 +51,7 @@ async def get_appointment_details(clinicToken: str, ref_id: str) -> dict:
         return cached                      
 
     headers = {"Authorization": f"Bearer {clinicToken}"}
-    existing = await find_appointment_by_id(apt_id, headers)
+    apt = await find_latest_appointment(apt_id, headers)
 
     if not existing:
         return {"Status": "Error", "Message": f"Appointment not found for reference ID: {ref_id}"}

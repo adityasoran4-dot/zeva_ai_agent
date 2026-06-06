@@ -1344,18 +1344,19 @@ const InboxPage: NextPageWithLayout = () => {
                         )}
                       </>
                     )}
-                  <div className="relative">
-  <button
-    onClick={() => setIsAiChatOpen((prev) => !prev)}
-    className="bg-white text-gray-700 border border-gray-200 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed p-2.5 rounded-xl font-semibold flex items-center space-x-2 transition-all hover:shadow-md"
-  >
-    Talk to an AI Agent
-  </button>
-  <AiAgentChat
-    isOpen={isAiChatOpen}
-    onClose={() => setIsAiChatOpen(false)}
-  />
-</div>
+                    <div className="relative">
+                      <button
+                        onClick={() => setIsAiChatOpen((prev) => !prev)}
+                        className="bg-white text-gray-700 border border-gray-200 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed p-2.5 rounded-xl font-semibold flex items-center space-x-2 transition-all hover:shadow-md"
+                      >
+                        Talk to an AI Agent
+                      </button>
+                      <AiAgentChat
+                        isOpen={isAiChatOpen}
+                        onClose={() => setIsAiChatOpen(false)}
+                        conversationId={selectedConversation?._id ?? null} // 👈 add this
+                      />
+                    </div>
 
                     {/* <EmojiPickerModal
                     triggerButton={

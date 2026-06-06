@@ -1,1 +1,1 @@
-hhttp://localhost:3000/api/clinics/allClinics
+69f4438103dc05deebfd99b5
