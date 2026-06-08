@@ -1,0 +1,61 @@
+{
+    "success": true,
+    "timings": [
+        {
+            "day": "Monday",
+            "isOpen": true,
+            "openingTime": "08:00 AM",
+            "closingTime": "10:00 PM",
+            "breakStart": "12:05 PM",
+            "breakEnd": "01:05 PM"
+        },
+        {
+            "day": "Tuesday",
+            "isOpen": true,
+            "openingTime": "08:00 AM",
+            "closingTime": "08:00 PM",
+            "breakStart": "12:05 PM",
+            "breakEnd": "01:05 PM"
+        },
+        {
+            "day": "Wednesday",
+            "isOpen": true,
+            "openingTime": "09:00 AM",
+            "closingTime": "08:00 PM",
+            "breakStart": "12:05 PM",
+            "breakEnd": "01:05 PM"
+        },
+        {
+            "day": "Thursday",
+            "isOpen": true,
+            "openingTime": "09:00 AM",
+            "closingTime": "06:00 PM",
+            "breakStart": "12:05 PM",
+            "breakEnd": "01:05 PM"
+        },
+        {
+            "day": "Friday",
+            "isOpen": true,
+            "openingTime": "09:00 AM",
+            "closingTime": "08:00 PM",
+            "breakStart": "12:05 PM",
+            "breakEnd": "01:05 PM"
+        },
+        {
+            "day": "Saturday",
+            "isOpen": true,
+            "openingTime": "09:00 AM",
+            "closingTime": "08:00 PM",
+            "breakStart": "12:05 PM",
+            "breakEnd": "01:05 PM"
+        },
+        {
+            "day": "Sunday",
+            "isOpen": true,
+            "openingTime": "09:00 AM",
+            "closingTime": "08:00 PM",
+            "breakStart": "12:05 PM",
+            "breakEnd": "01:05 PM"
+        }
+    ]
+}

@@ -1,1 +1,1 @@
-response
+http://localhost:3000/api/clinic/services

@@ -1,6 +1,5 @@
 from typing import Literal, TypedDict
 import httpx                                    
-from langchain_openai import ChatOpenAI
 from dotenv import load_dotenv
 from langgraph.graph import END, START, StateGraph
 from datetime import datetime, timedelta
@@ -188,7 +187,6 @@ def confirm_time(state: AppointmentState):
     }
 
 
-llm = ChatOpenAI(model="gpt-4o-mini")         
 
 def handle_error(state: AppointmentState):     
     if not state["patientExists"]:

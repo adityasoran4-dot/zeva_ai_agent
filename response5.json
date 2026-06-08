@@ -1,0 +1,555 @@
+[
+    {
+        "_id": "6a031ff3772d919dbd270009",
+        "name": "A2 Doc",
+        "email": "A2Doc@gmail.com",
+        "role": "doctorStaff",
+        "clinicId": "68909b31faa98f63e97e3d1b",
+        "createdBy": "68909b30faa98f63e97e3d17",
+        "isApproved": true,
+        "phone": ""
+    },
+    {
+        "_id": "6a04405b772d919dbd52288e",
+        "name": "A3 Doc",
+        "email": "A3Doc@gmail.com",
+        "role": "doctorStaff",
+        "clinicId": "68909b31faa98f63e97e3d1b",
+        "createdBy": "68909b30faa98f63e97e3d17",
+        "isApproved": true,
+        "phone": ""
+    },
+    {
+        "_id": "697a062fb6e885da1e8ae620",
+        "name": "Aahana",
+        "phone": "9876543234",
+        "email": "aahana@gmail.com",
+        "role": "doctorStaff",
+        "clinicId": "6948da55884bb6c3978fc579",
+        "createdBy": "6949118f9b42a92a80f79a27",
+        "isApproved": true
+    },
+    {
+        "_id": "6a1b0b798666566e89d7a4d4",
+        "name": "Aparna",
+        "email": "Aparna1@gmail.com",
+        "role": "doctorStaff",
+        "clinicId": "68909b31faa98f63e97e3d1b",
+        "createdBy": "68909b30faa98f63e97e3d17",
+        "isApproved": true
+    },
+    {
+        "_id": "69492364aab8bbc6a38d6635",
+        "name": "Arohi",
+        "phone": "8976546786",
+        "email": "arohi@gmail.com",
+        "role": "doctorStaff",
+        "clinicId": "6948da55884bb6c3978fc579",
+        "createdBy": "6948da53884bb6c3978fc574",
+        "isApproved": true
+    },
+    {
+        "_id": "68e39b017b341cbfb1fd14a2",
+        "name": "Atul",
+        "email": "atul@gmail.com",
+        "role": "doctorStaff",
+        "isApproved": true
+    },
+    {
+        "_id": "691ea8fc93a5402fa4dd4d74",
+        "name": "Disha",
+        "phone": "7865435675",
+        "email": "disha@gmail.com",
+        "role": "doctorStaff",
+        "clinicId": "68909b31faa98f63e97e3d1b",
+        "createdBy": "68909b30faa98f63e97e3d17",
+        "isApproved": true
+    },
+    {
+        "_id": "6974d02a68694fa783663d10",
+        "name": "Dr Ifada",
+        "email": "Ifada@ramacarepolyclinic.com",
+        "role": "doctorStaff",
+        "clinicId": "695611e64beeeb4df4ef0699",
+        "createdBy": "6958f9b1c67b517683891810",
+        "isApproved": true
+    },
+    {
+        "_id": "6974d0a968694fa783663f52",
+        "name": "Dr Jeena",
+        "email": "Jeena@ramacarepolyclinic",
+        "role": "doctorStaff",
+        "clinicId": "695611e64beeeb4df4ef0699",
+        "createdBy": "6958f9b1c67b517683891810",
+        "isApproved": true
+    },
+    {
+        "_id": "6983427a1d7304311f0044a8",
+        "name": "Dr Santosh Saroj ",
+        "email": "santosh12@gmail.com",
+        "role": "doctorStaff",
+        "clinicId": "68909b31faa98f63e97e3d1b",
+        "createdBy": "68909b30faa98f63e97e3d17",
+        "isApproved": true,
+        "phone": ""
+    },
+    {
+        "_id": "69e383c7b5b3c3b8accde750",
+        "name": "Dr. Aparna ",
+        "email": "Aparna@gmail.com",
+        "role": "doctorStaff",
+        "clinicId": "695611e64beeeb4df4ef0699",
+        "createdBy": "695611e34beeeb4df4ef0692",
+        "isApproved": true,
+        "phone": ""
+    },
+    {
+        "_id": "6975f58368694fa783665f4e",
+        "name": "Dr. Sahar Zomorrodi",
+        "email": "ramacaremimi@gmail.com",
+        "role": "doctorStaff",
+        "clinicId": "695611e64beeeb4df4ef0699",
+        "createdBy": "6958f9b1c67b517683891810",
+        "isApproved": true
+    },
+    {
+        "_id": "6975f55568694fa783665f38",
+        "name": "Dr.Hirbod Gilandoust",
+        "phone": "0503567035",
+        "email": "Hirbod@ramacarepolyclinic.com",
+        "role": "doctorStaff",
+        "clinicId": "695611e64beeeb4df4ef0699",
+        "createdBy": "6958f9b1c67b517683891810",
+        "isApproved": true
+    },
+    {
+        "_id": "6975f57168694fa783665f43",
+        "name": "Dr.Shruti Jalan",
+        "email": "Shruti@ramacarepolyclinic.com",
+        "role": "doctorStaff",
+        "clinicId": "695611e64beeeb4df4ef0699",
+        "createdBy": "6958f9b1c67b517683891810",
+        "isApproved": true
+    },
+    {
+        "_id": "69a540199141387aabb562fb",
+        "name": "Hansika",
+        "phone": "7666545476",
+        "email": "hansika@gmail.com",
+        "role": "doctorStaff",
+        "clinicId": "68909b31faa98f63e97e3d1b",
+        "createdBy": "68909b30faa98f63e97e3d17",
+        "isApproved": true
+    },
+    {
+        "_id": "6a1b0ac78666566e89d6ba02",
+        "name": "Hirbod",
+        "email": "Hirbod@gmail.com",
+        "role": "doctorStaff",
+        "clinicId": "68909b31faa98f63e97e3d1b",
+        "createdBy": "68909b30faa98f63e97e3d17",
+        "isApproved": true
+    },
+    {
+        "_id": "6a1b099d8666566e89d5b426",
+        "name": "Ifada",
+        "email": "Ifada@gmail.com",
+        "role": "doctorStaff",
+        "clinicId": "68909b31faa98f63e97e3d1b",
+        "createdBy": "68909b30faa98f63e97e3d17",
+        "isApproved": true
+    },
+    {
+        "_id": "699430760bfb1971e55ae517",
+        "name": "Jeena",
+        "email": "Jeena@gmail.com",
+        "role": "doctorStaff",
+        "clinicId": "68909b31faa98f63e97e3d1b",
+        "createdBy": "68909b30faa98f63e97e3d17",
+        "isApproved": true,
+        "phone": ""
+    },
+    {
+        "_id": "69ac0cf8f1856d8c47acb06e",
+        "name": "MIMI",
+        "email": "MIMI@gmail.com",
+        "role": "doctorStaff",
+        "clinicId": "68909b31faa98f63e97e3d1b",
+        "createdBy": "68909b30faa98f63e97e3d17",
+        "isApproved": true,
+        "phone": ""
+    },
+    {
+        "_id": "69a540039141387aabb54acf",
+        "name": "Mahi",
+        "phone": "8766655657",
+        "email": "mahi@gmail.com",
+        "role": "doctorStaff",
+        "clinicId": "68909b31faa98f63e97e3d1b",
+        "createdBy": "68909b30faa98f63e97e3d17",
+        "isApproved": true
+    },
+    {
+        "_id": "69a3d1ad91ede6d11c0cb043",
+        "name": "Mariya",
+        "phone": "0582781208",
+        "email": "mariya@ramacarepolyclinic.com",
+        "role": "doctorStaff",
+        "clinicId": "695611e64beeeb4df4ef0699",
+        "createdBy": "6970a5a855dcdb08f9e362dc",
+        "isApproved": true
+    },
+    {
+        "_id": "69afba7f9638f28a24bc1485",
+        "name": "Mayank",
+        "phone": "5678865556",
+        "email": "mayank@gmail.com",
+        "role": "doctorStaff",
+        "clinicId": "68909b31faa98f63e97e3d1b",
+        "createdBy": "68909b30faa98f63e97e3d17",
+        "isApproved": true
+    },
+    {
+        "_id": "6999a4756c1646ee9c4cb250",
+        "name": "Monika",
+        "phone": "9876578956",
+        "email": "m.diglip12@gmail.com",
+        "role": "doctorStaff",
+        "clinicId": "696641b3157d96fab999183d",
+        "createdBy": "696641b1157d96fab9991836",
+        "isApproved": true
+    },
+    {
+        "_id": "697db7417aa0083955ba33c2",
+        "name": "Mrinal",
+        "phone": "1234567890",
+        "email": "mrinal@gmail.com",
+        "role": "doctorStaff",
+        "clinicId": "68909b31faa98f63e97e3d1b",
+        "createdBy": "68909b30faa98f63e97e3d17",
+        "isApproved": true
+    },
+    {
+        "_id": "6975f60268694fa783665f6a",
+        "name": "Nodainne",
+        "email": "Nodainne@ramacarepolyclinic.com",
+        "role": "doctorStaff",
+        "clinicId": "695611e64beeeb4df4ef0699",
+        "createdBy": "6958f9b1c67b517683891810",
+        "isApproved": true
+    },
+    {
+        "_id": "6a1b0bcc8666566e89d7c372",
+        "name": "Noddaine",
+        "email": "Noddaine@gmail.com",
+        "role": "doctorStaff",
+        "clinicId": "68909b31faa98f63e97e3d1b",
+        "createdBy": "68909b30faa98f63e97e3d17",
+        "isApproved": true
+    },
+    {
+        "_id": "692579767059025ec037eeb6",
+        "name": "Pranit",
+        "phone": "7865436787",
+        "email": "pranit@gmail.com",
+        "role": "doctorStaff",
+        "clinicId": "68909b31faa98f63e97e3d1b",
+        "createdBy": "68909b30faa98f63e97e3d17",
+        "isApproved": true
+    },
+    {
+        "_id": "69cb54497da2e15f95ade7eb",
+        "name": "Preet",
+        "email": "Preet@gmail.com",
+        "role": "doctorStaff",
+        "clinicId": "68909b31faa98f63e97e3d1b",
+        "createdBy": "68909b30faa98f63e97e3d17",
+        "isApproved": true,
+        "phone": ""
+    },
+    {
+        "_id": "69269f7496275482d82e5e7b",
+        "name": "Rahul Kumar",
+        "phone": "8318253673",
+        "email": "rahul@gmail.com",
+        "role": "doctorStaff",
+        "clinicId": "68909b31faa98f63e97e3d1b",
+        "createdBy": "68909b30faa98f63e97e3d17",
+        "isApproved": true
+    },
+    {
+        "_id": "69a828fd3549b7384a2ecbb7",
+        "name": "Red Doc",
+        "email": "RedDoc@gmail.com",
+        "role": "doctorStaff",
+        "clinicId": "68909b31faa98f63e97e3d1b",
+        "createdBy": "68909b30faa98f63e97e3d17",
+        "isApproved": true,
+        "phone": ""
+    },
+    {
+        "_id": "6975f61168694fa783665f75",
+        "name": "Rekha",
+        "email": "Rekha@ramacarepolyclinic.com",
+        "role": "doctorStaff",
+        "clinicId": "695611e64beeeb4df4ef0699",
+        "createdBy": "6958f9b1c67b517683891810",
+        "isApproved": true
+    },
+    {
+        "_id": "6a1b0aa58666566e89d67b7b",
+        "name": "Sahar",
+        "email": "Sahar@gmail.com",
+        "role": "doctorStaff",
+        "clinicId": "68909b31faa98f63e97e3d1b",
+        "createdBy": "68909b30faa98f63e97e3d17",
+        "isApproved": true
+    },
+    {
+        "_id": "694f81824beeeb4df4edc894",
+        "name": "Sarraf",
+        "phone": "0904893887",
+        "email": "sarraf@gmail.com",
+        "role": "doctorStaff",
+        "clinicId": "68909b31faa98f63e97e3d1b",
+        "createdBy": "68909b30faa98f63e97e3d17",
+        "isApproved": true
+    },
+    {
+        "_id": "68e37d0a7b341cbfb1fd146e",
+        "name": "Sarthak Dwivedi",
+        "email": "44dwivedi@gmail.com",
+        "role": "doctorStaff",
+        "isApproved": true
+    },
+    {
+        "_id": "6926ef285df51b9f76340489",
+        "name": "Sarthak Dwivedi",
+        "phone": "7389298373",
+        "email": "sd@gmail.com",
+        "role": "doctorStaff",
+        "clinicId": "68909b31faa98f63e97e3d1b",
+        "createdBy": "68909b30faa98f63e97e3d17",
+        "isApproved": true
+    },
+    {
+        "_id": "6a1b0a688666566e89d61856",
+        "name": "Shamna",
+        "email": "Shamna@gmail.com",
+        "role": "doctorStaff",
+        "clinicId": "68909b31faa98f63e97e3d1b",
+        "createdBy": "68909b30faa98f63e97e3d17",
+        "isApproved": true
+    },
+    {
+        "_id": "68f78de2caa696c405c69e5e",
+        "name": "Shamna",
+        "email": "shamna@gmail.com",
+        "role": "doctorStaff",
+        "isApproved": true
+    },
+    {
+        "_id": "6970b9bb55dcdb08f9e37206",
+        "name": "Shamna ",
+        "email": "shamna@ramacarepolyclinic.com",
+        "role": "doctorStaff",
+        "clinicId": "695611e64beeeb4df4ef0699",
+        "createdBy": "695611e34beeeb4df4ef0692",
+        "isApproved": true
+    },
+    {
+        "_id": "6a1b0c118666566e89d7f76a",
+        "name": "Shruti",
+        "email": "Shruti@gmail.com",
+        "role": "doctorStaff",
+        "clinicId": "68909b31faa98f63e97e3d1b",
+        "createdBy": "68909b30faa98f63e97e3d17",
+        "isApproved": true
+    },
+    {
+        "_id": "6975f5f168694fa783665f5f",
+        "name": "Sonita",
+        "email": "Sonita@ramacarepolyclinic.com",
+        "role": "doctorStaff",
+        "clinicId": "695611e64beeeb4df4ef0699",
+        "createdBy": "6958f9b1c67b517683891810",
+        "isApproved": true
+    },
+    {
+        "_id": "6a1b0ba08666566e89d7a85a",
+        "name": "Sonita",
+        "email": "Sonita@gmail.com",
+        "role": "doctorStaff",
+        "clinicId": "68909b31faa98f63e97e3d1b",
+        "createdBy": "68909b30faa98f63e97e3d17",
+        "isApproved": true
+    },
+    {
+        "_id": "69b40bffd3bdf4d6d7869db8",
+        "name": "Soumya",
+        "email": "Soumya@gmail.com",
+        "role": "doctorStaff",
+        "clinicId": "695611e64beeeb4df4ef0699",
+        "createdBy": "695611e34beeeb4df4ef0692",
+        "isApproved": true
+    },
+    {
+        "_id": "6975f62268694fa783665f80",
+        "name": "Syam",
+        "email": "Syam@ramacarepolyclinic.com",
+        "role": "doctorStaff",
+        "clinicId": "695611e64beeeb4df4ef0699",
+        "createdBy": "6958f9b1c67b517683891810",
+        "isApproved": true
+    },
+    {
+        "_id": "69462d86616350e1ea4ca4ae",
+        "name": "Tina",
+        "phone": "9876578328",
+        "email": "Tina@gmail.com",
+        "role": "doctorStaff",
+        "clinicId": "69429a92dcdd2252bd9a5f85",
+        "createdBy": "69429a8adcdd2252bd9a5f7f",
+        "isApproved": true
+    },
+    {
+        "_id": "69b7c901be5e17083df173e2",
+        "name": "Varsha Ayur",
+        "email": "Varsha@gmail.com",
+        "role": "doctorStaff",
+        "clinicId": "695611e64beeeb4df4ef0699",
+        "createdBy": "695611e34beeeb4df4ef0692",
+        "isApproved": false,
+        "phone": ""
+    },
+    {
+        "_id": "68e0c1596399d9979193fb42",
+        "name": "abc",
+        "email": "abc@gmail.com",
+        "role": "doctorStaff",
+        "isApproved": true
+    },
+    {
+        "_id": "691db0ce255457b1fea72996",
+        "name": "atul",
+        "phone": "9876543234",
+        "email": "atul@gmail.cm",
+        "role": "doctorStaff",
+        "createdBy": "6888b1f1fe3ac913e15f16db",
+        "isApproved": true
+    },
+    {
+        "_id": "6979f4f3b6e885da1e8a8d43",
+        "name": "cfvbn m",
+        "phone": "1234567890",
+        "email": "priya27@gmail.com",
+        "role": "doctorStaff",
+        "clinicId": "6979f433b6e885da1e8a8abc",
+        "createdBy": "6979f433b6e885da1e8a8aaf",
+        "isApproved": true
+    },
+    {
+        "_id": "6911856aeabe0761cc4277b9",
+        "name": "clinicDoctor",
+        "phone": "4567893456",
+        "email": "doctor@gmail.com",
+        "role": "doctorStaff",
+        "createdBy": "6888b1f1fe3ac913e15f16db",
+        "isApproved": true
+    },
+    {
+        "_id": "691195d436d71f9f6e2ef6b8",
+        "name": "doct",
+        "phone": "7654325678",
+        "email": "yfdx@gmail.com",
+        "role": "doctorStaff",
+        "clinicId": "68909b31faa98f63e97e3d1b",
+        "createdBy": "68909b30faa98f63e97e3d17",
+        "isApproved": true
+    },
+    {
+        "_id": "691db13c255457b1fea72aca",
+        "name": "dsfsdf",
+        "phone": "9876545674",
+        "email": "adsf@gmail.com",
+        "role": "doctorStaff",
+        "createdBy": "6888b1f1fe3ac913e15f16db",
+        "isApproved": true
+    },
+    {
+        "_id": "691187c9eabe0761cc4277f5",
+        "name": "dummy",
+        "phone": "7865453678",
+        "email": "dummy@gmail.com",
+        "role": "doctorStaff",
+        "createdBy": "6888b1f1fe3ac913e15f16db",
+        "isApproved": true
+    },
+    {
+        "_id": "694913229b42a92a80f79cc5",
+        "name": "kjh",
+        "phone": "098765498765",
+        "email": "pragyadiglip27@gmail.com",
+        "role": "doctorStaff",
+        "clinicId": "69429a92dcdd2252bd9a5f85",
+        "createdBy": "69429a8adcdd2252bd9a5f7f",
+        "isApproved": false
+    },
+    {
+        "_id": "69999e8eafa8d3cedebae26e",
+        "name": "monika rawat",
+        "phone": "8765455646",
+        "email": "diglip4@gmail.com",
+        "role": "doctorStaff",
+        "clinicId": "696631cd157d96fab9991612",
+        "createdBy": "696631cb157d96fab999160d",
+        "isApproved": true
+    },
+    {
+        "_id": "698039a51cf5fcd89de20802",
+        "name": "muskan",
+        "phone": "8765465767",
+        "email": "mus@gmail.com",
+        "role": "doctorStaff",
+        "clinicId": "68909b31faa98f63e97e3d1b",
+        "createdBy": "68909b30faa98f63e97e3d17",
+        "isApproved": true
+    },
+    {
+        "_id": "697a0702b6e885da1e8ae87a",
+        "name": "quen",
+        "phone": "0987654323",
+        "email": "aaha@gmail.com",
+        "role": "doctorStaff",
+        "clinicId": "6948da55884bb6c3978fc579",
+        "createdBy": "6949118f9b42a92a80f79a27",
+        "isApproved": true
+    },
+    {
+        "_id": "6911899deabe0761cc427815",
+        "name": "test5",
+        "phone": "7645678324",
+        "email": "test5@gmail.com",
+        "role": "doctorStaff",
+        "createdBy": "6888b1f1fe3ac913e15f16db",
+        "isApproved": true
+    },
+    {
+        "_id": "69118a0d36d71f9f6e2ef54c",
+        "name": "you",
+        "phone": "8765435672",
+        "email": "you@gmail.com",
+        "role": "doctorStaff",
+        "createdBy": "6888b1f1fe3ac913e15f16db",
+        "isApproved": true
+    },
+    {
+        "_id": "69186fa9769f68c4d5bc9db7",
+        "name": "yux",
+        "phone": "9876543276",
+        "email": "yux@gmail.com",
+        "role": "doctorStaff",
+        "createdBy": "6888b1f1fe3ac913e15f16db",
+        "isApproved": true
+    }
+]

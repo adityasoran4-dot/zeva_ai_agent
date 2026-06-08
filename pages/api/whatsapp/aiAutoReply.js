@@ -11,20 +11,19 @@ import dbConnect from "../../../lib/database";
 import { emitIncomingMessageToUser } from "../../../services/socket-emitter";
 
 const connection = new IORedis(process.env.REDIS_URL, {
-  maxRetriesPerRequest: null, // required by BullMQ
+  maxRetriesPerRequest: null,
 });
 connection.on("connect", () => console.log("[Redis] Connected successfully"));
 connection.on("error", (err) =>
   console.error("[Redis] Connection error:", err.message),
 );
-// ─── Queue (used by webhook to schedule jobs) ────────────────────────────────
+
+// ─── Queue ────────────────────────────────────────────────────────────────────
 const aiReplyQueue = new Queue("ai-reply", { connection });
 
-// ─── Worker (processes jobs — runs in the same Node process) ─────────────────
-// Guard so Next.js hot-reload doesn't spin up duplicate workers
+// ─── Worker ───────────────────────────────────────────────────────────────────
 if (!global._aiWorkerStarted) {
   global._aiWorkerStarted = true;
-
   new Worker(
     "ai-reply",
     async (job) => {
@@ -32,7 +31,6 @@ if (!global._aiWorkerStarted) {
     },
     { connection },
   );
-
   console.log("[AI] BullMQ worker started");
 }
 
@@ -40,11 +38,10 @@ if (!global._aiWorkerStarted) {
 export async function scheduleAIReply({
   conversationId,
   messageContent,
-  clinicToken,
+  clinicId, // ✅ clinicId (not clinicToken)
   providerPhone,
   customerPhone,
 }) {
-  // Remove any existing delayed job for this conversation (debounce)
   try {
     const job = await aiReplyQueue.getJob(`ai-${conversationId}`);
     if (job) await job.remove();
@@ -52,16 +49,10 @@ export async function scheduleAIReply({
 
   await aiReplyQueue.add(
     "reply",
-    {
-      conversationId,
-      messageContent,
-      clinicToken,
-      providerPhone,
-      customerPhone,
-    },
+    { conversationId, messageContent, clinicId, providerPhone, customerPhone },
     {
       delay: 5000,
-      jobId: `ai-${conversationId}`, // deterministic — easy to cancel
+      jobId: `ai-${conversationId}`,
       removeOnComplete: true,
       removeOnFail: 100,
     },
@@ -80,18 +71,37 @@ export async function cancelAIReply(conversationId) {
   } catch (_) {}
 }
 
-// ─── Core logic (called by the worker) ───────────────────────────────────────
+// ─── Core logic ───────────────────────────────────────────────────────────────
 async function triggerAIReply({
   conversationId,
   messageContent,
-  clinicToken,
+  clinicId, // ✅ clinicId comes in
   providerPhone,
   customerPhone,
 }) {
   console.log(`[AI] Taking over conversation ${conversationId}`);
+
   try {
     await dbConnect();
 
+    // ─── 1. Fetch real JWT token from Python backend ──────────────────────
+    const tokenRes = await fetch("http://localhost:8000/get-token", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Internal-Secret": process.env.INTERNAL_SECRET,
+      },
+      body: JSON.stringify({ clinicId }),
+    });
+
+    if (!tokenRes.ok) {
+      console.error(`[AI] Could not fetch token for clinic: ${clinicId}`);
+      return;
+    }
+
+    const { token: clinicToken } = await tokenRes.json(); // ✅ real JWT
+
+    // ─── 2. Fetch DB records ──────────────────────────────────────────────
     const conversation = await Conversation.findById(conversationId);
     if (!conversation) {
       console.error(`[AI] Conversation not found: ${conversationId}`);
@@ -110,14 +120,15 @@ async function triggerAIReply({
       return;
     }
 
-    // Call FastAPI AI agent
-    const chatRes = await fetch("http://localhost:8000/chat", {
+    // ─── 3. Call Python AI agent with real JWT ────────────────────────────
+    const chatRes = await fetch(`http://localhost:8000/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         messages: messageContent,
         threadId: conversationId,
-        clinicToken: clinicToken,
+        clinicToken: clinicToken, // ✅ real JWT token
+        conversation_id: conversationId,
       }),
     });
 
@@ -129,7 +140,7 @@ async function triggerAIReply({
     const { response: aiReply } = await chatRes.json();
     console.log(`[AI] Reply for ${conversationId}:`, aiReply);
 
-    // Save outgoing AI message
+    // ─── 4. Save outgoing AI message ──────────────────────────────────────
     const newMessage = new Message({
       clinicId: conversation.clinicId,
       conversationId: conversation._id,
@@ -148,7 +159,7 @@ async function triggerAIReply({
     conversation.recentMessage = newMessage._id;
     await Promise.all([newMessage.save(), conversation.save()]);
 
-    // Send via WhatsApp
+    // ─── 5. Send via WhatsApp ─────────────────────────────────────────────
     const msgData = {
       channel: "whatsapp",
       to: lead.phone,
@@ -169,7 +180,7 @@ async function triggerAIReply({
     }
     await newMessage.save();
 
-    // Emit to staff UI so they see the AI reply in real time
+    // ─── 6. Emit to staff UI ──────────────────────────────────────────────
     const populatedMessage = await Message.findById(newMessage._id)
       .populate("recipientId", "name email phone")
       .populate("provider", "name label email phone");

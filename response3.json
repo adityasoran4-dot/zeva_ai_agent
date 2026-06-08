@@ -3,8 +3,15 @@
     "services": [
         {
             "_id": "6a21938e153027071f2b37a8",
-            "clinicId": "68909b31faa98f63e97e3d1b",
-            "departmentId": "698ae2ceeb9e90fef02868a5",
+            "clinicId": {
+                "_id": "68909b31faa98f63e97e3d1b",
+                "name": "Sarthak's Clinic",
+                "address": "new delhi amrit udhyan"
+            },
+            "departmentId": {
+                "_id": "698ae2ceeb9e90fef02868a5",
+                "name": "Beauty"
+            },
             "name": "Face PRP",
             "serviceSlug": "face-prp",
             "price": 149,
@@ -18,8 +25,15 @@
         },
         {
             "_id": "6a11c5123a0d55d72e65eadb",
-            "clinicId": "68909b31faa98f63e97e3d1b",
-            "departmentId": "6999c3d2495feb9e1daa4dd0",
+            "clinicId": {
+                "_id": "68909b31faa98f63e97e3d1b",
+                "name": "Sarthak's Clinic",
+                "address": "new delhi amrit udhyan"
+            },
+            "departmentId": {
+                "_id": "6999c3d2495feb9e1daa4dd0",
+                "name": "Dental test"
+            },
             "name": "Root canal Hirb",
             "serviceSlug": "root-canal-hirb",
             "price": 1000,
@@ -33,8 +47,15 @@
         },
         {
             "_id": "6a11c4e33a0d55d72e65d9f6",
-            "clinicId": "68909b31faa98f63e97e3d1b",
-            "departmentId": "6999c3d2495feb9e1daa4dd0",
+            "clinicId": {
+                "_id": "68909b31faa98f63e97e3d1b",
+                "name": "Sarthak's Clinic",
+                "address": "new delhi amrit udhyan"
+            },
+            "departmentId": {
+                "_id": "6999c3d2495feb9e1daa4dd0",
+                "name": "Dental test"
+            },
             "name": "Root Canal Aprana",
             "serviceSlug": "root-canal-aprana",
             "price": 700,
@@ -48,8 +69,15 @@
         },
         {
             "_id": "6a0b1651ebf17d23919b6b8b",
-            "clinicId": "68909b31faa98f63e97e3d1b",
-            "departmentId": "69aeddca89d07a1fcd547bf3",
+            "clinicId": {
+                "_id": "68909b31faa98f63e97e3d1b",
+                "name": "Sarthak's Clinic",
+                "address": "new delhi amrit udhyan"
+            },
+            "departmentId": {
+                "_id": "69aeddca89d07a1fcd547bf3",
+                "name": "Ayurveda"
+            },
             "name": "asdasdasdasdasd",
             "serviceSlug": "asdasdasdasdasd",
             "price": 300,
@@ -63,8 +91,15 @@
         },
         {
             "_id": "6a0824a1fb270a17449c2fee",
-            "clinicId": "68909b31faa98f63e97e3d1b",
-            "departmentId": "6999c3d2495feb9e1daa4dd0",
+            "clinicId": {
+                "_id": "68909b31faa98f63e97e3d1b",
+                "name": "Sarthak's Clinic",
+                "address": "new delhi amrit udhyan"
+            },
+            "departmentId": {
+                "_id": "6999c3d2495feb9e1daa4dd0",
+                "name": "Dental test"
+            },
             "name": "hypo",
             "serviceSlug": "hypo",
             "price": 200,
@@ -78,8 +113,15 @@
         },
         {
             "_id": "6a0809749d3077a6eaa3e5b3",
-            "clinicId": "68909b31faa98f63e97e3d1b",
-            "departmentId": "69e9cf3b6bcb2e8de9f223d5",
+            "clinicId": {
+                "_id": "68909b31faa98f63e97e3d1b",
+                "name": "Sarthak's Clinic",
+                "address": "new delhi amrit udhyan"
+            },
+            "departmentId": {
+                "_id": "69e9cf3b6bcb2e8de9f223d5",
+                "name": "Anniversary 2026"
+            },
             "name": "New ABC",
             "serviceSlug": "new-abc",
             "price": 5000,
@@ -93,8 +135,15 @@
         },
         {
             "_id": "69e9cf4b6bcb2e8de9f224b9",
-            "clinicId": "68909b31faa98f63e97e3d1b",
-            "departmentId": "69e9cf3b6bcb2e8de9f223d5",
+            "clinicId": {
+                "_id": "68909b31faa98f63e97e3d1b",
+                "name": "Sarthak's Clinic",
+                "address": "new delhi amrit udhyan"
+            },
+            "departmentId": {
+                "_id": "69e9cf3b6bcb2e8de9f223d5",
+                "name": "Anniversary 2026"
+            },
             "name": "Physiotherapy 60 mins",
             "serviceSlug": "physiotherapy-60-mins",
             "price": 199,
@@ -108,8 +157,15 @@
         },
         {
             "_id": "69e7719987aa81bd42d21bce",
-            "clinicId": "68909b31faa98f63e97e3d1b",
-            "departmentId": "69aeddca89d07a1fcd547bf3",
+            "clinicId": {
+                "_id": "68909b31faa98f63e97e3d1b",
+                "name": "Sarthak's Clinic",
+                "address": "new delhi amrit udhyan"
+            },
+            "departmentId": {
+                "_id": "69aeddca89d07a1fcd547bf3",
+                "name": "Ayurveda"
+            },
             "name": "SKIN CARE",
             "serviceSlug": "skin-care",
             "price": 100,
@@ -123,8 +179,15 @@
         },
         {
             "_id": "69e225e6e4ffb2d712a4c056",
-            "clinicId": "68909b31faa98f63e97e3d1b",
-            "departmentId": "6999c3d2495feb9e1daa4dd0",
+            "clinicId": {
+                "_id": "68909b31faa98f63e97e3d1b",
+                "name": "Sarthak's Clinic",
+                "address": "new delhi amrit udhyan"
+            },
+            "departmentId": {
+                "_id": "6999c3d2495feb9e1daa4dd0",
+                "name": "Dental test"
+            },
             "name": "Facial",
             "serviceSlug": "facial",
             "price": 100,
@@ -138,8 +201,15 @@
         },
         {
             "_id": "69da54bf2dac578b2133a01a",
-            "clinicId": "68909b31faa98f63e97e3d1b",
-            "departmentId": "69aeddca89d07a1fcd547bf3",
+            "clinicId": {
+                "_id": "68909b31faa98f63e97e3d1b",
+                "name": "Sarthak's Clinic",
+                "address": "new delhi amrit udhyan"
+            },
+            "departmentId": {
+                "_id": "69aeddca89d07a1fcd547bf3",
+                "name": "Ayurveda"
+            },
             "name": "ayurveda",
             "serviceSlug": "ayurveda",
             "price": 600,
@@ -153,8 +223,15 @@
         },
         {
             "_id": "69d1f4c12dac578b21812d18",
-            "clinicId": "68909b31faa98f63e97e3d1b",
-            "departmentId": "6999c3d2495feb9e1daa4dd0",
+            "clinicId": {
+                "_id": "68909b31faa98f63e97e3d1b",
+                "name": "Sarthak's Clinic",
+                "address": "new delhi amrit udhyan"
+            },
+            "departmentId": {
+                "_id": "6999c3d2495feb9e1daa4dd0",
+                "name": "Dental test"
+            },
             "name": "GLUTA",
             "serviceSlug": "gluta",
             "price": 500,
@@ -168,8 +245,15 @@
         },
         {
             "_id": "69d1f4a02dac578b21812c8e",
-            "clinicId": "68909b31faa98f63e97e3d1b",
-            "departmentId": "6999c3d2495feb9e1daa4dd0",
+            "clinicId": {
+                "_id": "68909b31faa98f63e97e3d1b",
+                "name": "Sarthak's Clinic",
+                "address": "new delhi amrit udhyan"
+            },
+            "departmentId": {
+                "_id": "6999c3d2495feb9e1daa4dd0",
+                "name": "Dental test"
+            },
             "name": "micronideeling",
             "serviceSlug": "micronideeling",
             "price": 1200,
@@ -183,8 +267,15 @@
         },
         {
             "_id": "69d1f4802dac578b21812c4f",
-            "clinicId": "68909b31faa98f63e97e3d1b",
-            "departmentId": "6999c3d2495feb9e1daa4dd0",
+            "clinicId": {
+                "_id": "68909b31faa98f63e97e3d1b",
+                "name": "Sarthak's Clinic",
+                "address": "new delhi amrit udhyan"
+            },
+            "departmentId": {
+                "_id": "6999c3d2495feb9e1daa4dd0",
+                "name": "Dental test"
+            },
             "name": "scaling polishing",
             "serviceSlug": "scaling-polishing",
             "price": 500,
@@ -198,8 +289,15 @@
         },
         {
             "_id": "69ba4b4dbc9f9ccea2f80c48",
-            "clinicId": "68909b31faa98f63e97e3d1b",
-            "departmentId": "69ba4ac7bc9f9ccea2f80a83",
+            "clinicId": {
+                "_id": "68909b31faa98f63e97e3d1b",
+                "name": "Sarthak's Clinic",
+                "address": "new delhi amrit udhyan"
+            },
+            "departmentId": {
+                "_id": "69ba4ac7bc9f9ccea2f80a83",
+                "name": "Product"
+            },
             "name": "Serum",
             "serviceSlug": "serum",
             "price": 400,
@@ -213,8 +311,15 @@
         },
         {
             "_id": "69aff1bb89d07a1fcd64d94e",
-            "clinicId": "68909b31faa98f63e97e3d1b",
-            "departmentId": "698ae2ceeb9e90fef02868a5",
+            "clinicId": {
+                "_id": "68909b31faa98f63e97e3d1b",
+                "name": "Sarthak's Clinic",
+                "address": "new delhi amrit udhyan"
+            },
+            "departmentId": {
+                "_id": "698ae2ceeb9e90fef02868a5",
+                "name": "Beauty"
+            },
             "name": "Beared Laser removal",
             "serviceSlug": "beared-laser-removal",
             "price": 200,
@@ -228,8 +333,15 @@
         },
         {
             "_id": "69aff1ab89d07a1fcd64d8b0",
-            "clinicId": "68909b31faa98f63e97e3d1b",
-            "departmentId": "698ae2ceeb9e90fef02868a5",
+            "clinicId": {
+                "_id": "68909b31faa98f63e97e3d1b",
+                "name": "Sarthak's Clinic",
+                "address": "new delhi amrit udhyan"
+            },
+            "departmentId": {
+                "_id": "698ae2ceeb9e90fef02868a5",
+                "name": "Beauty"
+            },
             "name": "OXYGENeo",
             "serviceSlug": "oxygeneo",
             "price": 1000,
@@ -243,8 +355,15 @@
         },
         {
             "_id": "69aff19989d07a1fcd64d461",
-            "clinicId": "68909b31faa98f63e97e3d1b",
-            "departmentId": "698ae2ceeb9e90fef02868a5",
+            "clinicId": {
+                "_id": "68909b31faa98f63e97e3d1b",
+                "name": "Sarthak's Clinic",
+                "address": "new delhi amrit udhyan"
+            },
+            "departmentId": {
+                "_id": "698ae2ceeb9e90fef02868a5",
+                "name": "Beauty"
+            },
             "name": "PRP",
             "serviceSlug": "prp",
             "price": 300,
@@ -258,8 +377,15 @@
         },
         {
             "_id": "69aff18f89d07a1fcd64d3c8",
-            "clinicId": "68909b31faa98f63e97e3d1b",
-            "departmentId": "698ae2ceeb9e90fef02868a5",
+            "clinicId": {
+                "_id": "68909b31faa98f63e97e3d1b",
+                "name": "Sarthak's Clinic",
+                "address": "new delhi amrit udhyan"
+            },
+            "departmentId": {
+                "_id": "698ae2ceeb9e90fef02868a5",
+                "name": "Beauty"
+            },
             "name": "Exosome",
             "serviceSlug": "exosome",
             "price": 1500,
@@ -273,8 +399,15 @@
         },
         {
             "_id": "69aee9ef89d07a1fcd593474",
-            "clinicId": "68909b31faa98f63e97e3d1b",
-            "departmentId": "698ae2ceeb9e90fef02868a5",
+            "clinicId": {
+                "_id": "68909b31faa98f63e97e3d1b",
+                "name": "Sarthak's Clinic",
+                "address": "new delhi amrit udhyan"
+            },
+            "departmentId": {
+                "_id": "698ae2ceeb9e90fef02868a5",
+                "name": "Beauty"
+            },
             "name": "Body Fillers",
             "serviceSlug": "body-fillers",
             "price": 20000,
@@ -288,8 +421,15 @@
         },
         {
             "_id": "69aee90c89d07a1fcd587640",
-            "clinicId": "68909b31faa98f63e97e3d1b",
-            "departmentId": "698ae2ceeb9e90fef02868a5",
+            "clinicId": {
+                "_id": "68909b31faa98f63e97e3d1b",
+                "name": "Sarthak's Clinic",
+                "address": "new delhi amrit udhyan"
+            },
+            "departmentId": {
+                "_id": "698ae2ceeb9e90fef02868a5",
+                "name": "Beauty"
+            },
             "name": "LIP FILLER",
             "serviceSlug": "lip-filler",
             "price": 10000,
@@ -303,8 +443,15 @@
         },
         {
             "_id": "69aedde989d07a1fcd5498b1",
-            "clinicId": "68909b31faa98f63e97e3d1b",
-            "departmentId": "69aeddca89d07a1fcd547bf3",
+            "clinicId": {
+                "_id": "68909b31faa98f63e97e3d1b",
+                "name": "Sarthak's Clinic",
+                "address": "new delhi amrit udhyan"
+            },
+            "departmentId": {
+                "_id": "69aeddca89d07a1fcd547bf3",
+                "name": "Ayurveda"
+            },
             "name": "Abhyangam",
             "serviceSlug": "abhyangam",
             "price": 200,
@@ -318,8 +465,15 @@
         },
         {
             "_id": "69aed93489d07a1fcd50f2fe",
-            "clinicId": "68909b31faa98f63e97e3d1b",
-            "departmentId": "698ae2ceeb9e90fef02868a5",
+            "clinicId": {
+                "_id": "68909b31faa98f63e97e3d1b",
+                "name": "Sarthak's Clinic",
+                "address": "new delhi amrit udhyan"
+            },
+            "departmentId": {
+                "_id": "698ae2ceeb9e90fef02868a5",
+                "name": "Beauty"
+            },
             "name": "Butt Fillers",
             "serviceSlug": "butt-fillers",
             "price": 4000,
@@ -333,8 +487,15 @@
         },
         {
             "_id": "69ae9e3682a65fb927c0dcf1",
-            "clinicId": "68909b31faa98f63e97e3d1b",
-            "departmentId": "6984547ff17d83c0369963bf",
+            "clinicId": {
+                "_id": "68909b31faa98f63e97e3d1b",
+                "name": "Sarthak's Clinic",
+                "address": "new delhi amrit udhyan"
+            },
+            "departmentId": {
+                "_id": "6984547ff17d83c0369963bf",
+                "name": "Dept2"
+            },
             "name": "filler",
             "serviceSlug": "filler",
             "price": 7899,
@@ -348,8 +509,15 @@
         },
         {
             "_id": "69abfd48f1856d8c479f38e6",
-            "clinicId": "68909b31faa98f63e97e3d1b",
-            "departmentId": "698ae2ceeb9e90fef02868a5",
+            "clinicId": {
+                "_id": "68909b31faa98f63e97e3d1b",
+                "name": "Sarthak's Clinic",
+                "address": "new delhi amrit udhyan"
+            },
+            "departmentId": {
+                "_id": "698ae2ceeb9e90fef02868a5",
+                "name": "Beauty"
+            },
             "name": "Filler",
             "serviceSlug": "filler",
             "price": 1000,
@@ -363,8 +531,15 @@
         },
         {
             "_id": "69a1a6bb3bdd16949546749a",
-            "clinicId": "68909b31faa98f63e97e3d1b",
-            "departmentId": "698ae2ceeb9e90fef02868a5",
+            "clinicId": {
+                "_id": "68909b31faa98f63e97e3d1b",
+                "name": "Sarthak's Clinic",
+                "address": "new delhi amrit udhyan"
+            },
+            "departmentId": {
+                "_id": "698ae2ceeb9e90fef02868a5",
+                "name": "Beauty"
+            },
             "name": "Hydra Facial",
             "serviceSlug": "hydra-facial",
             "price": 200,
@@ -378,8 +553,15 @@
         },
         {
             "_id": "699ff915ed68c7d776bc3d29",
-            "clinicId": "68909b31faa98f63e97e3d1b",
-            "departmentId": "6999c3d2495feb9e1daa4dd0",
+            "clinicId": {
+                "_id": "68909b31faa98f63e97e3d1b",
+                "name": "Sarthak's Clinic",
+                "address": "new delhi amrit udhyan"
+            },
+            "departmentId": {
+                "_id": "6999c3d2495feb9e1daa4dd0",
+                "name": "Dental test"
+            },
             "name": "NEW1",
             "serviceSlug": "new1",
             "price": 500,
@@ -393,8 +575,15 @@
         },
         {
             "_id": "699ff915ed68c7d776bc3d28",
-            "clinicId": "68909b31faa98f63e97e3d1b",
-            "departmentId": "6999c3d2495feb9e1daa4dd0",
+            "clinicId": {
+                "_id": "68909b31faa98f63e97e3d1b",
+                "name": "Sarthak's Clinic",
+                "address": "new delhi amrit udhyan"
+            },
+            "departmentId": {
+                "_id": "6999c3d2495feb9e1daa4dd0",
+                "name": "Dental test"
+            },
             "name": "NEW",
             "serviceSlug": "new",
             "price": 500,
@@ -408,7 +597,11 @@
         },
         {
             "_id": "699c44f5e47e7a6cbcf24654",
-            "clinicId": "68909b31faa98f63e97e3d1b",
+            "clinicId": {
+                "_id": "68909b31faa98f63e97e3d1b",
+                "name": "Sarthak's Clinic",
+                "address": "new delhi amrit udhyan"
+            },
             "name": "Root canal",
             "serviceSlug": "root-canal",
             "price": 500,
@@ -421,7 +614,11 @@
         },
         {
             "_id": "699425aa0bfb1971e55ad8b8",
-            "clinicId": "68909b31faa98f63e97e3d1b",
+            "clinicId": {
+                "_id": "68909b31faa98f63e97e3d1b",
+                "name": "Sarthak's Clinic",
+                "address": "new delhi amrit udhyan"
+            },
             "name": "New service",
             "serviceSlug": "new-service",
             "price": 560,
@@ -434,7 +631,11 @@
         },
         {
             "_id": "698ae31feb9e90fef02868b4",
-            "clinicId": "68909b31faa98f63e97e3d1b",
+            "clinicId": {
+                "_id": "68909b31faa98f63e97e3d1b",
+                "name": "Sarthak's Clinic",
+                "address": "new delhi amrit udhyan"
+            },
             "name": "Hydrafacial",
             "serviceSlug": "hydrafacial",
             "price": 200,
@@ -447,7 +648,11 @@
         },
         {
             "_id": "697c4a01599ce93e29db5a6b",
-            "clinicId": "68909b31faa98f63e97e3d1b",
+            "clinicId": {
+                "_id": "68909b31faa98f63e97e3d1b",
+                "name": "Sarthak's Clinic",
+                "address": "new delhi amrit udhyan"
+            },
             "name": "pakcgae sessionss",
             "serviceSlug": "pakcgae-sessionss",
             "price": 3000,

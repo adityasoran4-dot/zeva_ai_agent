@@ -19,7 +19,7 @@ export default async function handler(req, res) {
 
   try {
     const user = await User.findOne({ email });
-    console.log('user', user);
+    console.log("user", user);
 
     if (!user || user.role !== "clinic") {
       return res
@@ -37,7 +37,7 @@ export default async function handler(req, res) {
     if (!clinic || !clinic.isApproved) {
       return res.status(403).json({ message: "Clinic not approved by admin." });
     }
-    console.log('clinic details', clinic);
+    console.log("clinic details", clinic);
 
     // 🔍 Check 30-day trial period (only for new users with registeredAt field)
     // Legacy users (registeredAt is null) are exempt from trial restriction
@@ -45,7 +45,7 @@ export default async function handler(req, res) {
     let hoursRemaining = 999; // Large number for legacy users
     let minutesRemaining = 0;
     let trialEndDate = null;
-    
+
     if (clinic.registeredAt) {
       // New user - apply 30-day trial logic
       const accountCreatedAt = clinic.registeredAt;
@@ -54,20 +54,26 @@ export default async function handler(req, res) {
       trialEndDate.setDate(trialEndDate.getDate() + 30); // 30 days trial
 
       isTrialExpired = currentDate > trialEndDate;
-      hoursRemaining = Math.max(0, Math.ceil((trialEndDate - currentDate) / (1000 * 60 * 60)));
-      minutesRemaining = Math.max(0, Math.floor((trialEndDate - currentDate) / (1000 * 60)) % 60);
-      
-      console.log('Trial Status (NEW USER):', {
+      hoursRemaining = Math.max(
+        0,
+        Math.ceil((trialEndDate - currentDate) / (1000 * 60 * 60)),
+      );
+      minutesRemaining = Math.max(
+        0,
+        Math.floor((trialEndDate - currentDate) / (1000 * 60)) % 60,
+      );
+
+      console.log("Trial Status (NEW USER):", {
         registeredAt: accountCreatedAt,
         trialEndDate,
         currentDate,
         isTrialExpired,
         hoursRemaining,
-        minutesRemaining
+        minutesRemaining,
       });
     } else {
       // Legacy user - no trial restriction
-      console.log('Legacy user - no trial restriction applied');
+      console.log("Legacy user - no trial restriction applied");
     }
 
     // 🔍 Debug: Ensure JWT_SECRET is properly set
@@ -84,9 +90,23 @@ export default async function handler(req, res) {
         email: user.email,
       },
       jwtSecret,
-      { expiresIn: "1d" }
+      { expiresIn: "1d" },
     );
-    console.log('token', token);
+    try {
+      await fetch(`http://localhost:8000/store-token`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Internal-Secret": process.env.INTERNAL_SECRET,
+        },
+        body: JSON.stringify({
+          clinicId: clinic._id.toString(),
+          token: token,
+        }),
+      });
+    } catch (err) {
+      console.error("Failed to push token to AI backend:", err);
+    }
 
     return res.status(200).json({
       message: "Login successful",
@@ -101,9 +121,11 @@ export default async function handler(req, res) {
         hoursRemaining: hoursRemaining,
         minutesRemaining: minutesRemaining,
         trialEndDate: trialEndDate ? trialEndDate.toISOString() : null,
-        accountCreatedAt: clinic.registeredAt ? clinic.registeredAt.toISOString() : null,
-        isLegacyUser: !clinic.registeredAt // Flag to indicate legacy user
-      }
+        accountCreatedAt: clinic.registeredAt
+          ? clinic.registeredAt.toISOString()
+          : null,
+        isLegacyUser: !clinic.registeredAt, // Flag to indicate legacy user
+      },
     });
   } catch (err) {
     console.error("Login error:", err);
