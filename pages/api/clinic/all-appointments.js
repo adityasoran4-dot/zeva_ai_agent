@@ -118,6 +118,7 @@ export default async function handler(req, res) {
       const {
         search,
         emrNumber,
+        patientNumber,
         fromDate,
         toDate,
         doctorId,
@@ -258,6 +259,7 @@ export default async function handler(req, res) {
           { firstName: { $regex: search, $options: "i" } },
           { lastName: { $regex: search, $options: "i" } },
           { mobileNumber: { $regex: search, $options: "i" } },
+          { mobileNumber: search },
         ];
 
         // If we found patient IDs from hex search, add them to patient query
@@ -269,7 +271,10 @@ export default async function handler(req, res) {
       if (emrNumber) {
         patientQuery.emrNumber = { $regex: emrNumber, $options: "i" };
       }
-
+      if (patientNumber) {
+        const cleaned = patientNumber.replace(/^\+/, "");
+        patientQuery.mobileNumber = { $regex: cleaned, $options: "i" };
+      }
       // Build the final query
       const queryConditions = [];
 

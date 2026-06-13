@@ -6,9 +6,10 @@ import redis
 import logging
 
 logger = logging.getLogger(__name__)
-APPOINTMENT_CACHE_TTL = 120                
+APPOINTMENT_CACHE_TTL = 120
 
-async def find_lead_id(conversation_id:str,clinicToken:str):
+
+async def find_lead_id(conversation_id: str, clinicToken: str):
     headers = get_header(clinicToken)
 
     async with httpx.AsyncClient() as client:
@@ -36,19 +37,16 @@ async def find_lead_id(conversation_id:str,clinicToken:str):
 
                 page += 1
 
-            return {
-                "Status": "Error",
-                "Message": "No leadId found in any page."
-            }
+            return {"Status": "Error", "Message": "No leadId found in any page."}
 
         except Exception as e:
             return {
                 "Status": "Error",
-                "Message": f"Failed to fetch booking details: {e}"
+                "Message": f"Failed to fetch booking details: {e}",
             }
 
 
-async def find_patient_id(leadId:str,clinicToken:str):
+async def find_patient_number(leadId: str, clinicToken: str):
     headers = get_header(clinicToken)
 
     async with httpx.AsyncClient() as client:
@@ -67,15 +65,14 @@ async def find_patient_id(leadId:str,clinicToken:str):
                 for d in data["leads"]:
                     if d["_id"] == leadId:
                         print("FOUND LEAD")
-                        print(d)
-                        patient_id = d.get("patientId")
+                        patient_number = d.get("phone")
 
-                        if patient_id:
-                            return {"patientId": patient_id}
+                        if patient_number:
+                            return {"patient_number": patient_number}
                         else:
                             return {
                                 "Status": "Error",
-                                "Message": "There are no bookings yet."
+                                "Message": "There are no bookings yet.",
                             }
 
                 if not data["pagination"]["hasMore"]:
@@ -83,47 +80,51 @@ async def find_patient_id(leadId:str,clinicToken:str):
 
                 page += 1
 
-            return {
-                "Status": "Error",
-                "Message": "No Lead Id Found"
-            }
+            return {"Status": "Error", "Message": "No Lead Id Found"}
 
         except Exception as e:
             return {
                 "Status": "Error",
-                "Message": f"Failed to fetch booking details: {e}"
+                "Message": f"Failed to fetch booking details: {e}",
             }
+
 
 def extract_appointment_details(appointment: dict) -> dict:
     return {
-        "_id":           appointment.get("_id"),
-        "patientName":   appointment.get("patientName"),
+        "_id": appointment.get("_id"),
+        "patientName": appointment.get("patientName"),
         "patientNumber": appointment.get("patientNumber"),
-        "doctorName":    appointment.get("doctorName"),
-        "serviceNames":  appointment.get("serviceNames", []),
-        "status":        appointment.get("status"),
-        "startDate":     appointment.get("startDate"),
-        "fromTime":      appointment.get("fromTime"),
-        "toTime":        appointment.get("toTime"),
+        "doctorName": appointment.get("doctorName"),
+        "treatment_names": appointment.get("serviceNames", []),
+        "status": appointment.get("status"),
+        "startDate": appointment.get("startDate"),
+        "fromTime": appointment.get("fromTime"),
+        "toTime": appointment.get("toTime"),
     }
+
+
 async def find_latest_appointment(conversation_id: str, clinicToken: str):
     headers = get_header(clinicToken)
 
     # Step 1: Get lead ID
-    lead_result = await find_lead_id(conversation_id=conversation_id, clinicToken=clinicToken)
+    lead_result = await find_lead_id(
+        conversation_id=conversation_id, clinicToken=clinicToken
+    )
     if "Status" in lead_result and lead_result["Status"] == "Error":
         return lead_result  # Bubble up: "No leadId found" etc.
 
     # Step 2: Get patient ID
-    patient_result = await find_patient_id(leadId=lead_result["leadId"], clinicToken=clinicToken)
+    patient_result = await find_patient_number(
+        leadId=lead_result["leadId"], clinicToken=clinicToken
+    )
     if "Status" in patient_result and patient_result["Status"] == "Error":
         return patient_result  # Bubble up: "There are no bookings yet." etc.
 
-    patientId = patient_result["patientId"]
+    patientNumber = patient_result["patient_number"]
 
     url = (
         f"http://localhost:3000/api/clinic/all-appointments"
-        f"?page=1&limit=50&patientId={patientId}"
+        f"?page=1&limit=50&patientNumber={patientNumber}"
     )
 
     def parse_date(appt: dict) -> datetime:
@@ -137,6 +138,7 @@ async def find_latest_appointment(conversation_id: str, clinicToken: str):
             resp = await client.get(url, headers=headers)
             resp.raise_for_status()
             data = resp.json()
+            print(data)
 
             appointments = data.get("appointments", [])
             if not appointments:
@@ -146,25 +148,29 @@ async def find_latest_appointment(conversation_id: str, clinicToken: str):
             return {
                 "apt_details": extract_appointment_details(latest_apt),
                 "existing": latest_apt,
-                "all_apt":appointments
+                "all_apt": appointments,
             }
 
         except httpx.HTTPStatusError as e:
             return {
                 "Status": "Error",
-                "Message": f"API returned {e.response.status_code}: {e.response.text}"
+                "Message": f"API returned {e.response.status_code}: {e.response.text}",
             }
         except Exception as e:
             return {
                 "Status": "Error",
-                "Message": f"Failed to fetch appointment details: {e}"
+                "Message": f"Failed to fetch appointment details: {e}",
             }
 
 
-async def reschedule_apt(conversation_id: str, clinicToken: str, startDate: str, fromTime: str):
+async def reschedule_apt(
+    conversation_id: str, clinicToken: str, startDate: str, fromTime: str
+):
     headers = get_header(clinicToken)
 
-    apt = await find_latest_appointment(conversation_id=conversation_id, clinicToken=clinicToken)
+    apt = await find_latest_appointment(
+        conversation_id=conversation_id, clinicToken=clinicToken
+    )
     print(apt)
     # Check for any error bubbled up from lead/patient/appointment lookup
     if "Status" in apt and apt["Status"] == "Error":
@@ -173,15 +179,22 @@ async def reschedule_apt(conversation_id: str, clinicToken: str, startDate: str,
     existing = apt["existing"]
     apt_id = existing["_id"]
 
-    toTime = (datetime.strptime(fromTime, "%H:%M") + timedelta(minutes=20)).strftime("%H:%M")
+    toTime = (datetime.strptime(fromTime, "%H:%M") + timedelta(minutes=20)).strftime(
+        "%H:%M"
+    )
     try:
-        converted_date = datetime.strptime(startDate, "%d-%m-%Y").strftime("%Y-%m-%dT00:00:00.000Z")
+        converted_date = datetime.strptime(startDate, "%d-%m-%Y").strftime(
+            "%Y-%m-%dT00:00:00.000Z"
+        )
     except ValueError:
-        return {"Status": "Error", "Message": f"Invalid date format received: {startDate}"}
-    
+        return {
+            "Status": "Error",
+            "Message": f"Invalid date format received: {startDate}",
+        }
+
     print(existing["fromTime"])
 
-    existing["startDate"] = converted_date 
+    existing["startDate"] = converted_date
     existing["fromTime"] = fromTime
     existing["toTime"] = toTime
     existing["status"] = "Rescheduled"
@@ -196,7 +209,7 @@ async def reschedule_apt(conversation_id: str, clinicToken: str, startDate: str,
                 f"http://localhost:3000/api/clinic/update-appointment/{apt_id}",
                 json=existing,
                 headers=headers,
-                timeout=10.0
+                timeout=10.0,
             )
             print(put_resp)
         put_data = put_resp.json()

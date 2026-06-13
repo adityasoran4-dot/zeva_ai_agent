@@ -53,6 +53,29 @@ function parseMarkdownTable(
 }
 
 // ─── Content detectors ────────────────────────────────────────────────────────
+const SCHEDULER_LINK_TOKEN = "🔗 SCHEDULER_LINK:";
+
+const hasSchedulerLink = (c: string) => c.includes(SCHEDULER_LINK_TOKEN);
+
+function extractSchedulerLink(c: string): { text: string; link: string } {
+  const idx = c.indexOf(SCHEDULER_LINK_TOKEN);
+
+  const text = c.slice(0, idx).trim();
+
+  const raw = c
+    .slice(idx + SCHEDULER_LINK_TOKEN.length)
+    .trim()
+    .split("\n")[0]
+    .trim();
+
+  // Markdown link: [Text](URL)
+  const markdownMatch = raw.match(/\[[^\]]+\]\((https?:\/\/[^)]+)\)/);
+
+  const link = markdownMatch ? markdownMatch[1] : raw;
+
+  return { text, link };
+}
+
 const isBookingConfirmation = (c: string) =>
   c.includes("Treatment") &&
   c.includes("Doctor") &&
@@ -61,9 +84,12 @@ const isBookingConfirmation = (c: string) =>
   (c.toLowerCase().includes("confirm") ||
     c.toLowerCase().includes("summary") ||
     c.toLowerCase().includes("appointment"));
-// ✅ Replace your current isDateTimePicker with this
+
 const isDateTimePicker = (c: string) =>
   c.toLowerCase().includes("please select a new date and time");
+const isTimings = (c: string) =>
+  c.includes("TIMINGS_START") && c.includes("TIMINGS_END");
+
 const isRescheduleConfirmation = (c: string) =>
   (c.includes("Original Date") || c.includes("New Date")) &&
   (c.toLowerCase().includes("reschedule") ||
@@ -79,15 +105,22 @@ const isErrorBanner = (c: string) =>
   c.toLowerCase().includes("didn't go through") ||
   c.toLowerCase().includes("didn't go through") ||
   c.toLowerCase().includes("failed");
+// ─── Detectors ────────────────────────────────────────────────────────────────
+const isServicesSummary = (c: string) =>
+  c.includes("SERVICES_SUMMARY_START") && c.includes("SERVICES_SUMMARY_END");
 
+const isServicesDetail = (c: string) =>
+  c.includes("SERVICES_DETAIL_START") && c.includes("SERVICES_DETAIL_END");
 const isDoctorList = (c: string) =>
-  (c.toLowerCase().includes("doctor") || c.toLowerCase().includes("dr.")) &&
-  (c.includes("—") || c.includes("-")) &&
-  (c.toLowerCase().includes("dentistry") ||
-    c.toLowerCase().includes("orthodontic") ||
-    c.toLowerCase().includes("cosmetic") ||
-    c.toLowerCase().includes("specialist") ||
-    c.toLowerCase().includes("available"));
+  (c.toLowerCase().includes("doctor") ||
+    c.toLowerCase().includes("dr.") ||
+    c.toLowerCase().includes("available for")) &&
+  (c.includes("—") || c.includes(" - ")) &&
+  (c.includes("- ") || c.includes("* ")) &&
+  c.includes("DOCTORS_LIST_START") &&
+  c.includes("DOCTORS_LIST_END") &&
+  !isBookingConfirmation(c) &&
+  !isRescheduleConfirmation(c);
 
 const isFaqAnswer = (c: string) =>
   (c.includes("**Clinic") ||
@@ -99,8 +132,9 @@ const isFaqAnswer = (c: string) =>
     c.toLowerCase().includes("insurance")) &&
   !isBookingConfirmation(c) &&
   !isRescheduleConfirmation(c) &&
-  !isDateTimePicker(c); 
-
+  !isDateTimePicker(c) &&
+  !isServicesSummary(c) && // ← add these two
+  !isServicesDetail(c);
 
 // ─── Doctor avatar colors ─────────────────────────────────────────────────────
 const avatarPalette = [
@@ -141,6 +175,783 @@ function faqIcon(title: string) {
     return <Phone size={15} />;
   return <ChevronRight size={15} />;
 }
+
+// ─── Markdown Components (defined first — referenced by BookingLinkCard below) ─
+const MarkdownComponents: React.ComponentProps<
+  typeof ReactMarkdown
+>["components"] = {
+  h1: ({ children }) => (
+    <h1
+      style={{
+        fontSize: 14,
+        fontWeight: 700,
+        color: "#e0e7ff",
+        margin: "10px 0 5px",
+      }}
+    >
+      {children}
+    </h1>
+  ),
+  h2: ({ children }) => (
+    <h2
+      style={{
+        fontSize: 13,
+        fontWeight: 700,
+        color: "#c7d2fe",
+        margin: "8px 0 4px",
+      }}
+    >
+      {children}
+    </h2>
+  ),
+  h3: ({ children }) => (
+    <h3
+      style={{
+        fontSize: 12,
+        fontWeight: 700,
+        color: "#a5b4fc",
+        margin: "6px 0 3px",
+        textTransform: "uppercase",
+        letterSpacing: "0.5px",
+      }}
+    >
+      {children}
+    </h3>
+  ),
+  p: ({ children }) => (
+    <p
+      style={{
+        margin: "0 0 5px",
+        fontSize: 13,
+        lineHeight: 1.65,
+        color: "#cbd5e1",
+      }}
+    >
+      {children}
+    </p>
+  ),
+  strong: ({ children }) => (
+    <strong style={{ fontWeight: 700, color: "#e0e7ff" }}>{children}</strong>
+  ),
+  hr: () => (
+    <hr
+      style={{
+        border: "none",
+        borderTop: "1px solid rgba(255,255,255,0.08)",
+        margin: "8px 0",
+      }}
+    />
+  ),
+  ul: ({ children }) => (
+    <ul style={{ margin: "4px 0 6px", paddingLeft: 0, listStyle: "none" }}>
+      {children}
+    </ul>
+  ),
+  ol: ({ children }) => (
+    <ol style={{ margin: "4px 0 6px", paddingLeft: 18 }}>{children}</ol>
+  ),
+  li: ({ children }) => (
+    <li
+      style={{
+        display: "flex",
+        alignItems: "flex-start",
+        gap: 7,
+        marginBottom: 4,
+        fontSize: 13,
+        color: "#94a3b8",
+        lineHeight: 1.6,
+      }}
+    >
+      <span
+        style={{
+          flexShrink: 0,
+          marginTop: 6,
+          width: 5,
+          height: 5,
+          borderRadius: "50%",
+          background: "#6366f1",
+          display: "inline-block",
+        }}
+      />
+      <span>{children}</span>
+    </li>
+  ),
+  table: ({ children }) => (
+    <div style={{ overflowX: "auto", margin: "6px 0" }}>
+      <table
+        style={{
+          width: "100%",
+          borderCollapse: "collapse",
+          fontSize: 12,
+          border: "1px solid rgba(99,102,241,0.2)",
+          borderRadius: 8,
+          overflow: "hidden",
+        }}
+      >
+        {children}
+      </table>
+    </div>
+  ),
+  thead: ({ children }) => (
+    <thead style={{ background: "rgba(99,102,241,0.12)" }}>{children}</thead>
+  ),
+  tbody: ({ children }) => <tbody>{children}</tbody>,
+  tr: ({ children }) => (
+    <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+      {children}
+    </tr>
+  ),
+  th: ({ children }) => (
+    <th
+      style={{
+        padding: "7px 10px",
+        textAlign: "left",
+        fontWeight: 700,
+        fontSize: 10,
+        color: "#818cf8",
+        textTransform: "uppercase",
+        letterSpacing: "0.5px",
+      }}
+    >
+      {children}
+    </th>
+  ),
+  td: ({ children }) => (
+    <td
+      style={{
+        padding: "7px 10px",
+        color: "#cbd5e1",
+        fontSize: 12,
+        lineHeight: 1.5,
+      }}
+    >
+      {children}
+    </td>
+  ),
+  blockquote: ({ children }) => (
+    <div
+      style={{
+        background: "rgba(56,189,248,0.06)",
+        borderLeft: "3px solid #38bdf8",
+        borderRadius: "0 8px 8px 0",
+        padding: "7px 12px",
+        margin: "5px 0",
+        color: "#7dd3fc",
+        fontSize: 12,
+      }}
+    >
+      {children}
+    </div>
+  ),
+  code: ({ children, className }: any) => {
+    const isBlock = className?.includes("language-");
+    return isBlock ? (
+      <pre
+        style={{
+          background: "#020617",
+          color: "#e2e8f0",
+          borderRadius: 8,
+          padding: "9px 12px",
+          fontSize: 11,
+          overflowX: "auto",
+          margin: "5px 0",
+          border: "1px solid rgba(255,255,255,0.06)",
+        }}
+      >
+        <code>{children}</code>
+      </pre>
+    ) : (
+      <code
+        style={{
+          background: "rgba(124,58,237,0.15)",
+          color: "#c4b5fd",
+          fontSize: 12,
+          padding: "1px 5px",
+          borderRadius: 4,
+        }}
+      >
+        {children}
+      </code>
+    );
+  },
+};
+
+// ─── SERVICES SUMMARY CARD ────────────────────────────────────────────────────
+const ServicesSummaryCard: React.FC<{
+  content: string;
+  onSend: (msg: string) => void;
+}> = ({ content, onSend }) => {
+  const start = content.indexOf("SERVICES_SUMMARY_START");
+  const end = content.indexOf("SERVICES_SUMMARY_END");
+  const inner = content
+    .slice(start + "SERVICES_SUMMARY_START".length, end)
+    .trim();
+
+  const deptColors = [
+    {
+      bg: "rgba(99,102,241,0.08)",
+      border: "rgba(99,102,241,0.2)",
+      color: "#818cf8",
+    },
+    {
+      bg: "rgba(16,185,129,0.08)",
+      border: "rgba(16,185,129,0.2)",
+      color: "#34d399",
+    },
+    {
+      bg: "rgba(245,158,11,0.08)",
+      border: "rgba(245,158,11,0.2)",
+      color: "#fbbf24",
+    },
+    {
+      bg: "rgba(236,72,153,0.08)",
+      border: "rgba(236,72,153,0.2)",
+      color: "#f472b6",
+    },
+    {
+      bg: "rgba(56,189,248,0.08)",
+      border: "rgba(56,189,248,0.2)",
+      color: "#38bdf8",
+    },
+    {
+      bg: "rgba(167,139,250,0.08)",
+      border: "rgba(167,139,250,0.2)",
+      color: "#a78bfa",
+    },
+  ];
+
+  const departments: { name: string; count: number }[] = [];
+  inner.split("\n").forEach((line) => {
+    const match = line.match(/^-\s*(.+?)\s*\|\s*(\d+)/);
+    if (match)
+      departments.push({ name: match[1].trim(), count: parseInt(match[2]) });
+  });
+
+  return (
+    <div
+      style={{
+        borderRadius: 16,
+        overflow: "hidden",
+        border: "1px solid rgba(99,102,241,0.2)",
+        background: "#0f0f23",
+      }}
+    >
+      {/* Header */}
+      <div
+        style={{
+          background: "linear-gradient(135deg, #1e1b4b, #312e81)",
+          padding: "14px 16px",
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+        }}
+      >
+        <div
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: 10,
+            background: "rgba(129,140,248,0.2)",
+            border: "1px solid rgba(129,140,248,0.3)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Stethoscope size={15} color="#a5b4fc" />
+        </div>
+        <div>
+          <p
+            style={{
+              margin: 0,
+              fontSize: 12,
+              fontWeight: 700,
+              color: "#e0e7ff",
+              textTransform: "uppercase",
+              letterSpacing: "0.5px",
+            }}
+          >
+            Our Services
+          </p>
+          <p
+            style={{ margin: 0, fontSize: 10, color: "rgba(165,180,252,0.7)" }}
+          >
+            {departments.reduce((a, d) => a + d.count, 0)} treatments across{" "}
+            {departments.length} departments
+          </p>
+        </div>
+      </div>
+
+      {/* Department tiles */}
+      <div
+        style={{
+          padding: 12,
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: 8,
+          background: "#0f0f23",
+        }}
+      >
+        {departments.map((dept, i) => {
+          const col = deptColors[i % deptColors.length];
+          return (
+            <button
+              key={i}
+              onClick={() => onSend(`Show me ${dept.name} services`)}
+              style={{
+                padding: "10px 12px",
+                borderRadius: 12,
+                cursor: "pointer",
+                background: col.bg,
+                border: `1px solid ${col.border}`,
+                textAlign: "left",
+                transition: "all 0.15s",
+                fontFamily: "inherit",
+              }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.transform = "translateY(-1px)")
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.transform = "translateY(0)")
+              }
+            >
+              <p
+                style={{
+                  margin: "0 0 4px",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: col.color,
+                }}
+              >
+                {dept.name}
+              </p>
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: 10,
+                  color: "rgba(148,163,184,0.7)",
+                }}
+              >
+                {dept.count} treatment{dept.count !== 1 ? "s" : ""}
+              </p>
+            </button>
+          );
+        })}
+      </div>
+
+      <div
+        style={{
+          padding: "10px 16px 12px",
+          borderTop: "1px solid rgba(99,102,241,0.1)",
+          background: "rgba(99,102,241,0.04)",
+        }}
+      >
+        <p
+          style={{
+            margin: 0,
+            fontSize: 11,
+            color: "rgba(148,163,184,0.6)",
+            textAlign: "center",
+          }}
+        >
+          Tap a department to see treatments & pricing
+        </p>
+      </div>
+    </div>
+  );
+};
+
+// ─── SERVICES DETAIL CARD ─────────────────────────────────────────────────────
+const ServicesDetailCard: React.FC<{ content: string }> = ({ content }) => {
+  const start = content.indexOf("SERVICES_DETAIL_START");
+  const end = content.indexOf("SERVICES_DETAIL_END");
+  const inner = content
+    .slice(start + "SERVICES_DETAIL_START".length, end)
+    .trim();
+  const followUp = content.slice(end + "SERVICES_DETAIL_END".length).trim();
+
+  const lines = inner.split("\n");
+  const headerLine =
+    lines
+      .find((l) => l.includes("**"))
+      ?.replace(/\*\*/g, "")
+      .trim() ?? "Services";
+
+  const services: { name: string; price: string; duration: string }[] = [];
+  lines.forEach((line) => {
+    const match = line.match(
+      /^-\s*(.+?)\s*\|\s*(₹[\d,]+|[\d,]+)\s*\|\s*(\d+\s*min)/i,
+    );
+    if (match)
+      services.push({
+        name: match[1].trim(),
+        price: match[2].trim(),
+        duration: match[3].trim(),
+      });
+  });
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div
+        style={{
+          borderRadius: 16,
+          overflow: "hidden",
+          border: "1px solid rgba(99,102,241,0.2)",
+          background: "#0f0f23",
+        }}
+      >
+        {/* Header */}
+        <div
+          style={{
+            background: "linear-gradient(135deg, #1e1b4b, #312e81)",
+            padding: "12px 16px",
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+          }}
+        >
+          <div
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: 8,
+              background: "rgba(129,140,248,0.2)",
+              border: "1px solid rgba(129,140,248,0.3)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Stethoscope size={13} color="#a5b4fc" />
+          </div>
+          <p
+            style={{
+              margin: 0,
+              fontSize: 12,
+              fontWeight: 700,
+              color: "#e0e7ff",
+              textTransform: "uppercase",
+              letterSpacing: "0.5px",
+            }}
+          >
+            {headerLine}
+          </p>
+        </div>
+
+        {/* Column headers */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr auto auto",
+            padding: "8px 14px",
+            gap: 12,
+            borderBottom: "1px solid rgba(255,255,255,0.06)",
+            background: "rgba(99,102,241,0.06)",
+          }}
+        >
+          {["Treatment", "Price", "Duration"].map((h) => (
+            <span
+              key={h}
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                color: "#818cf8",
+                textTransform: "uppercase",
+                letterSpacing: "0.5px",
+              }}
+            >
+              {h}
+            </span>
+          ))}
+        </div>
+
+        {/* Rows */}
+        {services.map((svc, i) => (
+          <div
+            key={i}
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr auto auto",
+              padding: "10px 14px",
+              gap: 12,
+              alignItems: "center",
+              borderBottom:
+                i < services.length - 1
+                  ? "1px solid rgba(255,255,255,0.04)"
+                  : "none",
+              background:
+                i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.02)",
+            }}
+          >
+            <span style={{ fontSize: 12, color: "#e2e8f0", fontWeight: 500 }}>
+              {svc.name}
+            </span>
+            <span
+              style={{
+                fontSize: 12,
+                color: "#34d399",
+                fontWeight: 700,
+                whiteSpace: "nowrap",
+              }}
+            >
+              {svc.price.startsWith("₹") ? svc.price : `₹${svc.price}`}
+            </span>
+            <span
+              style={{
+                fontSize: 11,
+                color: "rgba(148,163,184,0.7)",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {svc.duration}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {followUp && (
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm]}
+          components={MarkdownComponents}
+        >
+          {followUp}
+        </ReactMarkdown>
+      )}
+    </div>
+  );
+};
+
+// ─── BOOKING LINK CARD ────────────────────────────────────────────────────────
+// NOTE: defined AFTER MarkdownComponents to avoid reference-before-definition
+const BookingLinkCard: React.FC<{ content: string }> = ({ content }) => {
+  const { text, link } = extractSchedulerLink(content);
+  const [hovered, setHovered] = useState(false);
+  console.log("Extracted Link:", link);
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      {/* Regular message text rendered as markdown */}
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={MarkdownComponents}
+      >
+        {text}
+      </ReactMarkdown>
+
+      {/* Scheduler link pill */}
+      <a
+        href={link}
+        target="_blank"
+        rel="noopener noreferrer"
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 10,
+          padding: "11px 14px",
+          borderRadius: 13,
+          background: hovered
+            ? "linear-gradient(135deg, rgba(99,102,241,0.22), rgba(139,92,246,0.18))"
+            : "linear-gradient(135deg, rgba(99,102,241,0.12), rgba(139,92,246,0.10))",
+          border: "1px solid rgba(99,102,241,0.3)",
+          textDecoration: "none",
+          transition: "background 0.15s, transform 0.15s",
+          transform: hovered ? "translateY(-1px)" : "translateY(0)",
+          cursor: "pointer",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 9,
+              background: "rgba(99,102,241,0.2)",
+              border: "1px solid rgba(129,140,248,0.35)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+            }}
+          >
+            <Calendar size={14} color="#a5b4fc" />
+          </div>
+          <div>
+            <p
+              style={{
+                margin: 0,
+                fontSize: 12,
+                fontWeight: 700,
+                color: "#e0e7ff",
+              }}
+            >
+              Book Online
+            </p>
+            <p
+              style={{
+                margin: 0,
+                fontSize: 10,
+                color: "rgba(165,180,252,0.6)",
+                marginTop: 1,
+              }}
+            >
+              Opens the booking scheduler
+            </p>
+          </div>
+        </div>
+        <ChevronRight size={14} color="rgba(165,180,252,0.5)" />
+      </a>
+    </div>
+  );
+};
+const TimingsCard: React.FC<{ content: string }> = ({ content }) => {
+  const start = content.indexOf("TIMINGS_START");
+  const end = content.indexOf("TIMINGS_END");
+  const inner = content.slice(start + "TIMINGS_START".length, end).trim();
+  const followUp = content.slice(end + "TIMINGS_END".length).trim();
+
+  const rows: { day: string; status: string; opens: string; closes: string }[] =
+    [];
+  inner.split("\n").forEach((line) => {
+    const cells = line
+      .split("|")
+      .map((c) => c.trim())
+      .filter(Boolean);
+    if (cells.length < 2) return;
+    if (cells[0].toLowerCase() === "day") return; // skip header
+    if (/^[-:]+$/.test(cells[0])) return; // skip separator
+    rows.push({
+      day: cells[0],
+      status: cells[1],
+      opens: cells[2] ?? "-",
+      closes: cells[3] ?? "-",
+    });
+  });
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div
+        style={{
+          borderRadius: 16,
+          overflow: "hidden",
+          border: "1px solid rgba(99,102,241,0.2)",
+          background: "#0f0f23",
+        }}
+      >
+        <div
+          style={{
+            background: "linear-gradient(135deg, #1e1b4b, #312e81)",
+            padding: "12px 16px",
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+          }}
+        >
+          <div
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: 8,
+              background: "rgba(129,140,248,0.2)",
+              border: "1px solid rgba(129,140,248,0.3)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Clock size={13} color="#a5b4fc" />
+          </div>
+          <p
+            style={{
+              margin: 0,
+              fontSize: 12,
+              fontWeight: 700,
+              color: "#e0e7ff",
+              textTransform: "uppercase",
+              letterSpacing: "0.5px",
+            }}
+          >
+            Clinic Hours
+          </p>
+        </div>
+
+        {rows.map((row, i) => {
+          const isOpen = row.status.toLowerCase() === "open";
+          return (
+            <div
+              key={i}
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr auto auto auto",
+                padding: "9px 14px",
+                gap: 10,
+                alignItems: "center",
+                borderBottom:
+                  i < rows.length - 1
+                    ? "1px solid rgba(255,255,255,0.04)"
+                    : "none",
+                background:
+                  i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.02)",
+              }}
+            >
+              <span style={{ fontSize: 12, color: "#e2e8f0", fontWeight: 600 }}>
+                {row.day}
+              </span>
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  padding: "2px 8px",
+                  borderRadius: 8,
+                  background: isOpen
+                    ? "rgba(52,211,153,0.15)"
+                    : "rgba(239,68,68,0.15)",
+                  border: isOpen
+                    ? "1px solid rgba(52,211,153,0.3)"
+                    : "1px solid rgba(239,68,68,0.3)",
+                  color: isOpen ? "#34d399" : "#f87171",
+                  textAlign: "center",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {isOpen ? "OPEN" : "CLOSED"}
+              </span>
+              <span
+                style={{
+                  fontSize: 11,
+                  color: "rgba(148,163,184,0.85)",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {isOpen ? row.opens : "–"}
+              </span>
+              <span
+                style={{
+                  fontSize: 11,
+                  color: "rgba(148,163,184,0.85)",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {isOpen ? row.closes : "–"}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      {followUp && (
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm]}
+          components={MarkdownComponents}
+        >
+          {followUp}
+        </ReactMarkdown>
+      )}
+    </div>
+  );
+};
 
 // ─── BOOKING CONFIRMATION CARD ────────────────────────────────────────────────
 const BookingCard: React.FC<{
@@ -370,14 +1181,25 @@ const BookingCard: React.FC<{
 };
 
 // ─── DATE TIME PICKER CARD ────────────────────────────────────────────────────
-const DateTimePicker: React.FC<{ onSend: (msg: string) => void }> = ({ onSend }) => {
+const DateTimePicker: React.FC<{ onSend: (msg: string) => void }> = ({
+  onSend,
+}) => {
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedTime, setSelectedTime] = useState("");
 
   const timeSlots = [
-    "09:00 AM", "09:30 AM", "10:00 AM", "10:30 AM",
-    "11:00 AM", "11:30 AM", "12:00 PM", "02:00 PM",
-    "02:30 PM", "03:00 PM", "03:30 PM", "04:00 PM",
+    "09:00 AM",
+    "09:30 AM",
+    "10:00 AM",
+    "10:30 AM",
+    "11:00 AM",
+    "11:30 AM",
+    "12:00 PM",
+    "02:00 PM",
+    "02:30 PM",
+    "03:00 PM",
+    "03:30 PM",
+    "04:00 PM",
   ];
 
   const today = new Date().toISOString().split("T")[0];
@@ -385,47 +1207,78 @@ const DateTimePicker: React.FC<{ onSend: (msg: string) => void }> = ({ onSend })
   const handleConfirm = () => {
     if (!selectedDate || !selectedTime) return;
     const formatted = new Date(selectedDate).toLocaleDateString("en-US", {
-      weekday: "long", year: "numeric", month: "long", day: "numeric",
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
     });
     onSend(`Reschedule to ${formatted} at ${selectedTime}`);
   };
 
   return (
-    <div style={{
-      borderRadius: 16,
-      overflow: "hidden",
-      border: "1px solid rgba(99,102,241,0.25)",
-      background: "#0f0f23",
-    }}>
-      {/* Header */}
-      <div style={{
-        background: "linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #3730a3 100%)",
-        padding: "14px 16px",
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        position: "relative",
+    <div
+      style={{
+        borderRadius: 16,
         overflow: "hidden",
-      }}>
-        <div style={{
-          position: "absolute", right: -20, top: -20,
-          width: 80, height: 80, borderRadius: "50%",
-          background: "rgba(129,140,248,0.15)",
-        }} />
-        <div style={{
-          width: 32, height: 32, borderRadius: 10,
-          background: "rgba(129,140,248,0.2)",
-          border: "1px solid rgba(129,140,248,0.3)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          zIndex: 1,
-        }}>
+        border: "1px solid rgba(99,102,241,0.25)",
+        background: "#0f0f23",
+      }}
+    >
+      {/* Header */}
+      <div
+        style={{
+          background:
+            "linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #3730a3 100%)",
+          padding: "14px 16px",
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          position: "relative",
+          overflow: "hidden",
+        }}
+      >
+        <div
+          style={{
+            position: "absolute",
+            right: -20,
+            top: -20,
+            width: 80,
+            height: 80,
+            borderRadius: "50%",
+            background: "rgba(129,140,248,0.15)",
+          }}
+        />
+        <div
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: 10,
+            background: "rgba(129,140,248,0.2)",
+            border: "1px solid rgba(129,140,248,0.3)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1,
+          }}
+        >
           <Calendar size={15} color="#a5b4fc" />
         </div>
         <div style={{ zIndex: 1 }}>
-          <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: "#e0e7ff", letterSpacing: "0.5px", textTransform: "uppercase" }}>
+          <p
+            style={{
+              margin: 0,
+              fontSize: 12,
+              fontWeight: 700,
+              color: "#e0e7ff",
+              letterSpacing: "0.5px",
+              textTransform: "uppercase",
+            }}
+          >
             Pick New Date & Time
           </p>
-          <p style={{ margin: 0, fontSize: 10, color: "rgba(165,180,252,0.7)" }}>
+          <p
+            style={{ margin: 0, fontSize: 10, color: "rgba(165,180,252,0.7)" }}
+          >
             Choose your preferred slot
           </p>
         </div>
@@ -433,7 +1286,16 @@ const DateTimePicker: React.FC<{ onSend: (msg: string) => void }> = ({ onSend })
 
       {/* Date picker */}
       <div style={{ padding: "14px 16px 0", background: "#0f0f23" }}>
-        <p style={{ margin: "0 0 7px", fontSize: 10, fontWeight: 700, color: "rgba(148,163,184,0.7)", textTransform: "uppercase", letterSpacing: "0.6px" }}>
+        <p
+          style={{
+            margin: "0 0 7px",
+            fontSize: 10,
+            fontWeight: 700,
+            color: "rgba(148,163,184,0.7)",
+            textTransform: "uppercase",
+            letterSpacing: "0.6px",
+          }}
+        >
           Select Date
         </p>
         <input
@@ -459,10 +1321,25 @@ const DateTimePicker: React.FC<{ onSend: (msg: string) => void }> = ({ onSend })
 
       {/* Time slots */}
       <div style={{ padding: "14px 16px", background: "#0f0f23" }}>
-        <p style={{ margin: "0 0 8px", fontSize: 10, fontWeight: 700, color: "rgba(148,163,184,0.7)", textTransform: "uppercase", letterSpacing: "0.6px" }}>
+        <p
+          style={{
+            margin: "0 0 8px",
+            fontSize: 10,
+            fontWeight: 700,
+            color: "rgba(148,163,184,0.7)",
+            textTransform: "uppercase",
+            letterSpacing: "0.6px",
+          }}
+        >
           Select Time
         </p>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3, 1fr)",
+            gap: 6,
+          }}
+        >
           {timeSlots.map((slot) => (
             <button
               key={slot}
@@ -470,13 +1347,16 @@ const DateTimePicker: React.FC<{ onSend: (msg: string) => void }> = ({ onSend })
               style={{
                 padding: "7px 4px",
                 borderRadius: 8,
-                border: selectedTime === slot
-                  ? "1px solid rgba(99,102,241,0.7)"
-                  : "1px solid rgba(255,255,255,0.07)",
-                background: selectedTime === slot
-                  ? "rgba(99,102,241,0.25)"
-                  : "rgba(255,255,255,0.03)",
-                color: selectedTime === slot ? "#a5b4fc" : "rgba(148,163,184,0.7)",
+                border:
+                  selectedTime === slot
+                    ? "1px solid rgba(99,102,241,0.7)"
+                    : "1px solid rgba(255,255,255,0.07)",
+                background:
+                  selectedTime === slot
+                    ? "rgba(99,102,241,0.25)"
+                    : "rgba(255,255,255,0.03)",
+                color:
+                  selectedTime === slot ? "#a5b4fc" : "rgba(148,163,184,0.7)",
                 fontSize: 11,
                 fontWeight: selectedTime === slot ? 700 : 500,
                 cursor: "pointer",
@@ -491,11 +1371,13 @@ const DateTimePicker: React.FC<{ onSend: (msg: string) => void }> = ({ onSend })
       </div>
 
       {/* Footer */}
-      <div style={{
-        background: "rgba(99,102,241,0.06)",
-        borderTop: "1px solid rgba(99,102,241,0.15)",
-        padding: "12px 16px",
-      }}>
+      <div
+        style={{
+          background: "rgba(99,102,241,0.06)",
+          borderTop: "1px solid rgba(99,102,241,0.15)",
+          padding: "12px 16px",
+        }}
+      >
         <button
           onClick={handleConfirm}
           disabled={!selectedDate || !selectedTime}
@@ -508,23 +1390,29 @@ const DateTimePicker: React.FC<{ onSend: (msg: string) => void }> = ({ onSend })
             fontWeight: 700,
             fontSize: 12,
             letterSpacing: "0.3px",
-            background: !selectedDate || !selectedTime
-              ? "rgba(99,102,241,0.15)"
-              : "linear-gradient(135deg, #4f46e5, #7c3aed)",
-            color: !selectedDate || !selectedTime ? "rgba(165,180,252,0.4)" : "#fff",
-            boxShadow: !selectedDate || !selectedTime
-              ? "none"
-              : "0 4px 14px rgba(99,102,241,0.4)",
+            background:
+              !selectedDate || !selectedTime
+                ? "rgba(99,102,241,0.15)"
+                : "linear-gradient(135deg, #4f46e5, #7c3aed)",
+            color:
+              !selectedDate || !selectedTime ? "rgba(165,180,252,0.4)" : "#fff",
+            boxShadow:
+              !selectedDate || !selectedTime
+                ? "none"
+                : "0 4px 14px rgba(99,102,241,0.4)",
             transition: "all 0.2s",
             fontFamily: "inherit",
           }}
         >
-          {!selectedDate || !selectedTime ? "Select date and time to continue" : "→ Confirm New Slot"}
+          {!selectedDate || !selectedTime
+            ? "Select date and time to continue"
+            : "→ Confirm New Slot"}
         </button>
       </div>
     </div>
   );
 };
+
 // ─── RESCHEDULE TIMELINE CARD ─────────────────────────────────────────────────
 const RescheduleCard: React.FC<{
   content: string;
@@ -628,7 +1516,7 @@ const RescheduleCard: React.FC<{
 
       {/* Timeline */}
       <div style={{ padding: "20px 20px 16px", background: "#0f0f23" }}>
-        {/* Old */}
+        {/* Old slot */}
         <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
           <div
             style={{
@@ -696,7 +1584,7 @@ const RescheduleCard: React.FC<{
           </div>
         </div>
 
-        {/* New */}
+        {/* New slot */}
         <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
           <div
             style={{
@@ -950,176 +1838,169 @@ const ErrorBanner: React.FC<{ content: string }> = ({ content }) => (
 
 // ─── DOCTOR GRID ──────────────────────────────────────────────────────────────
 const DoctorGrid: React.FC<{ content: string }> = ({ content }) => {
-  const lines = content.split("\n");
+  // Extract only the content between sentinel tags
+  const start = content.indexOf("DOCTORS_LIST_START");
+  const end = content.indexOf("DOCTORS_LIST_END");
+  const inner = content.slice(start + "DOCTORS_LIST_START".length, end).trim();
+
+  // Extract the follow-up text after DOCTORS_LIST_END
+  const followUp = content.slice(end + "DOCTORS_LIST_END".length).trim();
+
+  const lines = inner.split("\n");
   const doctors: { name: string; specialty: string }[] = [];
 
   lines.forEach((line) => {
     const cleaned = line.replace(/\*\*/g, "").trim();
-    const match = cleaned.match(/[-•]\s*(Dr\.?\s*\w+)\s*[—–-]+?\s*(.+)/);
-    if (match)
-      doctors.push({ name: match[1].trim(), specialty: match[2].trim() });
+    const match = cleaned.match(/^-\s*(.+?)\s*—\s*(.+)/);
+    if (match) {
+      doctors.push({
+        name: match[1].trim(),
+        specialty: match[2].trim(),
+      });
+    }
   });
 
   const headerLine =
     lines
-      .find(
-        (l) =>
-          l.toLowerCase().includes("doctor") ||
-          l.toLowerCase().includes("available"),
-      )
+      .find((l) => l.includes("**"))
       ?.replace(/\*\*/g, "")
-      .trim() ?? "Our Doctors";
+      .trim() ?? "Available Doctors";
 
-  if (doctors.length === 0) {
-    return (
-      <div
-        style={{
-          padding: "10px 14px",
-          background: "#0f0f23",
-          borderRadius: 14,
-          border: "1px solid rgba(99,102,241,0.2)",
-        }}
-      >
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
-      </div>
-    );
-  }
-
+  // rest of your existing DoctorGrid JSX unchanged,
+  // just add followUp text below the grid:
   return (
-    <div
-      style={{
-        borderRadius: 14,
-        overflow: "hidden",
-        border: "1px solid rgba(99,102,241,0.2)",
-        background: "#0f0f23",
-      }}
-    >
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <div
         style={{
-          background: "linear-gradient(135deg, #1e1b4b, #312e81)",
-          padding: "12px 16px",
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-          position: "relative",
+          borderRadius: 14,
           overflow: "hidden",
+          border: "1px solid rgba(99,102,241,0.2)",
+          background: "#0f0f23",
         }}
       >
+        {/* Header */}
         <div
           style={{
-            position: "absolute",
-            right: -10,
-            top: -10,
-            width: 60,
-            height: 60,
-            borderRadius: "50%",
-            background: "rgba(129,140,248,0.1)",
-          }}
-        />
-        <div
-          style={{
-            width: 28,
-            height: 28,
-            borderRadius: 8,
-            background: "rgba(129,140,248,0.2)",
-            border: "1px solid rgba(129,140,248,0.3)",
+            background: "linear-gradient(135deg, #1e1b4b, #312e81)",
+            padding: "12px 16px",
             display: "flex",
             alignItems: "center",
-            justifyContent: "center",
-            zIndex: 1,
+            gap: 10,
           }}
         >
-          <Stethoscope size={13} color="#a5b4fc" />
+          <div
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: 8,
+              background: "rgba(129,140,248,0.2)",
+              border: "1px solid rgba(129,140,248,0.3)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Stethoscope size={13} color="#a5b4fc" />
+          </div>
+          <p
+            style={{
+              margin: 0,
+              fontSize: 12,
+              fontWeight: 700,
+              color: "#e0e7ff",
+              letterSpacing: "0.5px",
+              textTransform: "uppercase",
+            }}
+          >
+            {headerLine}
+          </p>
         </div>
-        <p
+
+        {/* Doctor grid */}
+        <div
           style={{
-            margin: 0,
-            fontSize: 12,
-            fontWeight: 700,
-            color: "#e0e7ff",
-            letterSpacing: "0.5px",
-            textTransform: "uppercase",
-            zIndex: 1,
+            padding: "12px",
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: 8,
+            background: "#0f0f23",
           }}
         >
-          {headerLine}
-        </p>
-      </div>
-
-      <div
-        style={{
-          padding: "12px",
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: 8,
-          background: "#0f0f23",
-        }}
-      >
-        {doctors.map((doc, i) => {
-          const palette = avatarPalette[i % avatarPalette.length];
-          return (
-            <div
-              key={i}
-              style={{
-                background: "rgba(255,255,255,0.03)",
-                border: "1px solid rgba(255,255,255,0.07)",
-                borderRadius: 12,
-                padding: "10px 12px",
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                transition: "background 0.15s",
-              }}
-            >
+          {doctors.map((doc, i) => {
+            const palette = avatarPalette[i % avatarPalette.length];
+            return (
               <div
+                key={i}
                 style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: "50%",
-                  flexShrink: 0,
-                  background: palette.bg,
-                  color: palette.text,
+                  background: "rgba(255,255,255,0.03)",
+                  border: "1px solid rgba(255,255,255,0.07)",
+                  borderRadius: 12,
+                  padding: "10px 12px",
                   display: "flex",
                   alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 12,
-                  fontWeight: 800,
-                  boxShadow: `0 0 0 2px ${palette.glow}30`,
+                  gap: 10,
                 }}
               >
-                {initials(doc.name)}
-              </div>
-              <div style={{ minWidth: 0 }}>
-                <p
+                <div
                   style={{
-                    margin: "0 0 1px",
+                    width: 36,
+                    height: 36,
+                    borderRadius: "50%",
+                    flexShrink: 0,
+                    background: palette.bg,
+                    color: palette.text,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
                     fontSize: 12,
-                    fontWeight: 700,
-                    color: "#e2e8f0",
-                    whiteSpace: "nowrap",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
+                    fontWeight: 800,
+                    boxShadow: `0 0 0 2px ${palette.glow}30`,
                   }}
                 >
-                  {doc.name}
-                </p>
-                <p
-                  style={{
-                    margin: 0,
-                    fontSize: 10,
-                    color: "rgba(148,163,184,0.7)",
-                    whiteSpace: "nowrap",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                  }}
-                >
-                  {doc.specialty}
-                </p>
+                  {initials(doc.name)}
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <p
+                    style={{
+                      margin: "0 0 1px",
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: "#e2e8f0",
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {doc.name}
+                  </p>
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: 10,
+                      color: "rgba(148,163,184,0.7)",
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {doc.specialty}
+                  </p>
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
+
+      {/* Follow-up question rendered as plain markdown */}
+      {followUp && (
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm]}
+          components={MarkdownComponents}
+        >
+          {followUp}
+        </ReactMarkdown>
+      )}
     </div>
   );
 };
@@ -1398,219 +2279,26 @@ const FaqCard: React.FC<{ content: string }> = ({ content }) => {
   );
 };
 
-// ─── Markdown Components (default for plain messages) ─────────────────────────
-const MarkdownComponents: React.ComponentProps<
-  typeof ReactMarkdown
->["components"] = {
-  h1: ({ children }) => (
-    <h1
-      style={{
-        fontSize: 14,
-        fontWeight: 700,
-        color: "#e0e7ff",
-        margin: "10px 0 5px",
-      }}
-    >
-      {children}
-    </h1>
-  ),
-  h2: ({ children }) => (
-    <h2
-      style={{
-        fontSize: 13,
-        fontWeight: 700,
-        color: "#c7d2fe",
-        margin: "8px 0 4px",
-      }}
-    >
-      {children}
-    </h2>
-  ),
-  h3: ({ children }) => (
-    <h3
-      style={{
-        fontSize: 12,
-        fontWeight: 700,
-        color: "#a5b4fc",
-        margin: "6px 0 3px",
-        textTransform: "uppercase",
-        letterSpacing: "0.5px",
-      }}
-    >
-      {children}
-    </h3>
-  ),
-  p: ({ children }) => (
-    <p
-      style={{
-        margin: "0 0 5px",
-        fontSize: 13,
-        lineHeight: 1.65,
-        color: "#cbd5e1",
-      }}
-    >
-      {children}
-    </p>
-  ),
-  strong: ({ children }) => (
-    <strong style={{ fontWeight: 700, color: "#e0e7ff" }}>{children}</strong>
-  ),
-  hr: () => (
-    <hr
-      style={{
-        border: "none",
-        borderTop: "1px solid rgba(255,255,255,0.08)",
-        margin: "8px 0",
-      }}
-    />
-  ),
-  ul: ({ children }) => (
-    <ul style={{ margin: "4px 0 6px", paddingLeft: 0, listStyle: "none" }}>
-      {children}
-    </ul>
-  ),
-  ol: ({ children }) => (
-    <ol style={{ margin: "4px 0 6px", paddingLeft: 18 }}>{children}</ol>
-  ),
-  li: ({ children }) => (
-    <li
-      style={{
-        display: "flex",
-        alignItems: "flex-start",
-        gap: 7,
-        marginBottom: 4,
-        fontSize: 13,
-        color: "#94a3b8",
-        lineHeight: 1.6,
-      }}
-    >
-      <span
-        style={{
-          flexShrink: 0,
-          marginTop: 6,
-          width: 5,
-          height: 5,
-          borderRadius: "50%",
-          background: "#6366f1",
-          display: "inline-block",
-        }}
-      />
-      <span>{children}</span>
-    </li>
-  ),
-  table: ({ children }) => (
-    <div style={{ overflowX: "auto", margin: "6px 0" }}>
-      <table
-        style={{
-          width: "100%",
-          borderCollapse: "collapse",
-          fontSize: 12,
-          border: "1px solid rgba(99,102,241,0.2)",
-          borderRadius: 8,
-          overflow: "hidden",
-        }}
-      >
-        {children}
-      </table>
-    </div>
-  ),
-  thead: ({ children }) => (
-    <thead style={{ background: "rgba(99,102,241,0.12)" }}>{children}</thead>
-  ),
-  tbody: ({ children }) => <tbody>{children}</tbody>,
-  tr: ({ children }) => (
-    <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-      {children}
-    </tr>
-  ),
-  th: ({ children }) => (
-    <th
-      style={{
-        padding: "7px 10px",
-        textAlign: "left",
-        fontWeight: 700,
-        fontSize: 10,
-        color: "#818cf8",
-        textTransform: "uppercase",
-        letterSpacing: "0.5px",
-      }}
-    >
-      {children}
-    </th>
-  ),
-  td: ({ children }) => (
-    <td
-      style={{
-        padding: "7px 10px",
-        color: "#cbd5e1",
-        fontSize: 12,
-        lineHeight: 1.5,
-      }}
-    >
-      {children}
-    </td>
-  ),
-  blockquote: ({ children }) => (
-    <div
-      style={{
-        background: "rgba(56,189,248,0.06)",
-        borderLeft: "3px solid #38bdf8",
-        borderRadius: "0 8px 8px 0",
-        padding: "7px 12px",
-        margin: "5px 0",
-        color: "#7dd3fc",
-        fontSize: 12,
-      }}
-    >
-      {children}
-    </div>
-  ),
-  code: ({ children, className }: any) => {
-    const isBlock = className?.includes("language-");
-    return isBlock ? (
-      <pre
-        style={{
-          background: "#020617",
-          color: "#e2e8f0",
-          borderRadius: 8,
-          padding: "9px 12px",
-          fontSize: 11,
-          overflowX: "auto",
-          margin: "5px 0",
-          border: "1px solid rgba(255,255,255,0.06)",
-        }}
-      >
-        <code>{children}</code>
-      </pre>
-    ) : (
-      <code
-        style={{
-          background: "rgba(124,58,237,0.15)",
-          color: "#c4b5fd",
-          fontSize: 12,
-          padding: "1px 5px",
-          borderRadius: 4,
-        }}
-      >
-        {children}
-      </code>
-    );
-  },
-};
-
 // ─── Smart renderer ───────────────────────────────────────────────────────────
 const SmartRenderer: React.FC<{
   content: string;
   onSend: (msg: string) => void;
 }> = ({ content, onSend }) => {
-    if (isDateTimePicker(content)) return <DateTimePicker onSend={onSend} />;
-  if (isBookingConfirmation(content) && !isSuccessBanner(content))
-    return <BookingCard content={content} onSend={onSend} />;
-  if (isRescheduleConfirmation(content) && !isSuccessBanner(content))
-    return <RescheduleCard content={content} onSend={onSend} />;
+  // Scheduler link check MUST come first — it can co-exist with other keywords
+  if (hasSchedulerLink(content)) return <BookingLinkCard content={content} />;
+  if (isDateTimePicker(content)) return <DateTimePicker onSend={onSend} />;
   if (isSuccessBanner(content)) return <SuccessBanner content={content} />;
   if (isErrorBanner(content)) return <ErrorBanner content={content} />;
+  if (isServicesSummary(content))
+    return <ServicesSummaryCard content={content} onSend={onSend} />;
+  if (isServicesDetail(content))
+    return <ServicesDetailCard content={content} />;
+  if (isBookingConfirmation(content))
+    return <BookingCard content={content} onSend={onSend} />;
+  if (isRescheduleConfirmation(content))
+    return <RescheduleCard content={content} onSend={onSend} />;
   if (isDoctorList(content)) return <DoctorGrid content={content} />;
+  if (isTimings(content)) return <TimingsCard content={content} />;
   if (isFaqAnswer(content)) return <FaqCard content={content} />;
   return (
     <ReactMarkdown remarkPlugins={[remarkGfm]} components={MarkdownComponents}>
@@ -1634,9 +2322,21 @@ const AiAgentChat: React.FC<AiAgentChatProps> = ({
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [threadId] = useState(() => uuidv4());
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [threadId, setThreadId] = useState(() => uuidv4());
+
+  useEffect(() => {
+    setThreadId(uuidv4());
+    setMessages([
+      {
+        role: "assistant",
+        content:
+          "Welcome to **ZEVA Clinic** ✨\n\nI'm KAKA, your appointment agent. I can help you:\n- Book or reschedule an appointment\n- Answer any clinic questions\n\nWhat can I help you with today?",
+      },
+    ]);
+    setInput("");
+  }, [conversationId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -1648,8 +2348,17 @@ const AiAgentChat: React.FC<AiAgentChatProps> = ({
     ta.style.height = "auto";
     ta.style.height = Math.min(ta.scrollHeight, 96) + "px";
   }, [input]);
+  useEffect(() => {
+    setMessages([
+      {
+        role: "assistant",
+        content:
+          "Welcome to **ZEVA Clinic** ✨\n\nI'm KAKA, your appointment agent. I can help you:\n- Book or reschedule an appointment\n- Answer any clinic questions\n\nWhat can I help you with today?",
+      },
+    ]);
+    setInput("");
+  }, [conversationId]);
 
-  // ─── Core send logic (used by both the form and card buttons) ────────────
   const sendMessage = async (text: string) => {
     const trimmed = text.trim();
     if (!trimmed || isLoading) return;
@@ -2134,5 +2843,4 @@ const AiAgentChat: React.FC<AiAgentChatProps> = ({
     </>
   );
 };
-
 export default AiAgentChat;

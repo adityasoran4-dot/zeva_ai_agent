@@ -88,38 +88,6 @@ async def check_doctor(state: AppointmentState):
     }
 
 
-# async def check_room(state: AppointmentState):
-#     header = get_header(state['clinicToken'])
-#     url = "http://localhost:3000/api/clinic/rooms"
-
-#     async with httpx.AsyncClient() as client:
-#         search_room = await client.get(url, headers=header)
-#     data = search_room.json()
-
-#     room_name = state["room_name"].strip().lower()
-
-#     if data["success"] == True:
-#         room = next(
-#             (
-#                 r for r in data["rooms"]
-#                 if r.get("name", "").strip().lower() == room_name
-#             ),
-#             None,
-#         )
-#         if room:
-#             return {
-#                 "roomExists": True,
-#                 "rooms": data,
-#                 "selectedRoomId": room["_id"],
-#             }
-
-#     return {
-#         "roomExists": False,
-#         "rooms": data,
-#         "selectedRoomId": "",
-#     }
-
-
 async def check_treatments(state: AppointmentState):
     header = get_header(state['clinicToken'])
     url = "http://localhost:3000/api/clinic/services"

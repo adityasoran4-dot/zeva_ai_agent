@@ -5,7 +5,7 @@ import { useRouter } from "next/router";
 import axios from "axios";
 import { NextPageWithLayout } from "../../_app";
 import AvatarComponent from "@/components/shared/AvatarComponent";
-import AiAgentChat from "@/components/AIAgentChat";
+import AiAgentChat from "@/components/AiAgentChat";
 import {
   Search,
   Filter,

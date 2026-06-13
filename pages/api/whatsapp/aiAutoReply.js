@@ -51,7 +51,7 @@ export async function scheduleAIReply({
     "reply",
     { conversationId, messageContent, clinicId, providerPhone, customerPhone },
     {
-      delay: 5000,
+      delay: 1000,
       jobId: `ai-${conversationId}`,
       removeOnComplete: true,
       removeOnFail: 100,
@@ -75,7 +75,7 @@ export async function cancelAIReply(conversationId) {
 async function triggerAIReply({
   conversationId,
   messageContent,
-  clinicId, 
+  clinicId,
   providerPhone,
   customerPhone,
 }) {
@@ -127,8 +127,9 @@ async function triggerAIReply({
       body: JSON.stringify({
         messages: messageContent,
         threadId: conversationId,
-        clinicToken: clinicToken, 
+        clinicToken: clinicToken,
         conversation_id: conversationId,
+        channel: "whatsapp",
       }),
     });
 

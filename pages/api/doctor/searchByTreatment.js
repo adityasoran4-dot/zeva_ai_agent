@@ -14,7 +14,9 @@ export default async function handler(req, res) {
   await dbConnect();
 
   if (req.method !== "GET") {
-    return res.status(405).json({ success: false, message: "Method not allowed" });
+    return res
+      .status(405)
+      .json({ success: false, message: "Method not allowed" });
   }
 
   try {
@@ -37,9 +39,18 @@ export default async function handler(req, res) {
         select: "name email phone isApproved declined role",
       })
       .select(
-        "degree experience address location user consultationFee clinicContact timeSlots treatments photos resumeUrl slug slugLocked"
+        "degree experience address location user consultationFee clinicContact timeSlots treatments photos resumeUrl slug slugLocked",
       )
       .lean();
+
+    console.log(
+      doctorProfiles.flatMap((doc) =>
+        (doc.treatments || []).map((t) => ({
+          main: t.mainTreatment,
+          subs: t.subTreatments?.map((s) => s.name),
+        })),
+      ),
+    );
 
     // Filter only registered and available doctors
     const availableDoctors = doctorProfiles.filter((profile) => {
@@ -77,7 +88,7 @@ export default async function handler(req, res) {
     // Process doctors to format photos and other fields
     const formattedDoctors = matchingDoctors.map((doctor) => {
       const user = doctor.user || {};
-      
+
       // Process photos array
       const photos = (doctor.photos || [])
         .map((photo) => {
@@ -136,4 +147,3 @@ export default async function handler(req, res) {
     });
   }
 }
-
