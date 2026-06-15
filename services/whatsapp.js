@@ -264,6 +264,7 @@ export const deleteWhatsappTemplate = async (
 };
 
 // helper for sending typing indicators
+// helper for sending typing indicators
 export const sendWhatsAppTypingIndicator = async (
   phoneNumberId,
   toPhoneNumber,
@@ -290,28 +291,29 @@ export const sendWhatsAppTypingIndicator = async (
       },
     );
     console.log(
-      `Typing indicator ${
-        isTyping ? "started" : "stopped"
-      } for ${toPhoneNumber}`,
+      `Typing indicator ${isTyping ? "started" : "stopped"} for ${toPhoneNumber}`,
     );
   } catch (error) {
-    console.error("Error sending typing indicator: ", error);
-    // Don't throw error for typing indicator failures to not break main flow
+    console.error("Error sending typing indicator: ", error.message); // ← don't log full error object, just message
+    // Don't throw — typing indicator is cosmetic, never break main flow
   }
 };
-
-// main message handler
 export const handleWhatsappSendMessage = async (msgData) => {
   let resData = null;
-  const { credentials, to } = msgData;
+  const { credentials, to, skipTypingIndicator = false } = msgData; // ← destructure flag
   const { accessToken, phoneNumberId } = credentials;
   console.log({ msgData, credentials, accessToken, phoneNumberId });
 
   try {
     let apiUrl = `https://graph.facebook.com/v18.0/${phoneNumberId}/messages`;
     console.log("WhatsApp API URL: ", apiUrl);
-    // 1. Send typing indicator for conversational messages
-    if (msgData.type === "conversational" && !msgData.template) {
+
+    // 1. Send typing indicator — only if not skipped
+    if (
+      msgData.type === "conversational" &&
+      !msgData.template &&
+      !skipTypingIndicator
+    ) {
       await sendWhatsAppTypingIndicator(phoneNumberId, to, accessToken, true);
     }
 
@@ -322,48 +324,38 @@ export const handleWhatsappSendMessage = async (msgData) => {
       to: to,
     };
 
-    // Determine payload based on message type
     if (msgData.type === "reaction") {
-      // Reaction message type
       apiPayload.type = "reaction";
       apiPayload.reaction = {
-        message_id: msgData.reactedMessageId, // The ID of the message being reacted to
-        emoji: msgData.emoji, // Single emoji character like "👍"
+        message_id: msgData.reactedMessageId,
+        emoji: msgData.emoji,
       };
     } else if (msgData.mediaType) {
-      // Media message types
-      apiPayload.type = msgData.mediaType; // 'image', 'audio', 'document', 'video', 'sticker'
+      apiPayload.type = msgData.mediaType;
       apiPayload[msgData.mediaType] = {
         link: msgData.mediaUrl,
-        ...(msgData.caption && { caption: msgData.caption }), // For images/videos
-        ...(msgData.filename && { filename: msgData.filename }), // For documents
+        ...(msgData.caption && { caption: msgData.caption }),
+        ...(msgData.filename && { filename: msgData.filename }),
       };
     } else if (msgData.type === "location") {
-      // Location message
       apiPayload.type = "location";
       apiPayload.location = msgData.location;
     } else if (msgData.type === "contacts") {
-      // Contact message (vCard)
       apiPayload.type = "contacts";
-      apiPayload.contacts = msgData.contacts; // Array of contact objects
+      apiPayload.contacts = msgData.contacts;
     } else if (msgData.type === "interactive") {
-      // Interactive message (buttons, lists)
       apiPayload.type = "interactive";
       apiPayload.interactive = msgData.interactiveData;
     } else if (msgData.template) {
-      // Template message (existing logic, now categorized)
       apiPayload.type = "template";
       apiPayload.template = {
         name: msgData.template,
         language: { code: msgData.language || "en_US" },
       };
-
-      // Add components if they exist
       if (msgData.components && msgData.components.length > 0) {
         apiPayload.template.components = msgData.components;
       }
     } else {
-      // Default text message with formatting support[citation:6]
       apiPayload.type = "text";
       apiPayload.text = {
         preview_url: msgData.previewUrl || false,
@@ -371,7 +363,6 @@ export const handleWhatsappSendMessage = async (msgData) => {
       };
     }
 
-    // Add context for replies
     if (msgData.quotedMessageId) {
       apiPayload.context = {
         message_id: msgData.quotedMessageId,
@@ -393,8 +384,12 @@ export const handleWhatsappSendMessage = async (msgData) => {
       resData = data;
     }
 
-    // 4. Stop typing indicator
-    if (msgData.type === "conversational" && !msgData.template) {
+    // 4. Stop typing indicator — only if not skipped
+    if (
+      msgData.type === "conversational" &&
+      !msgData.template &&
+      !skipTypingIndicator
+    ) {
       await sendWhatsAppTypingIndicator(phoneNumberId, to, accessToken, false);
     }
 

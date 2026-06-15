@@ -7,43 +7,36 @@ import logging
 
 logger = logging.getLogger(__name__)
 APPOINTMENT_CACHE_TTL = 120
+LEAD_CACHE_TTL = 300
 
 
 async def find_lead_id(conversation_id: str, clinicToken: str):
+    cache_key = f"lead_id:{conversation_id}"
+    cached = await get_cache(cache_key)
+    if cached:
+        return cached
+
     headers = get_header(clinicToken)
-
     async with httpx.AsyncClient() as client:
-        try:
-            page = 1
+        page = 1
+        while True:
+            url = (
+                f"http://localhost:3000/api/messages/get-messages/"
+                f"{conversation_id}?page={page}&limit=50"
+            )
+            resp = await client.get(url, headers=headers)
+            data = resp.json()
+            for day in data["data"]:
+                for message in day["messages"]:
+                    if "leadId" in message:
+                        result = {"leadId": message["leadId"]}
+                        await set_cache(cache_key, result, LEAD_CACHE_TTL)
+                        return result
+            if not data["pagination"]["hasMore"]:
+                break
+            page += 1
 
-            while True:
-                url = (
-                    f"http://localhost:3000/api/messages/get-messages/"
-                    f"{conversation_id}?page={page}&limit=50"
-                )
-
-                resp = await client.get(url, headers=headers)
-                data = resp.json()
-
-                # Search all messages on this page
-                for day in data["data"]:
-                    for message in day["messages"]:
-                        if "leadId" in message:
-                            return {"leadId": message["leadId"]}
-
-                # Stop if there are no more pages
-                if not data["pagination"]["hasMore"]:
-                    break
-
-                page += 1
-
-            return {"Status": "Error", "Message": "No leadId found in any page."}
-
-        except Exception as e:
-            return {
-                "Status": "Error",
-                "Message": f"Failed to fetch booking details: {e}",
-            }
+    return {"Status": "Error", "Message": "No leadId found in any page."}
 
 
 async def find_patient_number(leadId: str, clinicToken: str):

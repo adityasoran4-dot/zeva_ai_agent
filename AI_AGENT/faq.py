@@ -6,7 +6,7 @@ from cache import get_cache, set_cache
 from appointment import get_header
 
 logger = logging.getLogger(__name__)
-CACHE_TTL = 120
+CACHE_TTL = 600
 
 # Limit to 5 concurrent requests at a time instead of 26
 SEMAPHORE = asyncio.Semaphore(5)

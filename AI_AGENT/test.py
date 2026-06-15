@@ -1,14 +1,33 @@
-import httpx
+import redis
 
-url = "http://localhost:3000/api/clinic/timings"
+r = redis.Redis(
+    host="127.0.0.1",
+    port=6379,
+    decode_responses=True,
+    protocol=2
+)
 
-token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2ODkwOWIzMGZhYTk4ZjYzZTk3ZTNkMTciLCJyb2xlIjoiY2xpbmljIiwiZW1haWwiOiI0NGR3aXZlZGlzYXJ0aGFrQGdtYWlsLmNvbSIsImlhdCI6MTc4MTMyNTk2OCwiZXhwIjoxNzgxNDEyMzY4fQ.Pv7x9l0NH60d3B-znajPdBXy7p4AIddanspU--3CLPs"
+for key in r.scan_iter("*"):
+    print(f"\n=== {key} ===")
+    print("TYPE:", r.type(key))
 
-headers = {
-    "Authorization": f"Bearer {token}"
-}
+    try:
+        t = r.type(key)
 
-response = httpx.get(url, headers=headers)
+        if t == "string":
+            print(r.get(key))
 
-print(response.status_code)
-print(response.text)
+        elif t == "hash":
+            print(r.hgetall(key))
+
+        elif t == "list":
+            print(r.lrange(key, 0, -1))
+
+        elif t == "set":
+            print(r.smembers(key))
+
+        elif t == "zset":
+            print(r.zrange(key, 0, -1, withscores=True))
+
+    except Exception as e:
+        print("ERROR:", e)
